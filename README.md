@@ -2,5 +2,5 @@
 Junior design team 1337 repository for Sandia National Labs' Python Exodus Project
 
 Team Members:
-Christoffer
-Michael
+Christoffer,
+Michael,
