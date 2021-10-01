@@ -6,5 +6,5 @@ Team Members:
 Christoffer,
 Michael,
 Allen,
-Christopher T,
+Christopher,
 John
