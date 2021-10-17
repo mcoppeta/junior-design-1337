@@ -18,13 +18,9 @@ class Exodus:
             sideset_i['sides'] = self.data[side_key]
             sidesets.append(sideset_i)
 
-    def print_dimensions(self):
-        for dim in self.data.dimensions.values():
-            print(dim)
-
     # prints legacy character array as string
     @staticmethod
-    def print_line(line):
+    def print(line):
         s = ""
         for c in line:
             if str(c) != '--':
@@ -35,4 +31,6 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus('sample-files/disk_out_ref.ex2')
-    print(ex.data)
+    print(ex.data['name_nod_var'])
+    for var in ex.data['name_nod_var']:
+        Exodus.print(var)
