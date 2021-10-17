@@ -4,7 +4,7 @@ import numpy as np
 class Exodus:
 
     def __init__(self, path):
-        self.data = nc.Dataset(path)
+        self.data = nc.Dataset("./bingobongo")
         self.nodal_coord_arr = self.data['coord']
 
         # build sideset array
@@ -17,7 +17,13 @@ class Exodus:
             sideset_i['elements'] = self.data[elem_key]
             sideset_i['sides'] = self.data[side_key]
             sidesets.append(sideset_i)
+        
 
+    def print_dimensions(self):
+        for dim in self.data.dimensions.values():
+            print(dim)
+
+    
     # prints legacy character array as string
     @staticmethod
     def print(line):
