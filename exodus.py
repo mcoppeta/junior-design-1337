@@ -8,7 +8,7 @@ class Exodus:
     def print_dimensions(self):
         for dim in self.data.dimensions.values():
             print(dim)
-
+            
 
 if __name__ == "__main__":
     ex = Exodus('sample-files/can.ex2')
