@@ -4,7 +4,7 @@ import numpy as np
 class Exodus:
 
     def __init__(self, path):
-        self.data = nc.Dataset("./bingobongo")
+        self.data = nc.Dataset(path)
         self.nodal_coord_arr = self.data['coord']
 
         # build sideset array
@@ -36,7 +36,5 @@ class Exodus:
         return s
 
 if __name__ == "__main__":
-    ex = Exodus('sample-files/disk_out_ref.ex2')
-    print(ex.data['name_nod_var'])
-    for var in ex.data['name_nod_var']:
-        Exodus.print(var)
+    ex = Exodus('sample-files/bake.e')    
+    print(ex.data)
