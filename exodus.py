@@ -18,17 +18,13 @@ class Exodus:
             sideset_i['sides'] = self.data[side_key]
             sidesets.append(sideset_i)
 
-
-            
-
-        
-
     def print_dimensions(self):
         for dim in self.data.dimensions.values():
             print(dim)
 
     # prints legacy character array as string
-    def print_line(self, line):
+    @staticmethod
+    def print_line(line):
         s = ""
         for c in line:
             if str(c) != '--':
