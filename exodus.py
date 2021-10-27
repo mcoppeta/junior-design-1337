@@ -17,7 +17,11 @@ class Exodus:
             sideset_i['elements'] = self.data[elem_key]
             sideset_i['sides'] = self.data[side_key]
             sidesets.append(sideset_i)
-        
+
+
+    def close(self):
+        self.data.close()
+
 
     def print_dimensions(self):
         for dim in self.data.dimensions.values():
