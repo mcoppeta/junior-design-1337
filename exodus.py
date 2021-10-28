@@ -18,6 +18,8 @@ class Exodus:
             self.data = nc.Dataset(path, mode, clobber, format=nc_format)
         except FileNotFoundError as fnfe:
             raise FileNotFoundError("file '{}' does not exist".format(path)) from fnfe
+        except PermissionError as pe:
+            raise PermissionError("You do not have access to '{}'".format(path))
         except OSError as ose:
             raise OSError("file '{}' exists, but clobber is set to False".format(path))
         """

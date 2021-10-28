@@ -26,5 +26,7 @@ def test_exodus_init_exceptions(tmp_path, tmpdir):
         exofile = exo.Exodus(tmp_path, 'w', False)
     with pytest.raises(ValueError):
         exofile = exo.Exodus(tmpdir + '/test.exo', 'w', True, "NOTAFORMAT")
+    with pytest.raises(PermissionError):
+        exofile = exo.Exodus(tmp_path, 'w', True)
 
 
