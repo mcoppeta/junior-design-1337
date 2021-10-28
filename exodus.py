@@ -3,8 +3,25 @@ import numpy as np
 
 class Exodus:
 
-    def __init__(self, path):
-        self.data = nc.Dataset(path)
+    __FORMAT_MAP = {'NETCDF4': 'NETCDF4',
+                    'NETCDF4_CLASSIC': 'NETCDF4_CLASSIC',
+                    'NETCDF3_LARGE_MODEL': 'NETCDF3_64BIT_OFFSET',
+                    'NETCDF3_CLASSIC': 'NETCDF3_CLASSIC'}
+
+    def __init__(self, path, mode, clobber=False, format='NETCDF4'):
+        if mode not in ['r', 'w', 'a']:
+            raise ValueError("mode must be 'w', 'r', or 'a', got '{}'".format(mode))
+        if format not in Exodus.__FORMAT_MAP:
+            raise ValueError("invalid file format: '{}'".format(format))
+        nc_format = Exodus.__FORMAT_MAP[format]
+        try:
+            self.data = nc.Dataset(path, mode, clobber, format=nc_format)
+        except FileNotFoundError as fnfe:
+            raise FileNotFoundError("file '{}' does not exist".format(path)) from fnfe
+        except OSError as ose:
+            raise OSError("file '{}' exists, but clobber is set to False".format(path))
+        """
+        # This stuff will currently cause errors if you create a new file because there's nothing to access
         self.nodal_coord_arr = self.data['coord']
 
         # build sideset array
@@ -16,7 +33,7 @@ class Exodus:
             sideset_i = {}
             sideset_i['elements'] = self.data[elem_key]
             sideset_i['sides'] = self.data[side_key]
-            sidesets.append(sideset_i)
+            sidesets.append(sideset_i)"""
 
 
     def close(self):
@@ -39,6 +56,8 @@ class Exodus:
         print(s)
         return s
 
+
 if __name__ == "__main__":
-    ex = Exodus('sample-files/bake.e')    
+    ex = Exodus('sample-files/disk_out_ref.ex2', 'r')
     print(ex.data)
+    ex.close()
