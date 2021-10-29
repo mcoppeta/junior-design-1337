@@ -22,20 +22,6 @@ class Exodus:
             raise PermissionError("You do not have access to '{}'".format(path))
         except OSError as ose:
             raise OSError("file '{}' exists, but clobber is set to False".format(path))
-        """
-        # This stuff will currently cause errors if you create a new file because there's nothing to access
-        self.nodal_coord_arr = self.data['coord']
-
-        # build sideset array
-        num_sidesets = self.data.dimensions['num_side_sets'].size
-        sidesets = []
-        for i in range(1,  num_sidesets + 1): # +1 since side sets index from 1
-            elem_key = 'elem_ss' + str(i)
-            side_key = 'side_ss' + str(i)
-            sideset_i = {}
-            sideset_i['elements'] = self.data[elem_key]
-            sideset_i['sides'] = self.data[side_key]
-            sidesets.append(sideset_i)"""
 
 
     def close(self):
@@ -45,6 +31,19 @@ class Exodus:
     def print_dimensions(self):
         for dim in self.data.dimensions.values():
             print(dim)
+
+    def get_sideset(self, i):
+        elem_key = 'elem_ss' + str(i)
+        side_key = 'side_ss' + str(i)
+        sideset_i = {}
+        sideset_i['elements'] = self.data[elem_key][:]
+        sideset_i['sides'] = self.data[side_key][:]
+        return sideset_i
+
+    def get_nodeset(self, i):
+        key = "node_ns" + str(i)
+        return self.data[key][:]
+
 
     
     # prints legacy character array as string
@@ -62,4 +61,8 @@ class Exodus:
 if __name__ == "__main__":
     ex = Exodus('sample-files/disk_out_ref.ex2', 'r')
     print(ex.data)
+    print(ex.get_nodeset(1))
+    sideset2 = ex.get_sideset(3)
+    print(sideset2['elements'])
+    print(sideset2['sides'])
     ex.close()
