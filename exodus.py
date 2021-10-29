@@ -1,5 +1,5 @@
 import netCDF4 as nc
-import numpy as np
+
 
 class Exodus:
 
@@ -23,10 +23,8 @@ class Exodus:
         except OSError as ose:
             raise OSError("file '{}' exists, but clobber is set to False".format(path))
 
-
     def close(self):
         self.data.close()
-
 
     def print_dimensions(self):
         for dim in self.data.dimensions.values():
@@ -44,8 +42,6 @@ class Exodus:
         key = "node_ns" + str(i)
         return self.data[key]
 
-
-    
     # prints legacy character array as string
     @staticmethod
     def print(line):
@@ -53,7 +49,7 @@ class Exodus:
         for c in line:
             if str(c) != '--':
                 s += str(c)[2]
-        
+
         print(s)
         return s
 
