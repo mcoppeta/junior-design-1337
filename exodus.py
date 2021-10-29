@@ -36,13 +36,13 @@ class Exodus:
         elem_key = 'elem_ss' + str(i)
         side_key = 'side_ss' + str(i)
         sideset_i = {}
-        sideset_i['elements'] = self.data[elem_key][:]
-        sideset_i['sides'] = self.data[side_key][:]
+        sideset_i['elements'] = self.data[elem_key]
+        sideset_i['sides'] = self.data[side_key]
         return sideset_i
 
     def get_nodeset(self, i):
         key = "node_ns" + str(i)
-        return self.data[key][:]
+        return self.data[key]
 
 
     
@@ -59,10 +59,12 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus('sample-files/disk_out_ref.ex2', 'r')
+    ex = Exodus('sample-files/disk_out_ref.ex2', 'a')
     print(ex.data)
-    print(ex.get_nodeset(1))
-    sideset2 = ex.get_sideset(3)
-    print(sideset2['elements'])
-    print(sideset2['sides'])
+    nodeset1 = ex.get_nodeset(1)
+    print(ex.get_nodeset(1)[:])
+
+    sideset2 = ex.get_sideset(2)
+    print(sideset2['elements'][:])
+    print(sideset2['sides'][:])
     ex.close()
