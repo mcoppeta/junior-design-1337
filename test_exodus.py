@@ -1,4 +1,6 @@
 import pytest
+import numpy
+import netCDF4
 import exodus as exo
 
 
@@ -28,5 +30,24 @@ def test_exodus_init_exceptions(tmp_path, tmpdir):
         exofile = exo.Exodus(tmpdir + '/test.exo', 'w', True, "NOTAFORMAT")
     with pytest.raises(PermissionError):
         exofile = exo.Exodus(tmp_path, 'w', True)
+    with pytest.raises(ValueError):
+        exofile = exo.Exodus(tmpdir + '/test2.exo', 'w', True, "NETCDF4", 7)
 
+
+def test_float(tmpdir):
+    exofile = exo.Exodus(tmpdir + '/test.exo', 'w', word_size=4)
+    assert type(exofile.to_float(1.2)) == numpy.single
+    exofile = exo.Exodus(tmpdir + '/test2.exo', 'w', word_size=8)
+    assert type(exofile.to_float(1.2)) == numpy.double
+    exofile.close()
+
+
+def test_parameters():
+    exofile = exo.Exodus('sample-files/disk_out_ref.ex2', 'r')
+    assert exofile.get_parameters()
+    assert exofile.get_title()
+    assert exofile.get_version()
+    assert exofile.get_api_version()
+    assert exofile.word_size()
+    exofile.close()
 
