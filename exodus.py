@@ -117,6 +117,12 @@ class Exodus:
     num_node_sets = property(lambda self: self.data.dimensions['num_node_sets'].size)
     num_side_sets = property(lambda self: self.data.dimensions['num_side_sets'].size)
 
+    def get_dimension(self, name):
+        if name in self.data.dimensions:
+            return self.data.dimensions[name].size
+        else:
+            raise RuntimeError("dimensions '{}' cannot be found!".format(name))
+
     def get_parameter(self, name):
         if name in self.data.ncattrs():
             return self.data.getncattr(name)
