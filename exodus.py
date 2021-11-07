@@ -209,6 +209,18 @@ class Exodus:
         for dim in self.data.dimensions.values():
             print(dim)
 
+    def print_dimension_names(self):
+        for dim in self.data.dimensions:
+            print(dim)
+
+    def print_variables(self):
+        for v in self.data.variables.values():
+            print(v, "\n")
+
+    def print_variable_names(self):
+        for v in self.data.variables:
+            print(v)
+
     def get_sideset(self, i):
         elem_key = 'elem_ss' + str(i)
         side_key = 'side_ss' + str(i)
