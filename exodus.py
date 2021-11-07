@@ -57,6 +57,7 @@ class Exodus:
             self._max_str_length = Exodus._MAX_STR_LENGTH
             self._max_line_length = Exodus._MAX_LINE_LENGTH
 
+
     def to_float(self, n):
         # Convert a number to the floating point type the file is using
         return self._float(n)
@@ -214,7 +215,7 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus('sample-files/cube_1ts_mod.e', 'r')
-    print(ex.info_records)
+    ex = Exodus('sample-files/bake.e', 'r')
+    print(ex.qa_records)
 
     ex.close()
