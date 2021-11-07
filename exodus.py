@@ -9,7 +9,8 @@ class Exodus:
                     'NETCDF3_LARGE_MODEL': 'NETCDF3_64BIT_OFFSET',
                     'NETCDF3_CLASSIC': 'NETCDF3_CLASSIC'}
     # In files, 1 is added to these numbers to allow for C compatibility
-    # Use self._max_str_length and self._max_line_length when modifying the file in case the file has special values
+    # Use self._max_str_length and self._max_line_length when
+    # modifying the file in case the file has special values
     _MAX_STR_LENGTH = 32
     _MAX_LINE_LENGTH = 80
 
@@ -24,11 +25,11 @@ class Exodus:
         nc_format = Exodus._FORMAT_MAP[format]
         try:
             self.data = nc.Dataset(path, mode, clobber, format=nc_format)
-        except FileNotFoundError as fnfe:
-            raise FileNotFoundError("file '{}' does not exist".format(path)) from fnfe
-        except PermissionError as pe:
+        except FileNotFoundError:
+            raise FileNotFoundError("file '{}' does not exist".format(path))
+        except PermissionError:
             raise PermissionError("You do not have access to '{}'".format(path))
-        except OSError as ose:
+        except OSError:
             raise OSError("file '{}' exists, but clobber is set to False".format(path))
 
         # init self._float
@@ -110,12 +111,29 @@ class Exodus:
     def title(self):
         return self.data.getncattr('title')
 
-    num_dim = property(lambda self: self.data.dimensions['num_dim'].size)
-    num_nodes = property(lambda self: self.data.dimensions['num_nodes'].size)
-    num_elem = property(lambda self: self.data.dimensions['num_elem'].size)
-    num_elem_blk = property(lambda self: self.data.dimensions['num_el_blk'].size)
-    num_node_sets = property(lambda self: self.data.dimensions['num_node_sets'].size)
-    num_side_sets = property(lambda self: self.data.dimensions['num_side_sets'].size)
+    @property
+    def num_dim(self):
+        return self.data.dimensions['num_dim'].size
+
+    @property
+    def num_nodes(self):
+        return self.data.dimensions['num_nodes'].size
+
+    @property
+    def num_elem(self):
+        return self.data.dimensions['num_elem'].size
+
+    @property
+    def num_elem_blk(self):
+        return self.data.dimensions['num_el_blk'].size
+
+    @property
+    def num_node_sets(self):
+        return self.data.dimensions['num_node_sets'].size
+
+    @property
+    def num_side_sets(self):
+        return self.data.dimensions['num_side_sets'].size
 
     def get_dimension(self, name):
         if name in self.data.dimensions:
@@ -164,5 +182,6 @@ if __name__ == "__main__":
     ex = Exodus('sample-files/can.ex2', 'r')
     print(ex.data.dimensions)
     print(ex.num_elem)
+    print(ex.parameters)
 
     ex.close()
