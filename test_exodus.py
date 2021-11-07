@@ -44,10 +44,10 @@ def test_float(tmpdir):
 
 def test_parameters():
     exofile = exo.Exodus('sample-files/disk_out_ref.ex2', 'r')
-    assert exofile.get_parameters()
-    assert exofile.get_title()
-    assert exofile.get_version()
-    assert exofile.get_api_version()
-    assert exofile.word_size()
+    assert exofile.parameters
+    assert exofile.title
+    assert exofile.version
+    assert exofile.api_version
+    assert exofile.word_size
     exofile.close()
 
