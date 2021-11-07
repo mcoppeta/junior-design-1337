@@ -161,6 +161,34 @@ class Exodus:
     def num_side_sets(self):
         return self.data.dimensions['num_side_sets'].size
 
+    @property
+    def num_time_steps(self):
+        return self.data['time_whole'].size
+
+    @property
+    def time_values(self):
+        """Returns a list of (float) time values for each time step"""
+        values = []
+        for step in self.time_steps:
+            values.append(self.timeAtStep(step))
+        return values
+
+    @property
+    def time_steps(self):
+        """Returns list of the time steps, 0-indexed"""
+        return [*range(self.num_time_steps)]
+    
+    def timeAtStep(self, step):
+        """Given an integer time step, return the corresponding float time value"""
+        return float(self.data['time_whole'][step].data)
+
+    def stepAtTime(self, time):
+        """Given a float time value, return the corresponding time step"""
+        for index, value in enumerate(self.time_values):
+            if value == time:
+                return index
+        return None
+
     def get_dimension(self, name):
         if name in self.data.dimensions:
             return self.data.dimensions[name].size
