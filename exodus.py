@@ -164,6 +164,7 @@ class Exodus:
             sideset_i['sides'] = self.data[side_key]
         else:
             raise RuntimeError("sideset '{}' cannot be found!".format(i))
+            
         return sideset_i
 
     def get_nodeset(self, i):
