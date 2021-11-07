@@ -158,8 +158,12 @@ class Exodus:
         elem_key = 'elem_ss' + str(i)
         side_key = 'side_ss' + str(i)
         sideset_i = {}
-        sideset_i['elements'] = self.data[elem_key]
-        sideset_i['sides'] = self.data[side_key]
+
+        if elem_key in self.data.variables and side_key in self.data.variables:
+            sideset_i['elements'] = self.data[elem_key]
+            sideset_i['sides'] = self.data[side_key]
+        else:
+            raise RuntimeError("sideset '{}' cannot be found!".format(i))
         return sideset_i
 
     def get_nodeset(self, i):
@@ -179,9 +183,10 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus('sample-files/can.ex2', 'r')
-    print(ex.data.dimensions)
-    print(ex.num_elem)
-    print(ex.parameters)
+    ex = Exodus('sample-files/cube_1ts_mod.e', 'r')
+    for var in ex.data.variables:
+        print(var)
+
+    print('node_ns20' in ex.data.variables)
 
     ex.close()
