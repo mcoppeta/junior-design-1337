@@ -73,6 +73,12 @@ class Exodus:
     def max_line_length(self):
         return self._max_line_length
 
+    ########################################################################
+    ##                                                                    ##
+    ##                  Data File Utilities                               ##
+    ##                                                                    ##
+    ########################################################################
+
     @property
     def parameters(self):
         # Returns a dictionary of global attribute/value pairs. Exodus II calls these parameters
@@ -108,6 +114,10 @@ class Exodus:
         return self.data.getncattr('version')
 
     @property
+    def title(self):
+        return self.data.getncattr('title')
+
+    @property
     def qa_records(self):
         lst = []
         for line in self.data.variables['qa_records'][0]:
@@ -120,10 +130,6 @@ class Exodus:
         for line in self.data.variables['info_records']:
             lst.append(Exodus.lineparse(line))
         return lst
-
-    @property
-    def title(self):
-        return self.data.getncattr('title')
 
     @property
     def num_dim(self):
