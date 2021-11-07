@@ -74,9 +74,9 @@ class Exodus:
         return self._max_line_length
 
     ########################################################################
-    ##                                                                    ##
-    ##                  Data File Utilities                               ##
-    ##                                                                    ##
+    #                                                                      #
+    #                        Data File Utilities                           #
+    #                                                                      #
     ########################################################################
 
     @property
@@ -130,6 +130,12 @@ class Exodus:
         for line in self.data.variables['info_records']:
             lst.append(Exodus.lineparse(line))
         return lst
+
+    ########################################################################
+    #                                                                      #
+    #                        Model Description                             #
+    #                                                                      #
+    ########################################################################
 
     @property
     def num_dim(self):
