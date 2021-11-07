@@ -1,5 +1,6 @@
 import netCDF4 as nc
 import numpy
+from iterate import SampleFiles
 
 
 class Exodus:
@@ -250,12 +251,16 @@ class Exodus:
             if str(c) != '--':
                 s += str(c)[2]
 
-        print(s)
         return s
 
 
 if __name__ == "__main__":
-    ex = Exodus('sample-files/bake.e', 'r')
-    print(ex.qa_records)
+    for file in SampleFiles():
+        ex = Exodus(file, 'r')
+        try:
+            print(ex.qa_records)
+        except KeyError:
+            print("no QA record found")
 
-    ex.close()
+        ex.close()
+
