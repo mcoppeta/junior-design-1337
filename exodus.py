@@ -108,6 +108,20 @@ class Exodus:
         return self.data.getncattr('version')
 
     @property
+    def qa_records(self):
+        lst = []
+        for line in self.data.variables['qa_records'][0]:
+            lst.append(Exodus.lineparse(line))
+        return lst
+
+    @property
+    def info_records(self):
+        lst = []
+        for line in self.data.variables['info_records']:
+            lst.append(Exodus.lineparse(line))
+        return lst
+
+    @property
     def title(self):
         return self.data.getncattr('title')
 
@@ -174,6 +188,10 @@ class Exodus:
     # prints legacy character array as string
     @staticmethod
     def print(line):
+        print(Exodus.lineparse(line))
+
+    @staticmethod
+    def lineparse(line):
         s = ""
         for c in line:
             if str(c) != '--':
@@ -185,9 +203,6 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus('sample-files/cube_1ts_mod.e', 'r')
-    for var in ex.data.variables:
-        print(var)
-
-    print('node_ns20' in ex.data.variables)
+    print(ex.info_records)
 
     ex.close()
