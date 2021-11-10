@@ -51,3 +51,19 @@ def test_parameters():
     assert exofile.word_size
     exofile.close()
 
+def test_get_nodeset():
+    # Testing that get_nodeset returns accurate info based on info from Coreform Cubit
+    # 'cube_1ts_mod.e' has 6 nodesets with 81 nodes and 1 nodeset with 729 nodes
+    exofile = exo.Exodus('sample-files/cube_1ts_mod.e', 'r')
+    i = 1
+    while i <= 6:
+        nodeset = exofile.get_nodeset(i)
+        assert len(nodeset) == 81
+        i += 1
+    assert len(exofile.get_nodeset(7)) == 729
+    exofile.close()
+    # Nodeset 1 in 'disk_out_ref.ex2' has 1 node with ID 7210
+    exofile = exo.Exodus('sample-files/disk_out_ref.ex2', 'r')
+    nodeset = exofile.get_nodeset(1)
+    assert nodeset[0] == 7210
+    exofile.close()
