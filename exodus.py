@@ -324,6 +324,44 @@ class Exodus:
             return self.data["node_num_map"][self.data[key][:]]
         return self.data[key][:]
 
+
+    def set_nodeset(self, node_set_id, node_ids):
+        ndx = node_set_id - 1
+        if ("ns_prop1" in self.data.variables):
+            ndx = numpy.where(self.data.variables["ns_prop1"][:] == node_set_id)[0][0]
+            ndx += 1
+        
+        key = "node_ns" + str(ndx)
+        nodeset = self.data[key]
+
+        if ("node_num_map" in self.data.variables):
+            indices = numpy.zeros(len(node_ids))
+            i = 0
+            for id in node_ids:
+                ndx = numpy.where(self.data["node_num_map"][:] == id)[0][0]
+                indices[i] = ndx
+                i += 1
+            nodeset[:] = indices
+            return
+        nodeset[:] = node_ids
+
+    # def add_nodeset(self, node_ids):
+    #     # self.data.createDimension("num_nod_ns4", len(node_ids))
+    #     # self.data.createVariable("node_ns4", numpy.dtype('i4'), ("num_nod_ns4"))
+
+    #     self.data.dimensions["num_node_sets"].size += 1
+    #     # if ("node_num_map" not in self.data.variables):
+    #     #     self.data["node_ns4"][:] = node_ids
+    #     #     return
+
+    #     # i = 0
+    #     # for id in node_ids:
+    #     #     ndx = numpy.where(self.data["node_num_map"][:] == id)[0][0]
+    #     #     self.data["node_ns4"][i] = ndx
+    #     #     i += 1
+            
+
+
     # prints legacy character array as string
     @staticmethod
     def print(line):
