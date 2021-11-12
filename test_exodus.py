@@ -3,6 +3,8 @@ import numpy
 import netCDF4
 import exodus as exo
 
+# Disables all warnings in this module
+pytestmark = pytest.mark.filterwarnings('ignore')
 
 def test_open():
     # Test that we can open a file without any errors
