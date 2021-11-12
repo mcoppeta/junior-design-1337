@@ -43,7 +43,7 @@ class Exodus:
 
         # Initialize all the important parameters
         if mode == 'w':
-            self.data.createDimension('title', 'Untitled database')
+            self.data.setncattr('title', 'Untitled database')
             self.data.createDimension('len_string', Exodus._MAX_STR_LENGTH + 1)
             self.data.createDimension('len_name', Exodus._MAX_NAME_LENGTH + 1)
             self.data.createDimension('len_line', Exodus._MAX_LINE_LENGTH + 1)
