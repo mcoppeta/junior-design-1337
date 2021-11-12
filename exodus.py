@@ -291,22 +291,38 @@ class Exodus:
         for v in self.data.variables:
             print(v)
 
-    def get_sideset(self, i):
-        elem_key = 'elem_ss' + str(i)
-        side_key = 'side_ss' + str(i)
+    def get_sideset(self, id):
+        ndx = id - 1
+
+        if ("ss_prop1" in self.data.variables):
+            ndx = numpy.where(self.data.variables["ss_prop1"][:] == id)[0][0]
+            ndx += 1
+
+        elem_key = 'elem_ss' + str(ndx)
+        side_key = 'side_ss' + str(ndx)
         sideset_i = {}
 
         if elem_key in self.data.variables and side_key in self.data.variables:
-            sideset_i['elements'] = self.data[elem_key]
-            sideset_i['sides'] = self.data[side_key]
+            if ("elem_num_map" in self.data.variables):
+                sideset_i['elements'] = self.data["elem_num_map"][self.data[elem_key][:]]
+            else:
+                sideset_i['elements'] = self.data[elem_key][:]
+            sideset_i['sides'] = self.data[side_key][:]
         else:
-            raise RuntimeError("sideset '{}' cannot be found!".format(i))
+            raise RuntimeError("sideset '{}' cannot be found!".format(id))
 
         return sideset_i
 
-    def get_nodeset(self, i):
-        key = "node_ns" + str(i)
-        return self.data[key]
+    def get_nodeset(self, id):
+        ndx = id - 1
+        if ("ns_prop1" in self.data.variables):
+            ndx = numpy.where(self.data.variables["ns_prop1"][:] == id)[0][0]
+            ndx += 1
+
+        key = "node_ns" + str(ndx)
+        if ("node_num_map" in self.data.variables):
+            return self.data["node_num_map"][self.data[key][:]]
+        return self.data[key][:]
 
     # prints legacy character array as string
     @staticmethod
