@@ -61,14 +61,14 @@ class Exodus:
             self.data.setncattr('int64_status', int64bit_status)
 
         # Warn the user if some non-critical parameters are missing
-        if 'len_string' not in self.data.dimensions:
-            warnings.warn("'len_string' dimension is missing!")
-        if 'len_name' not in self.data.dimensions:
-            warnings.warn("'len_name' dimension is missing!")
-        if 'len_line' in self.data.dimensions:
-            warnings.warn("'len_line' dimension is missing!")
-        if 'maximum_name_length' in self.data.ncattrs():
-            warnings.warn("'maximum_name_length' attribute is missing!")
+        # if 'len_string' not in self.data.dimensions:
+        #     warnings.warn("'len_string' dimension is missing!")
+        # if 'len_name' not in self.data.dimensions:
+        #     warnings.warn("'len_name' dimension is missing!")
+        # if 'len_line' in self.data.dimensions:
+        #     warnings.warn("'len_line' dimension is missing!")
+        # if 'maximum_name_length' in self.data.ncattrs():
+        #     warnings.warn("'maximum_name_length' attribute is missing!")
 
         # Check version compatibility
         ver = self.version
@@ -321,6 +321,7 @@ class Exodus:
 
         key = "node_ns" + str(ndx)
         if ("node_num_map" in self.data.variables):
+            print(self.data[key][:])
             return self.data["node_num_map"][self.data[key][:]]
         return self.data[key][:]
 
@@ -359,8 +360,26 @@ class Exodus:
     #     #     ndx = numpy.where(self.data["node_num_map"][:] == id)[0][0]
     #     #     self.data["node_ns4"][i] = ndx
     #     #     i += 1
-            
 
+    def get_nodes_in_elblock(self, id):
+        if ("node_num_map" not in self.data.variables):
+            raise Exception("Using node num map")
+        nodeids = self.data["connect" + str(id)]
+        # flatten it into 1d
+        nodeids = nodeids[:].flatten()   
+        return nodeids
+
+
+    def edit_coords(self, node_ids, dim, displace):
+        if ("node_num_map" not in self.data.variables):
+            raise Exception("Using node num map")
+        node_ndxs = node_ids - 1
+        dimnum = 0
+        if (dim == 'y'):
+            dimnum = 1
+        elif (dim == 'z'):
+            dimnum = 2
+        self.data["coord"][dimnum, node_ndxs] += displace
 
     # prints legacy character array as string
     @staticmethod
