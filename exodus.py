@@ -362,7 +362,7 @@ class Exodus:
     #     #     i += 1
 
     def get_nodes_in_elblock(self, id):
-        if ("node_num_map" not in self.data.variables):
+        if ("node_num_map" in self.data.variables):
             raise Exception("Using node num map")
         nodeids = self.data["connect" + str(id)]
         # flatten it into 1d
