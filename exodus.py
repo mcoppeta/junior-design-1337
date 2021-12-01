@@ -371,7 +371,7 @@ class Exodus:
 
 
     def edit_coords(self, node_ids, dim, displace):
-        if ("node_num_map" not in self.data.variables):
+        if ("node_num_map" in self.data.variables):
             raise Exception("Using node num map")
         node_ndxs = node_ids - 1
         dimnum = 0
