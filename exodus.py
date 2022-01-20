@@ -96,7 +96,11 @@ class Exodus:
 
     # TODO fix function that adds missing parts of the header
     # TODO function to find the longest name in the object
-    # TODO maximum_name_length should be the actual length, not with the 1 C character added. confirm this
+
+    # Everything in here that says it's the same as C is pretty much adapted 1-1 from the SEACAS Github and has been
+    # double checked for speed. (see /libraries/exodus/src/ex_inquire.c)
+    # Anything that says NOT IN C doesn't appear in the C version (to my knowledge) probably because the user does
+    # not need to worry about that information and the user should not be able to modify it
 
     ########################################################################
     #                                                                      #
@@ -104,64 +108,213 @@ class Exodus:
     #                                                                      #
     ########################################################################
 
-    @property
-    def parameters(self):
-        # Returns a dictionary of global attribute/value pairs. Exodus II calls these parameters
-        result = {}
-        for attr in self.data.ncattrs():
-            result[attr] = self.data.getncattr(attr)
-        return result
+    # GLOBAL PARAMETERS
 
+    # TODO perhaps in-place properties like these could have property setters as well
+
+    # Same as C
     @property
     def title(self):
-        # Guaranteed to exist
-        return self.data.getncattr('title')
+        try:
+            return self.data.getncattr('title')
+        except AttributeError:
+            AttributeError("Database title could not be found")
 
-    @property
-    def max_string_length(self):
-        max_str_len = Exodus._MAX_STR_LENGTH
-        if 'len_string' in self.data.dimensions:
-            # Subtract 1 because in C an extra character is added for C reasons
-            max_str_len = self.data.dimensions['len_string'].size - 1
-        return max_str_len
-
-    @property
-    def max_line_length(self):
-        max_line_len = Exodus._MAX_LINE_LENGTH
-        if 'len_line' in self.data.dimensions:
-            # Subtract 1 because in C an extra character is added for C reasons
-            max_line_len = self.data.dimensions['len_line'].size - 1
-        return max_line_len
-
+    # Same as C
     @property
     def max_allowed_name_length(self):
         max_name_len = Exodus._MAX_NAME_LENGTH
         if 'len_name' in self.data.dimensions:
-            # Subtract 1 because in C an extra character is added for C reasons
+            # Subtract 1 because in C an extra null character is added for C reasons
             max_name_len = self.data.dimensions['len_name'].size - 1
         return max_name_len
 
+    # Same as C
     @property
     def max_used_name_length(self):
-        max_used_name_len = 0
+        # 32 is the default size consistent with other databases
+        max_used_name_len = 32
         if 'maximum_name_length' in self.data.ncattrs():
+            # The length does not include the added null character from C
             max_used_name_len = self.data.getncattr('maximum_name_length')
         return max_used_name_len
 
+    # Same as C
     @property
     def api_version(self):
-        # Guaranteed to exist
-        params = self.parameters
-        if 'api_version' in params:
-            return self.data.getncattr('api_version')
-        elif 'api version' in params:
-            return self.data.getncattr('api version')
+        try:
+            result = self.data.getncattr('api_version')
+        except AttributeError:
+            # Try the old way of spelling it
+            try:
+                result = self.data.getncattr('api version')
+            except AttributeError:
+                raise AttributeError("Exodus API version could not be found")
+        return result
 
+    # Same as C
     @property
     def version(self):
-        # Guaranteed to exist
-        return self.data.getncattr('version')
+        try:
+            return self.data.getncattr('version')
+        except AttributeError:
+            raise AttributeError("Exodus database version could not be found")
 
+    # Same as C
+    @property
+    def num_qa(self):
+        try:
+            result = self.data.dimensions['num_qa_rec']
+        except KeyError:
+            result = 0
+        return result
+
+    # Same as C
+    @property
+    def num_info(self):
+        try:
+            result = self.data.dimensions['num_info']
+        except KeyError:
+            result = 0
+        return result
+
+    ########################################################################
+    #                                                                      #
+    #                        Model Description                             #
+    #                                                                      #
+    ########################################################################
+
+    # Same as C
+    @property
+    def num_dim(self):
+        try:
+            return self.data.dimensions['num_dim'].size
+        except KeyError:
+            raise KeyError("database dimensionality could not be found")
+
+    # Same as C
+    @property
+    def num_nodes(self):
+        try:
+            result = self.data.dimensions['num_nodes'].size
+        except KeyError:
+            # This and following functions don't actually error in C, they return 0. I assume there's a good reason.
+            result = 0
+        return result
+
+    # Same as C
+    @property
+    def num_elem(self):
+        try:
+            result = self.data.dimensions['num_elem'].size
+        except KeyError:
+            result = 0
+        return result
+
+    # Same as C
+    @property
+    def num_elem_blk(self):
+        try:
+            result = self.data.dimensions['num_el_blk'].size
+        except KeyError:
+            result = 0
+        return result
+
+    # Same as C
+    @property
+    def num_node_sets(self):
+        try:
+            result = self.data.dimensions['num_node_sets'].size
+        except KeyError:
+            result = 0
+        return result
+
+    # TODO /libraries/exodus/src/ex_inquire.c line 382 and 387 contain functions we don't have about concatenated
+    #  node sets. exodusII-new.pdf section 4.10 contains related information. I have no clue what this is but it's
+    #  probably important. (Line 44 of that file looks related?)
+
+    # Same as C
+    @property
+    def num_side_sets(self):
+        try:
+            result = self.data.dimensions['num_side_sets'].size
+        except KeyError:
+            result = 0
+        return result
+
+    # TODO Same deal as todo above. See lines 459, 561, and 566
+
+    # Same as C
+    @property
+    def num_time_steps(self):
+        try:
+            return self.data.dimensions['time_step'].size
+        except KeyError:
+            raise KeyError("Number of database time steps could not be found")
+
+    # TODO Similar to above, all of the _PROP functions (ctrl+f ex_get_num_props)
+
+    # Same as C
+    @property
+    def num_elem_map(self):
+        try:
+            result = self.data.dimensions['num_elem_maps'].size
+        except KeyError:
+            result = 0
+        return result
+
+    # Same as C
+    @property
+    def num_node_map(self):
+        try:
+            result = self.data.dimensions['num_node_maps'].size
+        except KeyError:
+            result = 0
+        return result
+
+    # TODO Below line 695 stuff gets really weird. What on earth even is an edge set, face set, and elem set?
+
+    # Same as C (i think)
+    @property
+    def num_node_var(self):
+        try:
+            return self.data.dimensions['num_nod_var'].size
+        except KeyError:
+            raise KeyError("Number of nodal variables could not be found")
+
+    # Same as C (i think)
+    @property
+    def num_elem_block_var(self):
+        try:
+            return self.data.dimensions['num_elem_var'].size
+        except KeyError:
+            raise KeyError("Number of element block variables could not be found")
+
+    # Same as C (i think)
+    @property
+    def num_node_set_var(self):
+        try:
+            return self.data.dimensions['num_nset_var'].size
+        except KeyError:
+            raise KeyError("Number of node set variables could not be found")
+
+    # Same as C (i think)
+    @property
+    def num_side_set_var(self):
+        try:
+            return self.data.dimensions['num_sset_var'].size
+        except KeyError:
+            raise KeyError("Number of side set variables could not be found")
+
+    # Same as C (i think)
+    @property
+    def num_global_var(self):
+        try:
+            return self.data.dimensions['num_glo_var'].size
+        except KeyError:
+            raise KeyError("Number of global variables could not be found")
+
+    # NOT IN C
     @property
     def file_size(self):
         if 'file_size' in self.data.ncattrs():
@@ -170,6 +323,7 @@ class Exodus:
             return 1 if self.data.data_model == 'NETCDF3_64BIT_OFFSET' else 0
             # No warning is raised because older files just don't have this
 
+    # NOT IN C
     @property
     def int64_status(self):
         # This might actually be for NETCDF5 files but I'm not certain
@@ -179,14 +333,36 @@ class Exodus:
             return 1 if self.data.data_model == 'NETCDF3_64BIT_DATA' else 0
             # No warning is raised because older files just don't have this
 
+    # NOT IN C
     @property
     def word_size(self):
-        # Guaranteed to exist
-        params = self.parameters
-        if 'floating_point_word_size' in params:
-            return self.data.getncattr('floating_point_word_size')
-        elif 'floating point word size' in params:
-            return self.data.getncattr('floating point word size')
+        try:
+            result = self.data.getncattr('floating_point_word_size')
+        except AttributeError:
+            try:
+                result = self.data.getncattr('floating point word size')
+            except AttributeError:
+                # This should NEVER happen, but here to be safe
+                raise AttributeError("Exodus database floating point word size could not be found")
+        return result
+
+    # NOT IN C
+    @property
+    def max_string_length(self):
+        max_str_len = Exodus._MAX_STR_LENGTH
+        if 'len_string' in self.data.dimensions:
+            # Subtract 1 because in C an extra character is added for C reasons
+            max_str_len = self.data.dimensions['len_string'].size - 1
+        return max_str_len
+
+    # NOT IN C
+    @property
+    def max_line_length(self):
+        max_line_len = Exodus._MAX_LINE_LENGTH
+        if 'len_line' in self.data.dimensions:
+            # Subtract 1 because in C an extra character is added for C reasons
+            max_line_len = self.data.dimensions['len_line'].size - 1
+        return max_line_len
 
     @property
     def qa_records(self):
@@ -201,40 +377,6 @@ class Exodus:
         for line in self.data.variables['info_records']:
             lst.append(Exodus.lineparse(line))
         return lst
-
-    ########################################################################
-    #                                                                      #
-    #                        Model Description                             #
-    #                                                                      #
-    ########################################################################
-
-    @property
-    def num_dim(self):
-        return self.data.dimensions['num_dim'].size
-
-    @property
-    def num_nodes(self):
-        return self.data.dimensions['num_nodes'].size
-
-    @property
-    def num_elem(self):
-        return self.data.dimensions['num_elem'].size
-
-    @property
-    def num_elem_blk(self):
-        return self.data.dimensions['num_el_blk'].size
-
-    @property
-    def num_node_sets(self):
-        return self.data.dimensions['num_node_sets'].size
-
-    @property
-    def num_side_sets(self):
-        return self.data.dimensions['num_side_sets'].size
-
-    @property
-    def num_time_steps(self):
-        return self.data['time_whole'].size
 
     @property
     def time_values(self):
@@ -397,12 +539,14 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        for file in SampleFiles():
-            ex = Exodus(file, 'r')
-            try:
-                print(ex.data)
-            except KeyError:
-                print("no QA record found")
-        ex.close()
+    ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    print(ex.data)
+    # with warnings.catch_warnings():
+    #     warnings.simplefilter('ignore')
+    #     for file in SampleFiles():
+    #         ex = Exodus(file, 'r')
+    #         try:
+    #             print(ex.data)
+    #         except KeyError:
+    #             print("no QA record found")
+    #     ex.close()
