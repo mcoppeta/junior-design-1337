@@ -15,7 +15,8 @@ class Exodus:
     _MAX_LINE_LENGTH = 80
     _EXODUS_VERSION = 7.22
 
-    def __init__(self, path, mode, clobber=False, format='EX_NETCDF4', word_size=4):
+    # Should creating a new file (mode 'w') be a function on its own?
+    def __init__(self, path, mode, shared=False, clobber=False, format='EX_NETCDF4', word_size=4):
         # clobber and format and word_size only apply to mode w
         if mode not in ['r', 'w', 'a']:
             raise ValueError("mode must be 'w', 'r', or 'a', got '{}'".format(mode))
@@ -24,8 +25,13 @@ class Exodus:
         if word_size not in [4, 8]:
             raise ValueError("word_size must be 4 or 8 bytes, {} is not supported".format(word_size))
         nc_format = Exodus._FORMAT_MAP[format]
+        # Sets shared mdoe if the user asked for it. I have no idea what this does :)
+        if shared:
+            smode = mode + 's'
+        else:
+            smode = mode
         try:
-            self.data = nc.Dataset(path, mode, clobber, format=nc_format)
+            self.data = nc.Dataset(path, smode, clobber, format=nc_format)
         except FileNotFoundError:
             raise FileNotFoundError("file '{}' does not exist".format(path))
         except PermissionError:
@@ -60,14 +66,14 @@ class Exodus:
                 int64bit_status = 1
             self.data.setncattr('int64_status', int64bit_status)
 
-        # Warn the user if some non-critical parameters are missing
-        # if 'len_string' not in self.data.dimensions:
-        #     warnings.warn("'len_string' dimension is missing!")
+        # TODO Uncomment these later
+        #  The C library doesn't seem to care if the file is in read or modify mode when it does this
+        # Add this if it doesn't exist (value of 33)
         # if 'len_name' not in self.data.dimensions:
         #     warnings.warn("'len_name' dimension is missing!")
-        # if 'len_line' in self.data.dimensions:
-        #     warnings.warn("'len_line' dimension is missing!")
-        # if 'maximum_name_length' in self.data.ncattrs():
+
+        # Add this if it doesn't exist (value of 32)
+        # if 'maximum_name_length' not in self.data.ncattrs():
         #     warnings.warn("'maximum_name_length' attribute is missing!")
 
         # Check version compatibility
@@ -79,20 +85,35 @@ class Exodus:
         # Read word size stored in file
         ws = self.word_size
         if ws == 4:
-            # This needs to be double checked because our examples use float32 and float64 which may be different
-            self._float = numpy.single
+            self._float = numpy.float32
         elif ws == 8:
-            self._float = numpy.double
+            self._float = numpy.float64
         else:
             raise ValueError("file contains a word size of {} which is not supported".format(ws))
 
+        if self.int64_status == 0:
+            self._int = numpy.int32
+        else:
+            self._int = numpy.int64
+
     def to_float(self, n):
-        # Convert a number to the floating point type the file is using
+        # Convert a number to the floating point type the database is using
         return self._float(n)
+
+    def to_int(self, n):
+        # Convert a number to the integer type the database is using
+        return self._int(n)
 
     @property
     def float(self):
+        # Returns floating point type of floating point numbers stored in the database
+        # You may use whatever crazy types you want while coding, but convert them before storing them in the DB
         return self._float
+
+    @property
+    def int(self):
+        # Returns integer type of integers stored in the database
+        return self._int
 
     # TODO fix function that adds missing parts of the header
     # TODO function to find the longest name in the object
@@ -314,26 +335,34 @@ class Exodus:
         except KeyError:
             raise KeyError("Number of global variables could not be found")
 
+    # Below are accessors for some data records that the C library doesn't seem to have
+    # Not sure where file_size is useful. int64_status and word_size are probably only useful on initialization.
+    # max_string/max_line_length are probably only useful on writing qa/info records. We can keep these for now but
+    # delete them later once we determine they're actually useless
+
     # NOT IN C
     @property
     def file_size(self):
+        # According to a comment in ex_utils.c @ line 1614
+        # "Basically, the difference is whether the coordinates and nodal variables are stored in a blob (xyz components
+        # together) or as a variable per component per nodal_variable."
         if 'file_size' in self.data.ncattrs():
             return self.data.getncattr('file_size')
         else:
             return 1 if self.data.data_model == 'NETCDF3_64BIT_OFFSET' else 0
             # No warning is raised because older files just don't have this
 
-    # NOT IN C
+    # NOT IN C (only used in ex_open.c)
     @property
     def int64_status(self):
-        # This might actually be for NETCDF5 files but I'm not certain
+        # Determines whether or not the file uses int64s
         if 'int64_status' in self.data.ncattrs():
             return self.data.getncattr('int64_status')
         else:
             return 1 if self.data.data_model == 'NETCDF3_64BIT_DATA' else 0
             # No warning is raised because older files just don't have this
 
-    # NOT IN C
+    # NOT IN C (only used in ex_open.c)
     @property
     def word_size(self):
         try:
@@ -349,6 +378,7 @@ class Exodus:
     # NOT IN C
     @property
     def max_string_length(self):
+        # See ex_put_qa.c @ line 119. This record is created and used when adding QA records
         max_str_len = Exodus._MAX_STR_LENGTH
         if 'len_string' in self.data.dimensions:
             # Subtract 1 because in C an extra character is added for C reasons
@@ -358,6 +388,7 @@ class Exodus:
     # NOT IN C
     @property
     def max_line_length(self):
+        # See ex_put_info.c @ line 121. This record is created and used when adding info records
         max_line_len = Exodus._MAX_LINE_LENGTH
         if 'len_line' in self.data.dimensions:
             # Subtract 1 because in C an extra character is added for C reasons
