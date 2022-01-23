@@ -13,6 +13,7 @@ def deep_copy(new_path, old_path):
 
     # copy variables
     for var in old.variables:
+        
         var_data = old[var]
 
         # variable creation data
@@ -25,6 +26,7 @@ def deep_copy(new_path, old_path):
         new[varname].setncatts(old[varname].__dict__)
 
     new.close()
+    print(old)
     old.close()
 
 

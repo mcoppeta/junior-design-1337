@@ -345,8 +345,9 @@ class Exodus:
             return
         nodeset[:] = node_ids
 
-    # def add_nodeset(self, node_ids):
-    #     # self.data.createDimension("num_nod_ns4", len(node_ids))
+
+    #   def add_nodeset(self, node_ids):
+         # self.data.createDimension("num_nod_ns4", len(node_ids))
     #     # self.data.createVariable("node_ns4", numpy.dtype('i4'), ("num_nod_ns4"))
 
     #     self.data.dimensions["num_node_sets"].size += 1
