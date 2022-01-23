@@ -24,9 +24,6 @@ def deep_copy(new_path, old_path):
         new[varname][:] = old[var][:]
         new[varname].setncatts(old[varname].__dict__)
 
-    print(new)
-    print('\n\n\n')
-    print(old)
     new.close()
     old.close()
 
