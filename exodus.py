@@ -471,6 +471,9 @@ class Exodus:
 
     # TODO what is ex_get_num_map.c?
 
+    #TODO ex__id_lkup
+    # TODO ex_put_set does the id i put in there refer to the user id or internal id
+
     def get_coord(self):
         pass
 
@@ -649,8 +652,8 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
-    print(ex.get_partial_node_id_map(1, 10))
+    ex = Exodus("sample-files/can.ex2", 'r')
+    print(ex.data)
     # with warnings.catch_warnings():
     #     warnings.simplefilter('ignore')
     #     for file in SampleFiles():
