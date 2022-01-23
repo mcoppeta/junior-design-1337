@@ -1,5 +1,4 @@
 import numpy as np
-import netCDF4 as nc
 from exodus import Exodus
 
 
@@ -39,7 +38,7 @@ class NSLedger:
         data.createDimension("num_node_sets", len(self.nodesets))
 
         # add ns_prop1 data
-        data.createVariable("ns_prop1", "int32", dimensions = ("num_node_sets"))
+        data.createVariable("ns_prop1", "int32", dimensions=("num_node_sets"))
         data['ns_prop1'][:] = np.array(self.nodeset_ids)
 
         # TODO: add nodesets, ns_status, dist_fact_ns
