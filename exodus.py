@@ -325,7 +325,6 @@ class Exodus:
             return self.data["node_num_map"][self.data[key][:]]
         return self.data[key][:]
 
-
     def set_nodeset(self, node_set_id, node_ids):
         ndx = node_set_id - 1
         if ("ns_prop1" in self.data.variables):
