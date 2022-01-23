@@ -1,19 +1,12 @@
+import netCDF4 as nc
+
 class Ledger:
     
     def __init__(self):
-        self.size = 0
-        self.dimension_map = {}
-        self.variable_map = {}
+        self.NSLedger = None
 
-
-    def addDimension(self, dim):
-        self.dimension_map[dim.name] = dim
-
-
-
-    def addVariable(self, var):
-        self.variable_map[var.name] = var
-
+    def initializeLedger(self, exofile):
+        None
     
 
 

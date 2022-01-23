@@ -2,6 +2,7 @@ import warnings
 import netCDF4 as nc
 import numpy
 from iterate import SampleFiles
+from ledger import Ledger
 
 
 class Exodus:
@@ -36,6 +37,9 @@ class Exodus:
         if mode == 'w' or mode == 'a':
             # This is important according to ex_open.c
             self.data.set_fill_off()
+
+        # save path variable for future use
+        self.path = path
 
         # We will read a bunch of data here to make sure it exists and warn the user if they might want to fix their
         # file. We don't save anything to memory so that if our data updates we don't have to update it in memory too.
@@ -85,6 +89,10 @@ class Exodus:
             self._float = numpy.double
         else:
             raise ValueError("file contains a word size of {} which is not supported".format(ws))
+
+        if mode == 'a':
+            self.ledger = Ledger()
+            self.ledger.initializeLedger(self)
 
     def to_float(self, n):
         # Convert a number to the floating point type the file is using
