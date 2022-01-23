@@ -35,7 +35,14 @@ class NSLedger:
         self.nodeset_map.pop(nodeset_id)
 
     def write(self, data):
+        # create num_node_sets dimension
         data.createDimension("num_node_sets", len(self.nodesets))
+
+        # add ns_prop1 data
+        data.createVariable("ns_prop1", "int32", dimensions = ("num_node_sets"))
+        data['ns_prop1'][:] = np.array(self.nodeset_ids)
+
+        # TODO: add nodesets, ns_status, dist_fact_ns
 
 
 if __name__ == "__main__":
