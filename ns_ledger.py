@@ -2,6 +2,7 @@ import numpy as np
 import netCDF4 as nc
 from exodus import Exodus
 
+
 class NSLedger:
 
     def __init__(self, ex):
@@ -15,6 +16,13 @@ class NSLedger:
             self.nodesets.append(ns_title)
             self.nodeset_map[ns_title] = None
 
+        if "ns_prop1" in ex.data.variables.keys():
+            for i in ex.variables['ns_prop1']:
+                self.nodeset_ids.append(i)
+        else:
+            for i in range(len(self.nodesets)):
+                self.nodeset_ids.append(i+1)
+
     def add_nodeset(self, node_ids):
 
         self.nodesets.append(self.new_nodeset_id)
@@ -27,7 +35,8 @@ class NSLedger:
         self.nodeset_map.pop(nodeset_id)
 
     def write(self, data):
-        data.createDimension("num_node_sets")
+        data.createDimension("num_node_sets", len(self.nodesets))
+
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/can.ex2", 'r', False)
