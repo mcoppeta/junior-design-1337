@@ -395,6 +395,85 @@ class Exodus:
             max_line_len = self.data.dimensions['len_line'].size - 1
         return max_line_len
 
+    # Getters for more advanced properties
+
+    # Nodes and elements have IDs and internal values
+    # As a programmer, when I call methods I pass in the internal value, which
+    # is some contiguous number. Usually I identify stuff with their IDs though.
+    # Internally, the method I call understands the internal value.
+    # Say I have 1 element in my file with ID 100. The ID is 100, the internal
+    # value is 1. In the connectivity array, '1' refers to this element. As a
+    # backend person, I need to subtract 1 to index on this internal value.
+    def get_node_id_map(self):
+        num_nodes = self.num_nodes
+        if num_nodes == 0:
+            warnings.warn("Cannot retrieve a node id map if there are no nodes!")
+            return
+        if 'node_num_map' not in self.data.variables:
+            # Return a default array from 1 to the number of nodes
+            warnings.warn("There is no node id map in this database!")
+            return numpy.arange(1, num_nodes + 1, dtype=self.int)
+        return self.data.variables['node_num_map'][:]
+
+    def get_partial_node_id_map(self, start, count):
+        # Start is 1 based (>0).  start + count - 1 <= number of nodes
+        num_nodes = self.num_nodes
+        if num_nodes == 0:
+            warnings.warn("Cannot retrieve a node id map if there are no nodes!")
+            return
+        if start < 1:
+            raise ValueError("start index must be greater than 0")
+        if start + count - 1 > num_nodes:
+            raise ValueError("start index + node count is larger than the total number of nodes")
+        if 'node_num_map' not in self.data.variables:
+            # Return a default array from start to start + count exclusive
+            warnings.warn("There is no node id map in this database!")
+            return numpy.arange(start, start + count, dtype=self.int)
+        return self.data.variables['node_num_map'][start - 1:start+count - 1]
+
+    def get_elem_id_map(self):
+        num_elem = self.num_elem
+        if num_elem == 0:
+            warnings.warn("Cannot retrieve an element id map if there are no elements!")
+            return
+        if 'elem_num_map' not in self.data.variables:
+            # Return a default array from 1 to the number of elements
+            warnings.warn("There is no element id map in this database!")
+            return numpy.arange(1, num_elem + 1, dtype=self.int)
+        return self.data.variables['elem_num_map'][:]
+
+    def get_partial_elem_id_map(self, start, count):
+        # Start is 1 based (>0).  start + count - 1 <= number of nodes
+        num_elem = self.num_elem
+        if num_elem == 0:
+            warnings.warn("Cannot retrieve an element id map if there are no elements!")
+            return
+        if start < 1:
+            raise ValueError("start index must be greater than 0")
+        if start + count - 1 > num_elem:
+            raise ValueError("start index + element count is larger than the total number of elements")
+        if 'elem_num_map' not in self.data.variables:
+            # Return a default array from start to start + count exclusive
+            warnings.warn("There is no element id map in this database!")
+            return numpy.arange(start, start + count, dtype=self.int)
+        return self.data.variables['elem_num_map'][start - 1:start+count - 1]
+
+    def get_elem_order_map(self):
+        num_elem = self.num_elem
+        if num_elem == 0:
+            warnings.warn("Cannot retrieve an element order map if there are no elements!")
+            return
+        if 'elem_map' not in self.data.variables:
+            # Return a default array from 1 to the number of elements
+            warnings.warn("There is no element order map in this database!")
+            return numpy.arange(1, num_elem + 1, dtype=self.int)
+        return self.data.variables['elem_map'][:]
+
+    # TODO what is ex_get_num_map.c?
+
+    def get_coord(self):
+        pass
+
     @property
     def qa_records(self):
         lst = []
@@ -571,7 +650,7 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
-    print(ex.data)
+    print(ex.get_partial_node_id_map(1, 10))
     # with warnings.catch_warnings():
     #     warnings.simplefilter('ignore')
     #     for file in SampleFiles():
