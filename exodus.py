@@ -2,7 +2,6 @@ import warnings
 import netCDF4 as nc
 import numpy
 from iterate import SampleFiles
-from ledger import Ledger
 
 
 class Exodus:
