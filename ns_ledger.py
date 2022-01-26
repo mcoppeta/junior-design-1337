@@ -10,6 +10,8 @@ class NSLedger:
         self.nodesets = []
         # keeps track of nodeset ids according to ns_prop1
         self.nodeset_ids = []
+        # O(1) lookup for nodeset ids to ensure uniqueness
+        self.nodeset_id_set = set()
         # counter to assign unique names to nodesets
         self.new_nodeset_id = 0
         self.ex = ex
@@ -29,12 +31,17 @@ class NSLedger:
         if "ns_prop1" in ex.data.variables.keys():
             for i in ex.data.variables['ns_prop1']:
                 self.nodeset_ids.append(i)
+                self.nodeset_id_set.add(i)
         # if not, create id map for consistency
         else:
             for i in range(len(self.nodesets)):
                 self.nodeset_ids.append(i+1)
+                self.nodeset_id_set.add(i+1)
 
     def add_nodeset(self, node_ids, nodeset_id):
+
+        if nodeset_id in self.nodeset_id_set:
+            raise KeyError("Nodeset ID already in use")
 
         self.nodesets.append(str(self.new_nodeset_id))
         self.nodeset_map[str(self.new_nodeset_id)] = np.array(node_ids)
@@ -57,7 +64,8 @@ class NSLedger:
         # O(1) with respect to the actual nodesets
         # O(n) with respect to number of changes in ledger
         nodeset_name = self.nodesets.pop(nodeset_num)
-        self.nodeset_ids.pop(nodeset_num)
+        removed_id = self.nodeset_ids.pop(nodeset_num)
+        self.nodeset_id_set.remove(removed_id)
         self.nodeset_map.pop(nodeset_name)
 
     def write(self, data):
