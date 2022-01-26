@@ -4,9 +4,9 @@ import numpy as np
 class NSLedger:
 
     def __init__(self, ex):
-        # maps the unque name assigned to each nodeset with the actual nodeset
+        # maps the unique name assigned to each nodeset with the actual nodeset
         self.nodeset_map = {}
-        # inorder list of unique nodest names
+        # inorder list of unique nodeset names
         self.nodesets = []
         # keeps track of nodeset ids according to ns_prop1
         self.nodeset_ids = []
@@ -14,7 +14,7 @@ class NSLedger:
         self.new_nodeset_id = 0
         self.ex = ex
 
-        # if no existing nodesets, no need to setup variables
+        # if no existing nodesets, no need to set up variables
         # beyond initialization
         if 'num_node_sets' not in ex.data.dimensions.keys():
             return
@@ -36,8 +36,8 @@ class NSLedger:
 
     def add_nodeset(self, node_ids, nodeset_id):
 
-        self.nodesets.append(self.new_nodeset_id)
-        self.nodeset_map[self.new_nodeset_id] = np.array(node_ids)
+        self.nodesets.append(str(self.new_nodeset_id))
+        self.nodeset_map[str(self.new_nodeset_id)] = np.array(node_ids)
         self.nodeset_ids.append(nodeset_id)
         self.new_nodeset_id += 1
 
@@ -51,13 +51,13 @@ class NSLedger:
 
         # raise ValueError if no nodeset is found
         if nodeset_num == -1:
-            raise ValueError("Cannot finde nodeset with ID " + str(nodeset_id))
+            raise ValueError("Cannot find nodeset with ID " + str(nodeset_id))
 
         # remove all references to removed nodeset
         # O(1) with respect to the actual nodesets
         # O(n) with respect to number of changes in ledger
         nodeset_name = self.nodesets.pop(nodeset_num)
-        self.nodeset_ids.pop(i)
+        self.nodeset_ids.pop(nodeset_num)
         self.nodeset_map.pop(nodeset_name)
 
     def write(self, data):
