@@ -555,6 +555,8 @@ class Exodus:
                            .format(id, 'dist_fact_ss%d' % internal_id))
         return set[:]
 
+    # TODO coord, info, partial coord, partial set, set dist fact, time, truth table, among others
+
     def get_coord(self):
         pass
 
