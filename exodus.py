@@ -471,8 +471,89 @@ class Exodus:
 
     # TODO what is ex_get_num_map.c?
 
-    #TODO ex__id_lkup
-    # TODO ex_put_set does the id i put in there refer to the user id or internal id
+    def get_all_times(self):
+        try:
+            result = self.data.variables['time_whole']
+        except KeyError:
+            raise KeyError("Could not retrieve timesteps from database!")
+        return result[:]
+
+    def _get_set_id(self, set_type, num):
+        # Returns internal id for a set given it's user defined id (num)
+        # valid sets are 'nodeset' and 'sideset'
+        if set_type == 'nodeset':
+            name = 'ns_prop1'
+        elif set_type == 'sideset':
+            name = 'ss_prop1'
+        else:
+            raise ValueError("{} is not a valid set type!".format(set_type))
+        try:
+            table = self.data.variables[name]
+        except KeyError:
+            raise KeyError("Set id map of type {} is missing from this database!".format(set_type))
+        # The C library caches information about sets including whether its sequential so it can skip a lot of this
+        internal_id = 1
+        for table_id in table:
+            if table_id == num:
+                break
+            internal_id += 1
+        if internal_id > len(table):
+            raise KeyError("Could not find set of type {} with id {}".format(set_type, num))
+        return internal_id
+        # The C library also does some crazy stuff with what might be the ns_status array
+
+    # Side sets are special?
+    def get_nodeset(self, id):
+        num_sets = self.num_node_sets
+        if num_sets == 0:
+            raise KeyError("No nodesets are stored in this database!")
+        internal_id = self._get_set_id('nodeset', id)
+        try:
+            set = self.data.variables['node_ns%d' % internal_id]
+        except KeyError:
+            raise KeyError("Failed to retrieve nodeset with id {} ('{}')".format(id, 'node_ns%d' % internal_id))
+        return set[:]
+
+    def get_nodeset_df(self, id):
+        num_sets = self.num_node_sets
+        if num_sets == 0:
+            raise KeyError("No nodesets are stored in this database!")
+        internal_id = self._get_set_id('nodeset', id)
+        try:
+            set = self.data.variables['dist_fact_ns%d' % internal_id]
+        except KeyError:
+            raise KeyError("Failed to retrieve distribution factors of nodeset with id {} ('{}')"
+                           .format(id, 'dist_fact_ns%d' % internal_id))
+        return set[:]
+
+    def get_sideset(self, id):
+        num_sets = self.num_side_sets
+        if num_sets == 0:
+            raise KeyError("No sidesets are stored in this database!")
+        internal_id = self._get_set_id('sideset', id)
+        try:
+            elmset = self.data.variables['elem_ss%d' % internal_id]
+        except KeyError:
+            raise KeyError(
+                "Failed to retrieve elements of sideset with id {} ('{}')".format(id, 'elem_ss%d' % internal_id))
+        try:
+            sset = self.data.variables['side_ss%d' % internal_id]
+        except KeyError:
+            raise KeyError(
+                "Failed to retrieve sides of sideset with id {} ('{}')".format(id, 'side_ss%d' % internal_id))
+        return elmset[:], sset[:]
+
+    def get_sideset_df(self, id):
+        num_sets = self.num_side_sets
+        if num_sets == 0:
+            raise KeyError("No sidesets are stored in this database!")
+        internal_id = self._get_set_id('sideset', id)
+        try:
+            set = self.data.variables['dist_fact_ss%d' % internal_id]
+        except KeyError:
+            raise KeyError("Failed to retrieve distribution factors of sideset with id {} ('{}')"
+                           .format(id, 'dist_fact_ss%d' % internal_id))
+        return set[:]
 
     def get_coord(self):
         pass
@@ -546,41 +627,6 @@ class Exodus:
         for v in self.data.variables:
             print(v)
 
-    def get_sideset(self, id):
-        ndx = id - 1
-
-        if ("ss_prop1" in self.data.variables):
-            ndx = numpy.where(self.data.variables["ss_prop1"][:] == id)[0][0]
-            ndx += 1
-
-        elem_key = 'elem_ss' + str(ndx)
-        side_key = 'side_ss' + str(ndx)
-        sideset_i = {}
-
-        if elem_key in self.data.variables and side_key in self.data.variables:
-            if ("elem_num_map" in self.data.variables):
-                sideset_i['elements'] = self.data["elem_num_map"][self.data[elem_key][:]]
-            else:
-                sideset_i['elements'] = self.data[elem_key][:]
-            sideset_i['sides'] = self.data[side_key][:]
-        else:
-            raise RuntimeError("sideset '{}' cannot be found!".format(id))
-
-        return sideset_i
-
-    def get_nodeset(self, id):
-        ndx = id - 1
-        if ("ns_prop1" in self.data.variables):
-            ndx = numpy.where(self.data.variables["ns_prop1"][:] == id)[0][0]
-            ndx += 1
-
-        key = "node_ns" + str(ndx)
-        if ("node_num_map" in self.data.variables):
-            print(self.data[key][:])
-            return self.data["node_num_map"][self.data[key][:]]
-        return self.data[key][:]
-
-
     def set_nodeset(self, node_set_id, node_ids):
         ndx = node_set_id - 1
         if ("ns_prop1" in self.data.variables):
@@ -653,7 +699,7 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/can.ex2", 'r')
-    print(ex.data)
+    print(ex.get_sideset_df(4))
     # with warnings.catch_warnings():
     #     warnings.simplefilter('ignore')
     #     for file in SampleFiles():
