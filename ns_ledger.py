@@ -30,8 +30,8 @@ class NSLedger:
         # setup support for ns_prop1 id map if it exists
         if "ns_prop1" in ex.data.variables.keys():
             for i in ex.data.variables['ns_prop1']:
-                self.nodeset_ids.append(i)
-                self.nodeset_id_set.add(i)
+                self.nodeset_ids.append(int(i))
+                self.nodeset_id_set.add(int(i))
         # if not, create id map for consistency
         else:
             for i in range(len(self.nodesets)):
@@ -46,6 +46,7 @@ class NSLedger:
         self.nodesets.append(str(self.new_nodeset_id))
         self.nodeset_map[str(self.new_nodeset_id)] = np.array(node_ids)
         self.nodeset_ids.append(nodeset_id)
+        self.nodeset_id_set.add(nodeset_id)
         self.new_nodeset_id += 1
 
     def remove_nodeset(self, nodeset_id):

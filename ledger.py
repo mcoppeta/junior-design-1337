@@ -1,3 +1,5 @@
+import numpy
+
 from ns_ledger import NSLedger
 from exodus import Exodus
 import netCDF4 as nc
@@ -8,6 +10,12 @@ class Ledger:
     def __init__(self, ex):
         self.nodeset_ledger = NSLedger(ex)
         self.ex = ex
+
+    def add_nodeset(self, node_ids, nodeset_id):
+        self.nodeset_ledger.add_nodeset(node_ids, nodeset_id)
+
+    def remove_nodeset(self, nodeset_id):
+        self.nodeset_ledger.remove_nodeset(nodeset_id)
 
     def write(self, path):
         out = nc.Dataset(path, "w", True, format="NETCDF3_CLASSIC")
@@ -48,6 +56,11 @@ class Ledger:
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/can.ex2", 'r')
+
     ledger = Ledger(ex)
+    new_ns = numpy.array([1,2,3])
+    ledger.add_nodeset(new_ns, 10)
+    ledger.remove_nodeset(1)
     ledger.write("sample-files/write.ex2")
+
     ex.close()
