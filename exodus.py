@@ -508,7 +508,7 @@ class Exodus():
     # that would increase the complexity enough to offset the added simplicity of this.
     # That probably explains why the C library doesn't do that either...
     # ...Alternatively we could put the maximum value for whatever integer type hdf5 uses but that's kinda hacky
-    # OR WE COULD USE A CRAZY ASS HELPER METHOD OOH
+    # OR WE COULD USE A CRAZY HELPER METHOD OOH
     # def get_set(self, set_type, id):
     #     # Returns a tuple containing the entry list and extra list of a set.
     #     # Node sets do not have an extra list and return None for the second tuple element.
