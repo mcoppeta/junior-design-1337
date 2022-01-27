@@ -185,7 +185,7 @@ class Exodus:
     @property
     def num_qa(self):
         try:
-            result = self.data.dimensions['num_qa_rec']
+            result = self.data.dimensions['num_qa_rec'].size
         except KeyError:
             result = 0
         return result
@@ -194,7 +194,7 @@ class Exodus:
     @property
     def num_info(self):
         try:
-            result = self.data.dimensions['num_info']
+            result = self.data.dimensions['num_info'].size
         except KeyError:
             result = 0
         return result
@@ -340,16 +340,18 @@ class Exodus:
     # max_string/max_line_length are probably only useful on writing qa/info records. We can keep these for now but
     # delete them later once we determine they're actually useless
 
-    # NOT IN C
+    # Same as C
     @property
-    def file_size(self):
+    def large_model(self):
         # According to a comment in ex_utils.c @ line 1614
         # "Basically, the difference is whether the coordinates and nodal variables are stored in a blob (xyz components
         # together) or as a variable per component per nodal_variable."
+        # This is important for coordinate getter functions
         if 'file_size' in self.data.ncattrs():
             return self.data.getncattr('file_size')
         else:
-            return 1 if self.data.data_model == 'NETCDF3_64BIT_OFFSET' else 0
+            # return 1 if self.data.data_model == 'NETCDF3_64BIT_OFFSET' else 0
+            return 0
             # No warning is raised because older files just don't have this
 
     # NOT IN C (only used in ex_open.c)
@@ -429,7 +431,7 @@ class Exodus:
             # Return a default array from start to start + count exclusive
             warnings.warn("There is no node id map in this database!")
             return numpy.arange(start, start + count, dtype=self.int)
-        return self.data.variables['node_num_map'][start - 1:start+count - 1]
+        return self.data.variables['node_num_map'][start - 1:start + count - 1]
 
     def get_elem_id_map(self):
         num_elem = self.num_elem
@@ -456,7 +458,7 @@ class Exodus:
             # Return a default array from start to start + count exclusive
             warnings.warn("There is no element id map in this database!")
             return numpy.arange(start, start + count, dtype=self.int)
-        return self.data.variables['elem_num_map'][start - 1:start+count - 1]
+        return self.data.variables['elem_num_map'][start - 1:start + count - 1]
 
     def get_elem_order_map(self):
         num_elem = self.num_elem
@@ -502,63 +504,491 @@ class Exodus:
         return internal_id
         # The C library also does some crazy stuff with what might be the ns_status array
 
-    # Side sets are special?
-    def get_nodeset(self, id):
+    # Theoretically we could have these call get partial set, but we would need to know the length of the set
+    # which would require an extra call to _get_set_id(), which is slow, or crazy extra arguments or helper methods
+    # that would increase the complexity enough to offset the added simplicity of this.
+    # That probably explains why the C library doesn't do that either...
+    # ...Alternatively we could put the maximum value for whatever integer type hdf5 uses but that's kinda hacky
+    # OR WE COULD USE A CRAZY ASS HELPER METHOD OOH
+    # def get_set(self, set_type, id):
+    #     # Returns a tuple containing the entry list and extra list of a set.
+    #     # Node sets do not have an extra list and return None for the second tuple element.
+    #     # Start is 1 based (>0) and count must be positive.
+    #     # Without these requirements, this doesn't behave in a very pythonic way
+    #     if set_type == 'nodeset':
+    #         num_sets = self.num_node_sets
+    #     elif set_type == 'sideset':
+    #         num_sets = self.num_side_sets
+    #     else:
+    #         raise KeyError("Invalid set type {}!".format(set_type))
+    #     if num_sets == 0:
+    #         raise KeyError("No sets of type {} are stored in this database!".format(set_type))
+    #     internal_id = self._get_set_id(set_type, id)
+    #
+    #     if set_type == 'nodeset':
+    #         entry_list = 'node_ns%d' % internal_id
+    #         extra_list = None
+    #     elif set_type == 'sideset':
+    #         entry_list = 'elem_ss%d' % internal_id
+    #         extra_list = 'side_ss%d' % internal_id
+    #     try:
+    #         entry_set = self.data.variables[entry_list][:]
+    #     except KeyError:
+    #         raise KeyError("Failed to retrieve entry set of type {} with id {} ('{}')"
+    #                        .format(set_type, id, entry_list))
+    #
+    #     if set_type == 'nodeset':
+    #         return entry_set, None
+    #     else:
+    #         try:
+    #             extra_set = self.data.variables[extra_list][:]
+    #         except KeyError:
+    #             raise KeyError("Failed to retrieve extra set of type {} with id {} ('{}')"
+    #                            .format(set_type, id, extra_list))
+    #         return entry_set, extra_set
+
+    # def get_set_parameters(self, set_type, id):
+    #     # Returns tuple (number of set entries, number of set distribution factors)
+    #     if set_type == 'nodeset':
+    #         num_sets = self.num_node_sets
+    #         entry_name = 'num_nod_ns'
+    #         # Node sets are special and don't have a df dimension. See ex_get_set_param
+    #     elif set_type == 'sideset':
+    #         num_sets = self.num_side_sets
+    #         entry_name = 'num_side_ss'
+    #         df_name = 'num_df_ss'
+    #     else:
+    #         raise KeyError("Invalid set type {}!".format(set_type))
+    #     if num_sets == 0:
+    #         raise KeyError("No sets of type {} are stored in this database!".format(set_type))
+    #     internal_id = self._get_set_id(set_type, id)
+    #     # Set entries
+    #     try:
+    #         num_entries = self.data.dimensions['%s%d' % (entry_name, internal_id)].size
+    #     except KeyError:
+    #         raise KeyError("Failed to retrieve number of entries in set of type {} with id {} ('{}')"
+    #                        .format(set_type, id, '%s%d' % (entry_name, internal_id)))
+    #     # Set dist facts
+    #     if set_type == 'nodeset':
+    #         # If the df variable exists num_df == num_entries, otherwise assume 0 df
+    #         if ('dist_fact_ns%d' % internal_id) in self.data.variables:
+    #             num_df = num_entries
+    #         else:
+    #             num_df = 0
+    #     else:
+    #         try:
+    #             num_df = self.data.dimensions['%s%d' % (df_name, internal_id)].size
+    #         except KeyError:
+    #             raise KeyError("Failed to retrieve number of distribution factors in set of type {} with id {} ('{}')"
+    #                            .format(set_type, id, '%s%d' % (df_name, internal_id)))
+    #     return num_entries, num_df
+
+    # def get_partial_set(self, set_type, id, start, count):
+    #     # Returns a tuple containing the entry list and extra list of a set.
+    #     # Node sets do not have an extra list and return None for the second tuple element.
+    #     # Start is 1 based (>0) and count must be positive.
+    #     # Without these requirements, this doesn't behave in a very pythonic way
+    #     if set_type == 'nodeset':
+    #         num_sets = self.num_node_sets
+    #     elif set_type == 'sideset':
+    #         num_sets = self.num_side_sets
+    #     else:
+    #         raise KeyError("Invalid set type {}!".format(set_type))
+    #     if num_sets == 0:
+    #         raise KeyError("No sets of type {} are stored in this database!".format(set_type))
+    #     if start < 1:
+    #         raise ValueError("Start index must be greater than 0")
+    #     if count < 0:
+    #         raise ValueError("Count must be a positive integer")
+    #     internal_id = self._get_set_id(set_type, id)
+    #
+    #     if set_type == 'nodeset':
+    #         entry_list = 'node_ns%d' % internal_id
+    #         extra_list = None
+    #     elif set_type == 'sideset':
+    #         entry_list = 'elem_ss%d' % internal_id
+    #         extra_list = 'side_ss%d' % internal_id
+    #     try:
+    #         entry_set = self.data.variables[entry_list][start - 1:start + count - 1]
+    #     except KeyError:
+    #         raise KeyError("Failed to retrieve entry set of type {} with id {} ('{}')"
+    #                        .format(set_type, id, entry_list))
+    #
+    #     if set_type == 'nodeset':
+    #         return entry_set, None
+    #     else:
+    #         try:
+    #             extra_set = self.data.variables[extra_list][start - 1:start + count - 1]
+    #         except KeyError:
+    #             raise KeyError("Failed to retrieve extra set of type {} with id {} ('{}')"
+    #                            .format(set_type, id, extra_list))
+    #         return entry_set, extra_set
+
+    def get_node_set(self, id):
         num_sets = self.num_node_sets
         if num_sets == 0:
-            raise KeyError("No nodesets are stored in this database!")
+            raise KeyError("No node sets are stored in this database!")
         internal_id = self._get_set_id('nodeset', id)
         try:
-            set = self.data.variables['node_ns%d' % internal_id]
+            set = self.data.variables['node_ns%d' % internal_id][:]
         except KeyError:
             raise KeyError("Failed to retrieve nodeset with id {} ('{}')".format(id, 'node_ns%d' % internal_id))
-        return set[:]
+        return set
 
-    def get_nodeset_df(self, id):
+    def get_partial_node_set(self, id, start, count):
+        num_sets = self.num_node_sets
+        if num_sets == 0:
+            raise KeyError("No node sets are stored in this database!")
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        internal_id = self._get_set_id('nodeset', id)
+        try:
+            set = self.data.variables['node_ns%d' % internal_id][start - 1:start + count - 1]
+        except KeyError:
+            raise KeyError("Failed to retrieve node set with id {} ('{}')".format(id, 'node_ns%d' % internal_id))
+        return set
+
+    def get_node_set_df(self, id):
+        num_sets = self.num_node_sets
+        if num_sets == 0:
+            raise KeyError("No nodesets are stored in this database!")
+        internal_id = self._get_set_id('nodeset', id)
+        if ('dist_fact_ns%d' % internal_id) in self.data.variables:
+            try:
+                set = self.data.variables['dist_fact_ns%d' % internal_id][:]
+            except KeyError:
+                raise KeyError("Failed to retrieve distribution factors of nodeset with id {} ('{}')"
+                               .format(id, 'dist_fact_ns%d' % internal_id))
+            return set
+        else:
+            warnings.warn("This database does not contain dist factors for node set {}".format(id))
+            return None
+
+    def get_partial_node_set_df(self, id, start, count):
+        num_sets = self.num_node_sets
+        if num_sets == 0:
+            raise KeyError("No nodesets are stored in this database!")
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        internal_id = self._get_set_id('nodeset', id)
+        if ('dist_fact_ns%d' % internal_id) in self.data.variables:
+            try:
+                set = self.data.variables['dist_fact_ns%d' % internal_id][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError("Failed to retrieve distribution factors of nodeset with id {} ('{}')"
+                               .format(id, 'dist_fact_ns%d' % internal_id))
+            return set
+        else:
+            warnings.warn("This database does not contain dist factors for node set {}".format(id))
+            return None
+
+    def get_node_set_params(self, id):
+        # Returns tuple (number of set entries, number of set distribution factors)
         num_sets = self.num_node_sets
         if num_sets == 0:
             raise KeyError("No nodesets are stored in this database!")
         internal_id = self._get_set_id('nodeset', id)
         try:
-            set = self.data.variables['dist_fact_ns%d' % internal_id]
+            num_entries = self.data.dimensions['num_nod_ns%d' % internal_id].size
         except KeyError:
-            raise KeyError("Failed to retrieve distribution factors of nodeset with id {} ('{}')"
-                           .format(id, 'dist_fact_ns%d' % internal_id))
-        return set[:]
+            raise KeyError("Failed to retrieve number of entries in node set with id {} ('{}')"
+                           .format(id, 'num_nod_ns%d' % internal_id))
+        if ('dist_fact_ns%d' % internal_id) in self.data.variables:
+            num_df = num_entries
+        else:
+            num_df = 0
+        return num_entries, num_df
 
-    def get_sideset(self, id):
+    def get_side_set(self, id):
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No sidesets are stored in this database!")
         internal_id = self._get_set_id('sideset', id)
         try:
-            elmset = self.data.variables['elem_ss%d' % internal_id]
+            elmset = self.data.variables['elem_ss%d' % internal_id][:]
         except KeyError:
             raise KeyError(
                 "Failed to retrieve elements of sideset with id {} ('{}')".format(id, 'elem_ss%d' % internal_id))
         try:
-            sset = self.data.variables['side_ss%d' % internal_id]
+            sset = self.data.variables['side_ss%d' % internal_id][:]
         except KeyError:
             raise KeyError(
                 "Failed to retrieve sides of sideset with id {} ('{}')".format(id, 'side_ss%d' % internal_id))
-        return elmset[:], sset[:]
+        return elmset, sset
 
-    def get_sideset_df(self, id):
+    def get_partial_side_set(self, id, start, count):
+        num_sets = self.num_side_sets
+        if num_sets == 0:
+            raise KeyError("No side sets are stored in this database!")
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        internal_id = self._get_set_id('sideset', id)
+        try:
+            elmset = self.data.variables['elem_ss%d' % internal_id][start - 1:start + count - 1]
+        except KeyError:
+            raise KeyError(
+                "Failed to retrieve elements of side set with id {} ('{}')".format(id, 'elem_ss%d' % internal_id))
+        try:
+            sset = self.data.variables['side_ss%d' % internal_id][start - 1:start + count - 1]
+        except KeyError:
+            raise KeyError(
+                "Failed to retrieve sides of side set with id {} ('{}')".format(id, 'side_ss%d' % internal_id))
+        return elmset, sset
+
+    def get_side_set_df(self, id):
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No sidesets are stored in this database!")
         internal_id = self._get_set_id('sideset', id)
         try:
-            set = self.data.variables['dist_fact_ss%d' % internal_id]
+            set = self.data.variables['dist_fact_ss%d' % internal_id][:]
         except KeyError:
             raise KeyError("Failed to retrieve distribution factors of sideset with id {} ('{}')"
                            .format(id, 'dist_fact_ss%d' % internal_id))
-        return set[:]
+        return set
 
-    # TODO coord, info, partial coord, partial set, set dist fact, time, truth table, among others
+    def get_partial_side_set_df(self, id, start, count):
+        num_sets = self.num_side_sets
+        if num_sets == 0:
+            raise KeyError("No sidesets are stored in this database!")
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        internal_id = self._get_set_id('sideset', id)
+        try:
+            set = self.data.variables['dist_fact_ss%d' % internal_id][start - 1:start + count - 1]
+        except KeyError:
+            raise KeyError("Failed to retrieve distribution factors of sideset with id {} ('{}')"
+                           .format(id, 'dist_fact_ss%d' % internal_id))
+        return set
 
-    def get_coord(self):
-        pass
+    def get_side_set_params(self, id):
+        # Returns tuple (number of set entries, number of set distribution factors)
+        num_sets = self.num_side_sets
+        if num_sets == 0:
+            raise KeyError("No side sets are stored in this database!")
+        internal_id = self._get_set_id('sideset', id)
+        try:
+            num_entries = self.data.dimensions['num_side_ss%d' % internal_id].size
+        except KeyError:
+            raise KeyError("Failed to retrieve number of entries in side set with id {} ('{}')"
+                           .format(id, 'num_side_ss%d' % internal_id))
+        try:
+            num_df = self.data.dimensions['num_df_ss%d' % internal_id].size
+        except KeyError:
+            raise KeyError("Failed to retrieve number of distribution factors in side set with id {} ('{}')"
+                           .format(id, 'num_df_ss%d' % internal_id))
+        return num_entries, num_df
+
+    def get_coords(self):
+        dim_cnt = self.num_dim
+        num_nodes = self.num_nodes
+        if num_nodes == 0:
+            return []
+        large = self.large_model
+        if not large:
+            try:
+                coord = self.data.variables['coord'][:]
+            except KeyError:
+                raise KeyError("Failed to retrieve nodal coordinate array!")
+        else:
+            try:
+                coordx = self.data.variables['coordx'][:]
+            except KeyError:
+                raise KeyError("Failed to retrieve x axis nodal coordinate array!")
+            if dim_cnt > 1:
+                try:
+                    coordy = self.data.variables['coordy'][:]
+                except KeyError:
+                    raise KeyError("Failed to retrieve y axis nodal coordinate array!")
+                if dim_cnt > 2:
+                    try:
+                        coordz = self.data.variables['coordz'][:]
+                    except KeyError:
+                        raise KeyError("Failed to retrieve z axis nodal coordinate array!")
+                    coord = numpy.array([coordx, coordy, coordz])
+                else:
+                    coord = numpy.array([coordx, coordy])
+            else:
+                coord = coordx
+        return coord
+
+    def get_partial_coords(self, start, count):
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        dim_cnt = self.num_dim
+        num_nodes = self.num_nodes
+        if num_nodes == 0:
+            return []
+        large = self.large_model
+        if not large:
+            try:
+                coord = self.data.variables['coord'][:, start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError("Failed to retrieve nodal coordinate array!")
+        else:
+            try:
+                coordx = self.data.variables['coordx'][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError("Failed to retrieve x axis nodal coordinate array!")
+            if dim_cnt > 1:
+                try:
+                    coordy = self.data.variables['coordy'][start - 1:start + count - 1]
+                except KeyError:
+                    raise KeyError("Failed to retrieve y axis nodal coordinate array!")
+                if dim_cnt > 2:
+                    try:
+                        coordz = self.data.variables['coordz'][start - 1:start + count - 1]
+                    except KeyError:
+                        raise KeyError("Failed to retrieve z axis nodal coordinate array!")
+                    coord = numpy.array([coordx, coordy, coordz])
+                else:
+                    coord = numpy.array([coordx, coordy])
+            else:
+                coord = coordx
+        return coord
+
+    def get_coord_x(self):
+        num_nodes = self.num_nodes
+        if num_nodes == 0:
+            return []
+        large = self.large_model
+        if not large:
+            try:
+                coord = self.data.variables['coord'][0]
+            except KeyError:
+                raise KeyError("Failed to retrieve nodal coordinate array!")
+        else:
+            try:
+                coord = self.data.variables['coordx'][:]
+            except KeyError:
+                raise KeyError("Failed to retrieve x axis nodal coordinate array!")
+        return coord
+
+    def get_partial_coord_x(self, start, count):
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        num_nodes = self.num_nodes
+        if num_nodes == 0:
+            return []
+        large = self.large_model
+        if not large:
+            try:
+                coord = self.data.variables['coord'][0][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError("Failed to retrieve nodal coordinate array!")
+        else:
+            try:
+                coord = self.data.variables['coordx'][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError("Failed to retrieve x axis nodal coordinate array!")
+        return coord
+
+    def get_coord_y(self):
+        dim_cnt = self.num_dim
+        num_nodes = self.num_nodes
+        if num_nodes == 0 or dim_cnt < 2:
+            return []
+        large = self.large_model
+        if not large:
+            try:
+                coord = self.data.variables['coord'][1]
+            except KeyError:
+                raise KeyError("Failed to retrieve nodal coordinate array!")
+        else:
+            try:
+                coord = self.data.variables['coordy'][:]
+            except KeyError:
+                raise KeyError("Failed to retrieve y axis nodal coordinate array!")
+        return coord
+
+    def get_partial_coord_y(self, start, count):
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        dim_cnt = self.num_dim
+        num_nodes = self.num_nodes
+        if num_nodes == 0 or dim_cnt < 2:
+            return []
+        large = self.large_model
+        if not large:
+            try:
+                coord = self.data.variables['coord'][1][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError("Failed to retrieve nodal coordinate array!")
+        else:
+            try:
+                coord = self.data.variables['coordy'][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError("Failed to retrieve y axis nodal coordinate array!")
+        return coord
+
+    def get_coord_z(self):
+        dim_cnt = self.num_dim
+        num_nodes = self.num_nodes
+        if num_nodes == 0 or dim_cnt < 3:
+            return []
+        large = self.large_model
+        if not large:
+            try:
+                coord = self.data.variables['coord'][2]
+            except KeyError:
+                raise KeyError("Failed to retrieve nodal coordinate array!")
+        else:
+            try:
+                coord = self.data.variables['coordz'][:]
+            except KeyError:
+                raise KeyError("Failed to retrieve z axis nodal coordinate array!")
+        return coord
+
+    def get_partial_coord_z(self, start, count):
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        dim_cnt = self.num_dim
+        num_nodes = self.num_nodes
+        if num_nodes == 0 or dim_cnt < 3:
+            return []
+        large = self.large_model
+        if not large:
+            try:
+                coord = self.data.variables['coord'][2][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError("Failed to retrieve nodal coordinate array!")
+        else:
+            try:
+                coord = self.data.variables['coordz'][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError("Failed to retrieve z axis nodal coordinate array!")
+        return coord
+
+    def get_coord_names(self):
+        try:
+            names = self.data.variables['coor_names']
+        except KeyError:
+            raise KeyError("Failed to retrieve coordinate name array!")
+        name = numpy.empty([3], str)
+        for i in range(len(names)):
+            name[i] = Exodus.lineparse(names[i])
+        return name
+
+    # TODO What are coordinate frames?
+
+    # TODO info, time, truth table, among others
+
 
     @property
     def qa_records(self):
@@ -634,7 +1064,7 @@ class Exodus:
         if ("ns_prop1" in self.data.variables):
             ndx = numpy.where(self.data.variables["ns_prop1"][:] == node_set_id)[0][0]
             ndx += 1
-        
+
         key = "node_ns" + str(ndx)
         nodeset = self.data[key]
 
@@ -669,9 +1099,8 @@ class Exodus:
             raise Exception("Using node num map")
         nodeids = self.data["connect" + str(id)]
         # flatten it into 1d
-        nodeids = nodeids[:].flatten()   
+        nodeids = nodeids[:].flatten()
         return nodeids
-
 
     def edit_coords(self, node_ids, dim, displace):
         if ("node_num_map" in self.data.variables):
@@ -700,8 +1129,8 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/can.ex2", 'r')
-    print(ex.get_sideset_df(4))
+    ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    print(ex.get_partial_coord_z(1, 4))
     # with warnings.catch_warnings():
     #     warnings.simplefilter('ignore')
     #     for file in SampleFiles():
