@@ -3,8 +3,7 @@ import netCDF4 as nc
 import numpy
 from iterate import SampleFiles
 
-
-class Exodus:
+class Exodus():
     _FORMAT_MAP = {'EX_NETCDF4': 'NETCDF4',
                    'EX_LARGE_MODEL': 'NETCDF3_64BIT_OFFSET',
                    'EX_NORMAL_MODEL': 'NETCDF3_CLASSIC',
@@ -25,7 +24,7 @@ class Exodus:
         if word_size not in [4, 8]:
             raise ValueError("word_size must be 4 or 8 bytes, {} is not supported".format(word_size))
         nc_format = Exodus._FORMAT_MAP[format]
-        # Sets shared mdoe if the user asked for it. I have no idea what this does :)
+        # Sets shared mode if the user asked for it. I have no idea what this does :)
         if shared:
             smode = mode + 's'
         else:
@@ -820,6 +819,7 @@ class Exodus:
                 coord = coordx
         return coord
 
+
     def get_partial_coords(self, start, count):
         if start < 1:
             raise ValueError("Start index must be greater than 0")
@@ -857,6 +857,7 @@ class Exodus:
                 coord = coordx
         return coord
 
+
     def get_coord_x(self):
         num_nodes = self.num_nodes
         if num_nodes == 0:
@@ -873,6 +874,7 @@ class Exodus:
             except KeyError:
                 raise KeyError("Failed to retrieve x axis nodal coordinate array!")
         return coord
+
 
     def get_partial_coord_x(self, start, count):
         if start < 1:
@@ -895,6 +897,7 @@ class Exodus:
                 raise KeyError("Failed to retrieve x axis nodal coordinate array!")
         return coord
 
+
     def get_coord_y(self):
         dim_cnt = self.num_dim
         num_nodes = self.num_nodes
@@ -912,6 +915,7 @@ class Exodus:
             except KeyError:
                 raise KeyError("Failed to retrieve y axis nodal coordinate array!")
         return coord
+
 
     def get_partial_coord_y(self, start, count):
         if start < 1:
@@ -935,6 +939,7 @@ class Exodus:
                 raise KeyError("Failed to retrieve y axis nodal coordinate array!")
         return coord
 
+
     def get_coord_z(self):
         dim_cnt = self.num_dim
         num_nodes = self.num_nodes
@@ -952,6 +957,7 @@ class Exodus:
             except KeyError:
                 raise KeyError("Failed to retrieve z axis nodal coordinate array!")
         return coord
+
 
     def get_partial_coord_z(self, start, count):
         if start < 1:
@@ -975,6 +981,7 @@ class Exodus:
                 raise KeyError("Failed to retrieve z axis nodal coordinate array!")
         return coord
 
+
     def get_coord_names(self):
         try:
             names = self.data.variables['coor_names']
@@ -982,7 +989,7 @@ class Exodus:
             raise KeyError("Failed to retrieve coordinate name array!")
         name = numpy.empty([3], str)
         for i in range(len(names)):
-            name[i] = Exodus.lineparse(names[i])
+            name[i] = self.lineparse(names[i])
         return name
 
     # TODO What are coordinate frames?
@@ -1130,7 +1137,6 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
-    print(ex.get_partial_coord_z(1, 4))
     # with warnings.catch_warnings():
     #     warnings.simplefilter('ignore')
     #     for file in SampleFiles():
