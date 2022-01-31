@@ -89,10 +89,6 @@ class Exodus:
         else:
             raise ValueError("file contains a word size of {} which is not supported".format(ws))
 
-        if mode == 'a':
-            self.ledger = Ledger()
-            self.ledger.initializeLedger(self)
-
     def to_float(self, n):
         # Convert a number to the floating point type the file is using
         return self._float(n)

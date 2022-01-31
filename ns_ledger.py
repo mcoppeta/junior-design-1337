@@ -30,7 +30,11 @@ class NSLedger:
         # setup support for ns_prop1 id map if it exists
         if "ns_prop1" in ex.data.variables.keys():
             for i in ex.data.variables['ns_prop1']:
+<<<<<<< HEAD
                 self.nodeset_ids.append(int(i))
+=======
+                self.nodeset_ids.append(i)
+>>>>>>> 0b8c87038c2df7404d2fee62a2707a2968ecc6fd
                 self.nodeset_id_set.add(int(i))
         # if not, create id map for consistency
         else:
@@ -66,8 +70,45 @@ class NSLedger:
         # O(n) with respect to number of changes in ledger
         nodeset_name = self.nodesets.pop(nodeset_num)
         removed_id = self.nodeset_ids.pop(nodeset_num)
-        self.nodeset_id_set.remove(removed_id)
+        self.nodeset_id_set.remove(int(removed_id))
         self.nodeset_map.pop(nodeset_name)
+
+    def merge_nodesets(self, newID, nodeset_id1, nodeset_id2):
+        if newID in self.nodeset_id_set:
+            raise KeyError("Nodeset ID already in use")
+
+        ns1 = -1
+        ns2 = -1
+        # search for nodeset that corresponds with given IDs
+        for i in range(len(self.nodeset_ids)):
+            if self.nodeset_ids[i] == nodeset_id1:
+                ns1 = i + 1
+            elif self.nodeset_ids[i] == nodeset_id2:
+                ns2 = i + 1
+            if ns1 != -1 and ns2 != -1:
+                break
+
+        # raise ValueError if no nodeset is found
+        if ns1 == -1:
+            raise ValueError("Cannot find nodeset with ID " + str(ns1))
+        if ns2 == -1:
+            raise ValueError("Cannot find nodeset with ID " + str(ns2))
+
+        #merge ns2 into ns1
+        n1 = self.ex.data.variables['node_ns%d' % ns1][:]
+        n2 = self.ex.data.variables['node_ns%d' % ns2][:]
+        n3 = []
+        for i in n1:
+            n3.append(i)
+        for i in n2:
+            if i not in n3:
+                n3.append(i)
+
+        self.add_nodeset(n3, newID)
+        self.remove_nodeset(nodeset_id1)
+        self.remove_nodeset(nodeset_id2)
+
+
 
     def write(self, data):
 
