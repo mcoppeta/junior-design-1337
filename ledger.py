@@ -9,6 +9,9 @@ class Ledger:
         self.nodeset_ledger = NSLedger(ex)
         self.ex = ex
 
+    def merge_nodesets(self, newID, ns1, ns2):
+        self.nodeset_ledger.merge_nodesets(newID, ns1, ns2)
+
     def write(self, path):
         out = nc.Dataset(path, "w", True, format="NETCDF3_CLASSIC")
         old = self.ex.data
@@ -49,5 +52,6 @@ class Ledger:
 if __name__ == "__main__":
     ex = Exodus("sample-files/can.ex2", 'r')
     ledger = Ledger(ex)
-    ledger.write("sample-files/write.ex2")
+    ledger.merge_nodesets(4444, 1, 100)
+    ledger.write("sample-files/w/write.ex2")
     ex.close()
