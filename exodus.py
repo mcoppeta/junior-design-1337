@@ -42,6 +42,9 @@ class Exodus():
             # This is important according to ex_open.c
             self.data.set_fill_off()
 
+        # save path variable for future use
+        self.path = path
+
         # We will read a bunch of data here to make sure it exists and warn the user if they might want to fix their
         # file. We don't save anything to memory so that if our data updates we don't have to update it in memory too.
         # This is the same practice used in the C library so its probably a good idea.
@@ -1066,6 +1069,40 @@ class Exodus():
         for v in self.data.variables:
             print(v)
 
+
+    def get_sideset(self, id):
+        ndx = id - 1
+
+        if ("ss_prop1" in self.data.variables):
+            ndx = numpy.where(self.data.variables["ss_prop1"][:] == id)[0][0]
+            ndx += 1
+
+        elem_key = 'elem_ss' + str(ndx)
+        side_key = 'side_ss' + str(ndx)
+        sideset_i = {}
+
+        if elem_key in self.data.variables and side_key in self.data.variables:
+            if ("elem_num_map" in self.data.variables):
+                sideset_i['elements'] = self.data["elem_num_map"][self.data[elem_key][:]]
+            else:
+                sideset_i['elements'] = self.data[elem_key][:]
+            sideset_i['sides'] = self.data[side_key][:]
+        else:
+            raise RuntimeError("sideset '{}' cannot be found!".format(id))
+
+        return sideset_i
+
+    def get_nodeset(self, id):
+        ndx = id - 1
+        if ("ns_prop1" in self.data.variables):
+            ndx = numpy.where(self.data.variables["ns_prop1"][:] == id)[0][0]
+            ndx += 1
+
+        key = "node_ns" + str(ndx)
+        if ("node_num_map" in self.data.variables):
+            print(self.data[key][:])
+            return self.data["node_num_map"][self.data[key][:]]
+        return self.data[key][:]
     def set_nodeset(self, node_set_id, node_ids):
         ndx = node_set_id - 1
         if ("ns_prop1" in self.data.variables):
@@ -1086,8 +1123,9 @@ class Exodus():
             return
         nodeset[:] = node_ids
 
-    # def add_nodeset(self, node_ids):
-    #     # self.data.createDimension("num_nod_ns4", len(node_ids))
+
+    #   def add_nodeset(self, node_ids):
+         # self.data.createDimension("num_nod_ns4", len(node_ids))
     #     # self.data.createVariable("node_ns4", numpy.dtype('i4'), ("num_nod_ns4"))
 
     #     self.data.dimensions["num_node_sets"].size += 1
