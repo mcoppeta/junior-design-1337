@@ -30,11 +30,7 @@ class NSLedger:
         # setup support for ns_prop1 id map if it exists
         if "ns_prop1" in ex.data.variables.keys():
             for i in ex.data.variables['ns_prop1']:
-<<<<<<< HEAD
                 self.nodeset_ids.append(int(i))
-=======
-                self.nodeset_ids.append(i)
->>>>>>> 0b8c87038c2df7404d2fee62a2707a2968ecc6fd
                 self.nodeset_id_set.add(int(i))
         # if not, create id map for consistency
         else:

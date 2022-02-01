@@ -1,9 +1,10 @@
 import warnings
 import netCDF4 as nc
 import numpy
-from iterate import SampleFiles
+from ledger import Ledger
 
-class Exodus():
+
+class Exodus:
     _FORMAT_MAP = {'EX_NETCDF4': 'NETCDF4',
                    'EX_LARGE_MODEL': 'NETCDF3_64BIT_OFFSET',
                    'EX_NORMAL_MODEL': 'NETCDF3_CLASSIC',
@@ -23,6 +24,8 @@ class Exodus():
             raise ValueError("invalid file format: '{}'".format(format))
         if word_size not in [4, 8]:
             raise ValueError("word_size must be 4 or 8 bytes, {} is not supported".format(word_size))
+        if path.split(".")[-1] not in ['e', 'ex2']:
+            raise ValueError("file must be an exodus file with extension .e or .ex2")
         nc_format = Exodus._FORMAT_MAP[format]
         # Sets shared mode if the user asked for it. I have no idea what this does :)
         if shared:
@@ -38,9 +41,14 @@ class Exodus():
         except OSError:
             raise OSError("file '{}' exists, but clobber is set to False".format(path))
 
+        self.mode = mode
+        self.path = path
+        self.clobber = clobber
+
         if mode == 'w' or mode == 'a':
             # This is important according to ex_open.c
             self.data.set_fill_off()
+            self.ledger = Ledger(self)
 
         # save path variable for future use
         self.path = path
@@ -822,7 +830,6 @@ class Exodus():
                 coord = coordx
         return coord
 
-
     def get_partial_coords(self, start, count):
         if start < 1:
             raise ValueError("Start index must be greater than 0")
@@ -860,7 +867,6 @@ class Exodus():
                 coord = coordx
         return coord
 
-
     def get_coord_x(self):
         num_nodes = self.num_nodes
         if num_nodes == 0:
@@ -877,7 +883,6 @@ class Exodus():
             except KeyError:
                 raise KeyError("Failed to retrieve x axis nodal coordinate array!")
         return coord
-
 
     def get_partial_coord_x(self, start, count):
         if start < 1:
@@ -900,7 +905,6 @@ class Exodus():
                 raise KeyError("Failed to retrieve x axis nodal coordinate array!")
         return coord
 
-
     def get_coord_y(self):
         dim_cnt = self.num_dim
         num_nodes = self.num_nodes
@@ -918,7 +922,6 @@ class Exodus():
             except KeyError:
                 raise KeyError("Failed to retrieve y axis nodal coordinate array!")
         return coord
-
 
     def get_partial_coord_y(self, start, count):
         if start < 1:
@@ -942,7 +945,6 @@ class Exodus():
                 raise KeyError("Failed to retrieve y axis nodal coordinate array!")
         return coord
 
-
     def get_coord_z(self):
         dim_cnt = self.num_dim
         num_nodes = self.num_nodes
@@ -960,7 +962,6 @@ class Exodus():
             except KeyError:
                 raise KeyError("Failed to retrieve z axis nodal coordinate array!")
         return coord
-
 
     def get_partial_coord_z(self, start, count):
         if start < 1:
@@ -984,7 +985,6 @@ class Exodus():
                 raise KeyError("Failed to retrieve z axis nodal coordinate array!")
         return coord
 
-
     def get_coord_names(self):
         try:
             names = self.data.variables['coor_names']
@@ -998,7 +998,6 @@ class Exodus():
     # TODO What are coordinate frames?
 
     # TODO info, time, truth table, among others
-
 
     @property
     def qa_records(self):
@@ -1019,7 +1018,7 @@ class Exodus():
         """Returns a list of (float) time values for each time step"""
         values = []
         for step in self.time_steps:
-            values.append(self.timeAtStep(step))
+            values.append(self.time_at_step(step))
         return values
 
     @property
@@ -1027,11 +1026,11 @@ class Exodus():
         """Returns list of the time steps, 0-indexed"""
         return [*range(self.num_time_steps)]
 
-    def timeAtStep(self, step):
+    def time_at_step(self, step):
         """Given an integer time step, return the corresponding float time value"""
         return float(self.data['time_whole'][step].data)
 
-    def stepAtTime(self, time):
+    def step_at_time(self, time):
         """Given a float time value, return the corresponding time step"""
         for index, value in enumerate(self.time_values):
             if value == time:
@@ -1069,11 +1068,10 @@ class Exodus():
         for v in self.data.variables:
             print(v)
 
-
     def get_sideset(self, id):
         ndx = id - 1
 
-        if ("ss_prop1" in self.data.variables):
+        if "ss_prop1" in self.data.variables:
             ndx = numpy.where(self.data.variables["ss_prop1"][:] == id)[0][0]
             ndx += 1
 
@@ -1082,7 +1080,7 @@ class Exodus():
         sideset_i = {}
 
         if elem_key in self.data.variables and side_key in self.data.variables:
-            if ("elem_num_map" in self.data.variables):
+            if "elem_num_map" in self.data.variables:
                 sideset_i['elements'] = self.data["elem_num_map"][self.data[elem_key][:]]
             else:
                 sideset_i['elements'] = self.data[elem_key][:]
@@ -1094,25 +1092,26 @@ class Exodus():
 
     def get_nodeset(self, id):
         ndx = id - 1
-        if ("ns_prop1" in self.data.variables):
+        if "ns_prop1" in self.data.variables:
             ndx = numpy.where(self.data.variables["ns_prop1"][:] == id)[0][0]
             ndx += 1
 
         key = "node_ns" + str(ndx)
-        if ("node_num_map" in self.data.variables):
+        if "node_num_map" in self.data.variables:
             print(self.data[key][:])
             return self.data["node_num_map"][self.data[key][:]]
         return self.data[key][:]
+
     def set_nodeset(self, node_set_id, node_ids):
         ndx = node_set_id - 1
-        if ("ns_prop1" in self.data.variables):
+        if "ns_prop1" in self.data.variables:
             ndx = numpy.where(self.data.variables["ns_prop1"][:] == node_set_id)[0][0]
             ndx += 1
 
         key = "node_ns" + str(ndx)
         nodeset = self.data[key]
 
-        if ("node_num_map" in self.data.variables):
+        if "node_num_map" in self.data.variables:
             indices = numpy.zeros(len(node_ids))
             i = 0
             for id in node_ids:
@@ -1123,9 +1122,8 @@ class Exodus():
             return
         nodeset[:] = node_ids
 
-
     #   def add_nodeset(self, node_ids):
-         # self.data.createDimension("num_nod_ns4", len(node_ids))
+    #       self.data.createDimension("num_nod_ns4", len(node_ids))
     #     # self.data.createVariable("node_ns4", numpy.dtype('i4'), ("num_nod_ns4"))
 
     #     self.data.dimensions["num_node_sets"].size += 1
@@ -1140,23 +1138,54 @@ class Exodus():
     #     #     i += 1
 
     def get_nodes_in_elblock(self, id):
-        if ("node_num_map" in self.data.variables):
+        if "node_num_map" in self.data.variables:
             raise Exception("Using node num map")
         nodeids = self.data["connect" + str(id)]
         # flatten it into 1d
         nodeids = nodeids[:].flatten()
         return nodeids
 
+    ################################################################
+    #                                                              #
+    #                        Write                                 #
+    #                                                              #
+    ################################################################
+
     def edit_coords(self, node_ids, dim, displace):
-        if ("node_num_map" in self.data.variables):
+        if "node_num_map" in self.data.variables:
             raise Exception("Using node num map")
         node_ndxs = node_ids - 1
         dimnum = 0
-        if (dim == 'y'):
+        if dim == 'y':
             dimnum = 1
-        elif (dim == 'z'):
+        elif dim == 'z':
             dimnum = 2
         self.data["coord"][dimnum, node_ndxs] += displace
+
+    def add_nodeset(self, node_ids, nodeset_id):
+        if self.mode != 'w' or self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.add_nodeset(node_ids, nodeset_id)
+
+    def remove_nodeset(self, nodeset_id):
+        if self.mode != 'w' or self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.remove_nodeset(nodeset_id)
+
+    def merge_nodeset(self, new_id, ns1, ns2):
+        if self.mode != 'w' or self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.merge_nodesets(new_id, ns1, ns2)
+
+    def write(self):
+        if self.mode == 'w':
+            self.ledger.write(self.path)
+        elif self.mode == 'a':
+            if self.clobber:
+                self.ledger.write(self.path)
+            else:
+                path = self.path.split('.')[:-1]
+                self.ledger.write(path + "_revision.ex2")
 
     # prints legacy character array as string
     @staticmethod
@@ -1175,12 +1204,3 @@ class Exodus():
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
-    # with warnings.catch_warnings():
-    #     warnings.simplefilter('ignore')
-    #     for file in SampleFiles():
-    #         ex = Exodus(file, 'r')
-    #         try:
-    #             print(ex.data)
-    #         except KeyError:
-    #             print("no QA record found")
-    #     ex.close()
