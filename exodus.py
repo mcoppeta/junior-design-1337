@@ -11,8 +11,10 @@ class Exodus:
                    'EX_64BIT_DATA': 'NETCDF3_64BIT_DATA'}
     # Default values
     _MAX_STR_LENGTH = 32
+    _MAX_STR_LENGTH_T = 'U32'
     _MAX_NAME_LENGTH = 32
     _MAX_LINE_LENGTH = 80
+    _MAX_LINE_LENGTH_T = 'U80'
     _EXODUS_VERSION = 7.22
 
     # Should creating a new file (mode 'w') be a function on its own?
@@ -986,32 +988,45 @@ class Exodus:
         return coord
 
     def get_coord_names(self):
+        dim_cnt = self.num_dim
         try:
             names = self.data.variables['coor_names']
         except KeyError:
             raise KeyError("Failed to retrieve coordinate name array!")
-        name = numpy.empty([3], str)
-        for i in range(len(names)):
+        name = numpy.empty([dim_cnt], 'U%s' % self.max_allowed_name_length)
+        for i in range(dim_cnt):
             name[i] = self.lineparse(names[i])
         return name
 
     # TODO What are coordinate frames?
 
-    # TODO info, time, truth table, among others
+    def get_info(self):
+        num = self.num_info
+        result = numpy.empty([num], Exodus._MAX_LINE_LENGTH_T)
+        if num > 0:
+            try:
+                infos = self.data.variables['info_records']
+            except KeyError:
+                raise KeyError("Failed to retrieve info records from database!")
+            for i in range(num):
+                result[i] = Exodus.lineparse(infos[i])
+        return result
 
-    @property
-    def qa_records(self):
-        lst = []
-        for line in self.data.variables['qa_records'][0]:
-            lst.append(Exodus.lineparse(line))
-        return lst
+    def get_qa(self):
+        num = self.num_qa
+        result = numpy.empty([num, 4], Exodus._MAX_STR_LENGTH_T)
+        if num > 0:
+            try:
+                qas = self.data.variables['qa_records']
+            except KeyError:
+                raise KeyError("Failed to retrieve qa records from database!")
+            for i in range(num):
+                for j in range(4):
+                    result[i, j] = Exodus.lineparse(qas[i, j])
+        return result
 
-    @property
-    def info_records(self):
-        lst = []
-        for line in self.data.variables['info_records']:
-            lst.append(Exodus.lineparse(line))
-        return lst
+
+    # TODO time, truth table, among others
 
     @property
     def time_values(self):
