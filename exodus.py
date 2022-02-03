@@ -109,31 +109,27 @@ class Exodus:
             self._int = numpy.int64
 
     def to_float(self, n):
+        """Returns ``n`` converted to the floating-point type stored in the database."""
         # Convert a number to the floating point type the database is using
         return self._float(n)
 
     def to_int(self, n):
+        """Returns ``n`` converted to the integer type stored in the database."""
         # Convert a number to the integer type the database is using
         return self._int(n)
 
     @property
     def float(self):
+        """The floating-point type stored in the database."""
         # Returns floating point type of floating point numbers stored in the database
         # You may use whatever crazy types you want while coding, but convert them before storing them in the DB
         return self._float
 
     @property
     def int(self):
+        """The integer type stored in the database."""
         # Returns integer type of integers stored in the database
         return self._int
-
-    # TODO fix function that adds missing parts of the header
-    # TODO function to find the longest name in the object
-
-    # Everything in here that says it's the same as C is pretty much adapted 1-1 from the SEACAS Github and has been
-    # double checked for speed. (see /libraries/exodus/src/ex_inquire.c)
-    # Anything that says NOT IN C doesn't appear in the C version (to my knowledge) probably because the user does
-    # not need to worry about that information and the user should not be able to modify it
 
     ########################################################################
     #                                                                      #
@@ -141,13 +137,21 @@ class Exodus:
     #                                                                      #
     ########################################################################
 
-    # GLOBAL PARAMETERS
+    # Everything in here that says it's the same as C is pretty much adapted 1-1 from the SEACAS Github and has been
+    # double checked for speed. (see /libraries/exodus/src/ex_inquire.c)
+    # Anything that says NOT IN C doesn't appear in the C version (to my knowledge) probably because the user does
+    # not need to worry about that information and the user should not be able to modify it
+
+    # GLOBAL PARAMETERS AND MODEL DEFINITION
+
+    # region Properties
 
     # TODO perhaps in-place properties like these could have property setters as well
 
     # Same as C
     @property
     def title(self):
+        """The database title."""
         try:
             return self.data.getncattr('title')
         except AttributeError:
@@ -156,6 +160,7 @@ class Exodus:
     # Same as C
     @property
     def max_allowed_name_length(self):
+        """The maximum allowed length for variable/dimension/attribute names in this database."""
         max_name_len = Exodus._MAX_NAME_LENGTH
         if 'len_name' in self.data.dimensions:
             # Subtract 1 because in C an extra null character is added for C reasons
@@ -165,6 +170,7 @@ class Exodus:
     # Same as C
     @property
     def max_used_name_length(self):
+        """The maximum used length for variable/dimension/attribute names in this database."""
         # 32 is the default size consistent with other databases
         max_used_name_len = 32
         if 'maximum_name_length' in self.data.ncattrs():
@@ -175,6 +181,7 @@ class Exodus:
     # Same as C
     @property
     def api_version(self):
+        """The Exodus API version this database was built with."""
         try:
             result = self.data.getncattr('api_version')
         except AttributeError:
@@ -188,6 +195,7 @@ class Exodus:
     # Same as C
     @property
     def version(self):
+        """The Exodus version this database uses."""
         try:
             return self.data.getncattr('version')
         except AttributeError:
@@ -196,6 +204,7 @@ class Exodus:
     # Same as C
     @property
     def num_qa(self):
+        """Number of QA records."""
         try:
             result = self.data.dimensions['num_qa_rec'].size
         except KeyError:
@@ -205,29 +214,26 @@ class Exodus:
     # Same as C
     @property
     def num_info(self):
+        """Number of info records."""
         try:
             result = self.data.dimensions['num_info'].size
         except KeyError:
             result = 0
         return result
 
-    ########################################################################
-    #                                                                      #
-    #                        Model Description                             #
-    #                                                                      #
-    ########################################################################
-
     # Same as C
     @property
     def num_dim(self):
+        """Number of dimensions (coordinate axes) used in the model."""
         try:
             return self.data.dimensions['num_dim'].size
         except KeyError:
-            raise KeyError("database dimensionality could not be found")
+            raise KeyError("Database dimensionality could not be found")
 
     # Same as C
     @property
     def num_nodes(self):
+        """Number of nodes stored in this database."""
         try:
             result = self.data.dimensions['num_nodes'].size
         except KeyError:
@@ -238,6 +244,7 @@ class Exodus:
     # Same as C
     @property
     def num_elem(self):
+        """Number of elements stored in this database."""
         try:
             result = self.data.dimensions['num_elem'].size
         except KeyError:
@@ -247,6 +254,7 @@ class Exodus:
     # Same as C
     @property
     def num_elem_blk(self):
+        """Number of element blocks stored in this database."""
         try:
             result = self.data.dimensions['num_el_blk'].size
         except KeyError:
@@ -256,6 +264,7 @@ class Exodus:
     # Same as C
     @property
     def num_node_sets(self):
+        """Number of node sets stored in this database."""
         try:
             result = self.data.dimensions['num_node_sets'].size
         except KeyError:
@@ -269,6 +278,7 @@ class Exodus:
     # Same as C
     @property
     def num_side_sets(self):
+        """Number of side sets stored in this database."""
         try:
             result = self.data.dimensions['num_side_sets'].size
         except KeyError:
@@ -280,12 +290,15 @@ class Exodus:
     # Same as C
     @property
     def num_time_steps(self):
+        """Number of time steps stored in this database."""
         try:
             return self.data.dimensions['time_step'].size
         except KeyError:
             raise KeyError("Number of database time steps could not be found")
 
     # TODO Similar to above, all of the _PROP functions (ctrl+f ex_get_num_props)
+
+    # Are these two functions below for order maps?
 
     # Same as C
     @property
@@ -409,7 +422,11 @@ class Exodus:
             max_line_len = self.data.dimensions['len_line'].size - 1
         return max_line_len
 
-    # Getters for more advanced properties
+    # endregion
+
+    # MODEL VARIABLE ACCESSORS
+
+    # region Get methods
 
     # Nodes and elements have IDs and internal values
     # As a programmer, when I call methods I pass in the internal value, which
@@ -419,6 +436,7 @@ class Exodus:
     # value is 1. In the connectivity array, '1' refers to this element. As a
     # backend person, I need to subtract 1 to index on this internal value.
     def get_node_id_map(self):
+        """Return the node ID map for this database."""
         num_nodes = self.num_nodes
         if num_nodes == 0:
             warnings.warn("Cannot retrieve a node id map if there are no nodes!")
@@ -430,6 +448,11 @@ class Exodus:
         return self.data.variables['node_num_map'][:]
 
     def get_partial_node_id_map(self, start, count):
+        """
+        Return a subset of the node ID map for this database.
+
+        Subset starts at node number ``start`` (1-based) and contains ``count`` elements.
+        """
         # Start is 1 based (>0).  start + count - 1 <= number of nodes
         num_nodes = self.num_nodes
         if num_nodes == 0:
@@ -446,6 +469,7 @@ class Exodus:
         return self.data.variables['node_num_map'][start - 1:start + count - 1]
 
     def get_elem_id_map(self):
+        """Return the element ID map for this database."""
         num_elem = self.num_elem
         if num_elem == 0:
             warnings.warn("Cannot retrieve an element id map if there are no elements!")
@@ -457,6 +481,11 @@ class Exodus:
         return self.data.variables['elem_num_map'][:]
 
     def get_partial_elem_id_map(self, start, count):
+        """
+        Return a subset of the element ID map for this database.
+
+        Subset starts at element number ``start`` (1-based) and contains ``count`` elements.
+        """
         # Start is 1 based (>0).  start + count - 1 <= number of nodes
         num_elem = self.num_elem
         if num_elem == 0:
@@ -473,6 +502,7 @@ class Exodus:
         return self.data.variables['elem_num_map'][start - 1:start + count - 1]
 
     def get_elem_order_map(self):
+        """Returns the element order map for this database."""
         num_elem = self.num_elem
         if num_elem == 0:
             warnings.warn("Cannot retrieve an element order map if there are no elements!")
@@ -486,11 +516,12 @@ class Exodus:
     # TODO what is ex_get_num_map.c?
 
     def get_all_times(self):
+        """"Returns an array of all time steps from this database."""
         try:
-            result = self.data.variables['time_whole']
+            result = self.data.variables['time_whole'][:]
         except KeyError:
             raise KeyError("Could not retrieve timesteps from database!")
-        return result[:]
+        return result
 
     def _get_set_id(self, set_type, num):
         # Returns internal id for a set given it's user defined id (num)
@@ -516,12 +547,12 @@ class Exodus:
         return internal_id
         # The C library also does some crazy stuff with what might be the ns_status array
 
+    # These commented functions are an alternative way to do set related getters. Keeping these here just in case.
+    #
     # Theoretically we could have these call get partial set, but we would need to know the length of the set
     # which would require an extra call to _get_set_id(), which is slow, or crazy extra arguments or helper methods
     # that would increase the complexity enough to offset the added simplicity of this.
     # That probably explains why the C library doesn't do that either...
-    # ...Alternatively we could put the maximum value for whatever integer type hdf5 uses but that's kinda hacky
-    # OR WE COULD USE A CRAZY HELPER METHOD OOH
     # def get_set(self, set_type, id):
     #     # Returns a tuple containing the entry list and extra list of a set.
     #     # Node sets do not have an extra list and return None for the second tuple element.
@@ -558,7 +589,7 @@ class Exodus:
     #             raise KeyError("Failed to retrieve extra set of type {} with id {} ('{}')"
     #                            .format(set_type, id, extra_list))
     #         return entry_set, extra_set
-
+    #
     # def get_set_parameters(self, set_type, id):
     #     # Returns tuple (number of set entries, number of set distribution factors)
     #     if set_type == 'nodeset':
@@ -594,7 +625,7 @@ class Exodus:
     #             raise KeyError("Failed to retrieve number of distribution factors in set of type {} with id {} ('{}')"
     #                            .format(set_type, id, '%s%d' % (df_name, internal_id)))
     #     return num_entries, num_df
-
+    #
     # def get_partial_set(self, set_type, id, start, count):
     #     # Returns a tuple containing the entry list and extra list of a set.
     #     # Node sets do not have an extra list and return None for the second tuple element.
@@ -637,6 +668,7 @@ class Exodus:
     #         return entry_set, extra_set
 
     def get_node_set(self, id):
+        """Returns an array of the nodes contained in the node set with given ID."""
         num_sets = self.num_node_sets
         if num_sets == 0:
             raise KeyError("No node sets are stored in this database!")
@@ -648,6 +680,11 @@ class Exodus:
         return set
 
     def get_partial_node_set(self, id, start, count):
+        """
+        Returns a partial array of the nodes contained in the node set with given ID.
+
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        """
         num_sets = self.num_node_sets
         if num_sets == 0:
             raise KeyError("No node sets are stored in this database!")
@@ -663,6 +700,7 @@ class Exodus:
         return set
 
     def get_node_set_df(self, id):
+        """Returns an array containing the distribution factors in the node set with given ID."""
         num_sets = self.num_node_sets
         if num_sets == 0:
             raise KeyError("No nodesets are stored in this database!")
@@ -679,6 +717,11 @@ class Exodus:
             return None
 
     def get_partial_node_set_df(self, id, start, count):
+        """
+        Returns a partial array of the distribution factors contained in the node set with given ID.
+
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        """
         num_sets = self.num_node_sets
         if num_sets == 0:
             raise KeyError("No nodesets are stored in this database!")
@@ -699,6 +742,11 @@ class Exodus:
             return None
 
     def get_node_set_params(self, id):
+        """
+        Returns a tuple containing the parameters for the node set with given ID.
+
+        Returned tuple is of format (number of nodes, number of distribution factors).
+        """
         # Returns tuple (number of set entries, number of set distribution factors)
         num_sets = self.num_node_sets
         if num_sets == 0:
@@ -716,6 +764,11 @@ class Exodus:
         return num_entries, num_df
 
     def get_side_set(self, id):
+        """
+        Returns tuple containing the elements and sides contained in the side set with given ID.
+
+        Returned tuple is of format (elements in side set, sides in side set).
+        """
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No sidesets are stored in this database!")
@@ -733,6 +786,12 @@ class Exodus:
         return elmset, sset
 
     def get_partial_side_set(self, id, start, count):
+        """
+        Returns tuple containing a subset of the elements and sides contained in the side set with given ID.
+
+        Arrays start at element number ``start`` (1-based) and contains ``count`` elements.
+        Returned tuple is of format (elements in side set, sides in side set).
+        """
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No side sets are stored in this database!")
@@ -754,6 +813,7 @@ class Exodus:
         return elmset, sset
 
     def get_side_set_df(self, id):
+        """Returns an array containing the distribution factors in the side set with given ID."""
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No sidesets are stored in this database!")
@@ -766,6 +826,11 @@ class Exodus:
         return set
 
     def get_partial_side_set_df(self, id, start, count):
+        """
+        Returns a partial array of the distribution factors contained in the side set with given ID.
+
+        Array starts at element number ``start`` (1-based) and contains ``count`` elements.
+        """
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No sidesets are stored in this database!")
@@ -782,6 +847,11 @@ class Exodus:
         return set
 
     def get_side_set_params(self, id):
+        """
+        Returns a tuple containing the parameters for the side set with given ID.
+
+        Returned tuple is of format (number of elements, number of distribution factors).
+        """
         # Returns tuple (number of set entries, number of set distribution factors)
         num_sets = self.num_side_sets
         if num_sets == 0:
@@ -800,6 +870,7 @@ class Exodus:
         return num_entries, num_df
 
     def get_coords(self):
+        """Returns a multi-dimensional array containing the coordinates of all nodes."""
         dim_cnt = self.num_dim
         num_nodes = self.num_nodes
         if num_nodes == 0:
@@ -833,6 +904,11 @@ class Exodus:
         return coord
 
     def get_partial_coords(self, start, count):
+        """
+        Returns a multi-dimensional array containing the coordinates of the specified set of nodes.
+
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        """
         if start < 1:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
@@ -870,6 +946,7 @@ class Exodus:
         return coord
 
     def get_coord_x(self):
+        """Returns an array containing the x coordinate of all nodes."""
         num_nodes = self.num_nodes
         if num_nodes == 0:
             return []
@@ -887,6 +964,11 @@ class Exodus:
         return coord
 
     def get_partial_coord_x(self, start, count):
+        """
+        Returns an array containing the x coordinate of the specified set of nodes.
+
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        """
         if start < 1:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
@@ -908,6 +990,7 @@ class Exodus:
         return coord
 
     def get_coord_y(self):
+        """Returns an array containing the y coordinate of all nodes."""
         dim_cnt = self.num_dim
         num_nodes = self.num_nodes
         if num_nodes == 0 or dim_cnt < 2:
@@ -926,6 +1009,11 @@ class Exodus:
         return coord
 
     def get_partial_coord_y(self, start, count):
+        """
+        Returns an array containing the y coordinate of the specified set of nodes.
+
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        """
         if start < 1:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
@@ -948,6 +1036,7 @@ class Exodus:
         return coord
 
     def get_coord_z(self):
+        """Returns an array containing the z coordinate of all nodes."""
         dim_cnt = self.num_dim
         num_nodes = self.num_nodes
         if num_nodes == 0 or dim_cnt < 3:
@@ -966,6 +1055,11 @@ class Exodus:
         return coord
 
     def get_partial_coord_z(self, start, count):
+        """
+        Returns an array containing the z coordinate of the specified set of nodes.
+
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        """
         if start < 1:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
@@ -988,6 +1082,7 @@ class Exodus:
         return coord
 
     def get_coord_names(self):
+        """Returns an array containing the names of the coordinate axes in this database."""
         dim_cnt = self.num_dim
         try:
             names = self.data.variables['coor_names']
@@ -1001,6 +1096,7 @@ class Exodus:
     # TODO What are coordinate frames?
 
     def get_info(self):
+        """Returns an array containing the info records stored in this database."""
         num = self.num_info
         result = numpy.empty([num], Exodus._MAX_LINE_LENGTH_T)
         if num > 0:
@@ -1013,6 +1109,7 @@ class Exodus:
         return result
 
     def get_qa(self):
+        """Returns an n x 4 array containing the QA records stored in this database."""
         num = self.num_qa
         result = numpy.empty([num, 4], Exodus._MAX_STR_LENGTH_T)
         if num > 0:
@@ -1025,8 +1122,9 @@ class Exodus:
                     result[i, j] = Exodus.lineparse(qas[i, j])
         return result
 
-
     # TODO time, truth table, among others
+
+    # endregion
 
     @property
     def time_values(self):
