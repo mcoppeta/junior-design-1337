@@ -169,7 +169,7 @@ class NSLedger:
                                     dimensions=("num_nod_ns" + str(i+1)))
                 data["node_ns"+str(i+1)][:] = self.nodeset_map[nodeset_name][:]
 
-        # TODO: add ns_status, dist_fact_ns, ns_names
+        # TODO: add ns_status, dist_fact_ns
 
     @staticmethod
     def lineparse(line):
