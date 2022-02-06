@@ -271,10 +271,6 @@ class Exodus:
             result = 0
         return result
 
-    # TODO /libraries/exodus/src/ex_inquire.c line 382 and 387 contain functions we don't have about concatenated
-    #  node sets. exodusII-new.pdf section 4.10 contains related information. I have no clue what this is but it's
-    #  probably important. (Line 44 of that file looks related?)
-
     # Same as C
     @property
     def num_side_sets(self):
@@ -284,8 +280,6 @@ class Exodus:
         except KeyError:
             result = 0
         return result
-
-    # TODO Same deal as todo above. See lines 459, 561, and 566
 
     # Same as C
     @property
@@ -512,8 +506,6 @@ class Exodus:
             warnings.warn("There is no element order map in this database!")
             return numpy.arange(1, num_elem + 1, dtype=self.int)
         return self.data.variables['elem_map'][:]
-
-    # TODO what is ex_get_num_map.c?
 
     def get_all_times(self):
         """"Returns an array of all time steps from this database."""
@@ -1093,8 +1085,6 @@ class Exodus:
             name[i] = self.lineparse(names[i])
         return name
 
-    # TODO What are coordinate frames?
-
     def get_info(self):
         """Returns an array containing the info records stored in this database."""
         num = self.num_info
@@ -1122,7 +1112,10 @@ class Exodus:
                     result[i, j] = Exodus.lineparse(qas[i, j])
         return result
 
-    # TODO time, truth table, among others
+    # TODO time, truth table, among others, element stuff
+
+    # elem block stuff here
+    # ID, count, connectivity, type
 
     # endregion
 
@@ -1248,4 +1241,5 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    ex = Exodus("sample-files/can.ex2", 'r')
+    print(ex.data)
