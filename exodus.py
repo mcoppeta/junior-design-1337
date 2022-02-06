@@ -1137,7 +1137,7 @@ class Exodus:
 
     def step_at_time(self, time):
         """Given a float time value, return the corresponding time step"""
-        for index, value in enumerate(self.time_values):
+        for index, value in enumerate(self.get_all_times()):
             if value == time:
                 return index
         return None
