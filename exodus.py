@@ -1193,21 +1193,6 @@ class Exodus:
             return
         nodeset[:] = node_ids
 
-    #   def add_nodeset(self, node_ids):
-    #       self.data.createDimension("num_nod_ns4", len(node_ids))
-    #     # self.data.createVariable("node_ns4", numpy.dtype('i4'), ("num_nod_ns4"))
-
-    #     self.data.dimensions["num_node_sets"].size += 1
-    #     # if ("node_num_map" not in self.data.variables):
-    #     #     self.data["node_ns4"][:] = node_ids
-    #     #     return
-
-    #     # i = 0
-    #     # for id in node_ids:
-    #     #     ndx = numpy.where(self.data["node_num_map"][:] == id)[0][0]
-    #     #     self.data["node_ns4"][i] = ndx
-    #     #     i += 1
-
     def get_nodes_in_elblock(self, id):
         if "node_num_map" in self.data.variables:
             raise Exception("Using node num map")
