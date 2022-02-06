@@ -1127,14 +1127,6 @@ class Exodus:
     # endregion
 
     @property
-    def time_values(self):
-        """Returns a list of (float) time values for each time step"""
-        values = []
-        for step in self.time_steps:
-            values.append(self.time_at_step(step))
-        return values
-
-    @property
     def time_steps(self):
         """Returns list of the time steps, 0-indexed"""
         return [*range(self.num_time_steps)]
