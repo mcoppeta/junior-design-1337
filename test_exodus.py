@@ -15,7 +15,7 @@ def test_open():
 
 def test_create(tmpdir):
     # Test that we can create a file without any errors
-    exofile = exo.Exodus(tmpdir + '/test.exo', 'w')
+    exofile = exo.Exodus(tmpdir + '/test.ex2', 'w')
     assert exofile.data
     exofile.close()
 
@@ -29,17 +29,17 @@ def test_exodus_init_exceptions(tmp_path, tmpdir):
     with pytest.raises(OSError):
         exofile = exo.Exodus(tmp_path, 'w', False)
     with pytest.raises(ValueError):
-        exofile = exo.Exodus(tmpdir + '/test.exo', 'w', True, "NOTAFORMAT")
+        exofile = exo.Exodus(tmpdir + '/test.ex2', 'w', True, "NOTAFORMAT")
     with pytest.raises(PermissionError):
         exofile = exo.Exodus(tmp_path, 'w', True)
     with pytest.raises(ValueError):
-        exofile = exo.Exodus(tmpdir + '/test2.exo', 'w', True, "NETCDF4", 7)
+        exofile = exo.Exodus(tmpdir + '/test2.ex2', 'w', True, "NETCDF4", 7)
 
 
 def test_float(tmpdir):
-    exofile = exo.Exodus(tmpdir + '/test.exo', 'w', word_size=4)
+    exofile = exo.Exodus(tmpdir + '/test.ex2', 'w', word_size=4)
     assert type(exofile.to_float(1.2)) == numpy.single
-    exofile = exo.Exodus(tmpdir + '/test2.exo', 'w', word_size=8)
+    exofile = exo.Exodus(tmpdir + '/test2.ex2', 'w', word_size=8)
     assert type(exofile.to_float(1.2)) == numpy.double
     exofile.close()
 
