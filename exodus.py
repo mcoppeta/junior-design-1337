@@ -1222,17 +1222,6 @@ class Exodus:
     #                                                              #
     ################################################################
 
-    def edit_coords(self, node_ids, dim, displace):
-        if "node_num_map" in self.data.variables:
-            raise Exception("Using node num map")
-        node_ndxs = node_ids - 1
-        dimnum = 0
-        if dim == 'y':
-            dimnum = 1
-        elif dim == 'z':
-            dimnum = 2
-        self.data["coord"][dimnum, node_ndxs] += displace
-
     def add_nodeset(self, node_ids, nodeset_id):
         if self.mode != 'w' or self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
