@@ -7,7 +7,7 @@ ex = Exodus('sample-files/can copy.ex2', 'a')
 ids = ex.get_nodes_in_elblock(2)
 
 # add 8 to each y coordinate for every node in the square
-ex.edit_coords(ids, 'y', 8)
+#ex.edit_coords(ids, 'y', 8)  #This function has been removed
 
 # close the file
 ex.close()

@@ -1127,14 +1127,6 @@ class Exodus:
     # endregion
 
     @property
-    def time_values(self):
-        """Returns a list of (float) time values for each time step"""
-        values = []
-        for step in self.time_steps:
-            values.append(self.time_at_step(step))
-        return values
-
-    @property
     def time_steps(self):
         """Returns list of the time steps, 0-indexed"""
         return [*range(self.num_time_steps)]
@@ -1201,21 +1193,6 @@ class Exodus:
             return
         nodeset[:] = node_ids
 
-    #   def add_nodeset(self, node_ids):
-    #       self.data.createDimension("num_nod_ns4", len(node_ids))
-    #     # self.data.createVariable("node_ns4", numpy.dtype('i4'), ("num_nod_ns4"))
-
-    #     self.data.dimensions["num_node_sets"].size += 1
-    #     # if ("node_num_map" not in self.data.variables):
-    #     #     self.data["node_ns4"][:] = node_ids
-    #     #     return
-
-    #     # i = 0
-    #     # for id in node_ids:
-    #     #     ndx = numpy.where(self.data["node_num_map"][:] == id)[0][0]
-    #     #     self.data["node_ns4"][i] = ndx
-    #     #     i += 1
-
     def get_nodes_in_elblock(self, id):
         if "node_num_map" in self.data.variables:
             raise Exception("Using node num map")
@@ -1229,17 +1206,6 @@ class Exodus:
     #                        Write                                 #
     #                                                              #
     ################################################################
-
-    def edit_coords(self, node_ids, dim, displace):
-        if "node_num_map" in self.data.variables:
-            raise Exception("Using node num map")
-        node_ndxs = node_ids - 1
-        dimnum = 0
-        if dim == 'y':
-            dimnum = 1
-        elif dim == 'z':
-            dimnum = 2
-        self.data["coord"][dimnum, node_ndxs] += displace
 
     def add_nodeset(self, node_ids, nodeset_id):
         if self.mode != 'w' or self.mode != 'a':
