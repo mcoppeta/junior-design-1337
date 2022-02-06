@@ -1,13 +1,16 @@
-from exodus import Exodus
+import numpy as np
 
-# first open the file
-ex = Exodus('sample-files/can copy.ex2', 'a')
+test_string = list("hello, world")
+arr = np.empty(33, '|S1')
+for i in range(len(test_string)):
+    arr[i] = test_string[i]
 
-# lets get all the nodes in element block 2, which is the square
-ids = ex.get_nodes_in_elblock(2)
+mask = np.empty(33, bool)
+for i in range(33):
+    if i < len(test_string):
+        mask[i] = False
+    else:
+        mask[i] = True
 
-# add 8 to each y coordinate for every node in the square
-ex.edit_coords(ids, 'y', 8)
-
-# close the file
-ex.close()
+out = np.ma.core.MaskedArray(arr, mask)
+print(out)
