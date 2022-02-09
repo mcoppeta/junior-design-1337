@@ -515,19 +515,21 @@ class Exodus:
             raise KeyError("Could not retrieve timesteps from database!")
         return result
 
-    def _get_set_id(self, set_type, num):
-        # Returns internal id for a set given it's user defined id (num)
-        # valid sets are 'nodeset' and 'sideset'
-        if set_type == 'nodeset':
+    def _lookup_id(self, type, num):
+        # Returns internal id for a set or block given it's user defined id (num)
+        # valid sets are 'nodeset' and 'sideset', blocks are 'elblock'
+        if type == 'nodeset':
             name = 'ns_prop1'
-        elif set_type == 'sideset':
+        elif type == 'sideset':
             name = 'ss_prop1'
+        elif type == 'elblock':
+            name = 'eb_prop1'
         else:
-            raise ValueError("{} is not a valid set type!".format(set_type))
+            raise ValueError("{} is not a valid set/block type!".format(type))
         try:
             table = self.data.variables[name]
         except KeyError:
-            raise KeyError("Set id map of type {} is missing from this database!".format(set_type))
+            raise KeyError("Set/block id map of type {} is missing from this database!".format(type))
         # The C library caches information about sets including whether its sequential so it can skip a lot of this
         internal_id = 1
         for table_id in table:
@@ -535,7 +537,7 @@ class Exodus:
                 break
             internal_id += 1
         if internal_id > len(table):
-            raise KeyError("Could not find set of type {} with id {}".format(set_type, num))
+            raise KeyError("Could not find set/block of type {} with id {}".format(type, num))
         return internal_id
         # The C library also does some crazy stuff with what might be the ns_status array
 
@@ -664,7 +666,7 @@ class Exodus:
         num_sets = self.num_node_sets
         if num_sets == 0:
             raise KeyError("No node sets are stored in this database!")
-        internal_id = self._get_set_id('nodeset', id)
+        internal_id = self._lookup_id('nodeset', id)
         try:
             set = self.data.variables['node_ns%d' % internal_id][:]
         except KeyError:
@@ -684,7 +686,7 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        internal_id = self._get_set_id('nodeset', id)
+        internal_id = self._lookup_id('nodeset', id)
         try:
             set = self.data.variables['node_ns%d' % internal_id][start - 1:start + count - 1]
         except KeyError:
@@ -696,7 +698,7 @@ class Exodus:
         num_sets = self.num_node_sets
         if num_sets == 0:
             raise KeyError("No nodesets are stored in this database!")
-        internal_id = self._get_set_id('nodeset', id)
+        internal_id = self._lookup_id('nodeset', id)
         if ('dist_fact_ns%d' % internal_id) in self.data.variables:
             try:
                 set = self.data.variables['dist_fact_ns%d' % internal_id][:]
@@ -721,7 +723,7 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        internal_id = self._get_set_id('nodeset', id)
+        internal_id = self._lookup_id('nodeset', id)
         if ('dist_fact_ns%d' % internal_id) in self.data.variables:
             try:
                 set = self.data.variables['dist_fact_ns%d' % internal_id][start - 1:start + count - 1]
@@ -743,7 +745,7 @@ class Exodus:
         num_sets = self.num_node_sets
         if num_sets == 0:
             raise KeyError("No nodesets are stored in this database!")
-        internal_id = self._get_set_id('nodeset', id)
+        internal_id = self._lookup_id('nodeset', id)
         try:
             num_entries = self.data.dimensions['num_nod_ns%d' % internal_id].size
         except KeyError:
@@ -764,7 +766,7 @@ class Exodus:
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No sidesets are stored in this database!")
-        internal_id = self._get_set_id('sideset', id)
+        internal_id = self._lookup_id('sideset', id)
         try:
             elmset = self.data.variables['elem_ss%d' % internal_id][:]
         except KeyError:
@@ -791,7 +793,7 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        internal_id = self._get_set_id('sideset', id)
+        internal_id = self._lookup_id('sideset', id)
         try:
             elmset = self.data.variables['elem_ss%d' % internal_id][start - 1:start + count - 1]
         except KeyError:
@@ -809,7 +811,7 @@ class Exodus:
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No sidesets are stored in this database!")
-        internal_id = self._get_set_id('sideset', id)
+        internal_id = self._lookup_id('sideset', id)
         try:
             set = self.data.variables['dist_fact_ss%d' % internal_id][:]
         except KeyError:
@@ -830,7 +832,7 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        internal_id = self._get_set_id('sideset', id)
+        internal_id = self._lookup_id('sideset', id)
         try:
             set = self.data.variables['dist_fact_ss%d' % internal_id][start - 1:start + count - 1]
         except KeyError:
@@ -848,7 +850,7 @@ class Exodus:
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No side sets are stored in this database!")
-        internal_id = self._get_set_id('sideset', id)
+        internal_id = self._lookup_id('sideset', id)
         try:
             num_entries = self.data.dimensions['num_side_ss%d' % internal_id].size
         except KeyError:
@@ -1114,6 +1116,35 @@ class Exodus:
 
     # TODO time, truth table, among others, element stuff
 
+    def get_elem_block_params(self, id):
+        """
+        Returns a tuple containing the parameters for the element block with given ID.
+
+        Returned tuple is of format (number of nodes, number of distribution factors).
+        """
+        internal_id = self._lookup_id('elblock', id)
+        try:
+            num_entries = self.data.dimensions['num_el_in_blk%d' % internal_id].size
+            if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
+                num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
+            else:
+                num_node_entry = 0
+            if num_node_entry > 0:
+                connect = self.data.variables['connect%d' % internal_id]
+                topology = connect.getncattr('elem_type')
+            else:
+                topology = None
+            if ('num_att_in_blk%d' % internal_id) in  self.data.dimensions:
+                num_att_blk = self.data.dimensions['num_att_in_blk%d' % internal_id].size
+            else:
+                num_att_blk = 0
+        except KeyError:
+            # TODO this
+            raise KeyError("Failed to retrieve parameters of element block with id {} ('{}')"
+                           .format(id, 'num_nod_ns%d' % internal_id))
+        # TODO this
+        return num_entries, num_node_entry, topology, num_att_blk
+
     # elem block stuff here
     # ID, count, connectivity, type
 
@@ -1242,4 +1273,4 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/can.ex2", 'r')
-    print(ex.data)
+    print(ex.data.variables['connect1'])
