@@ -161,6 +161,11 @@ class NSLedger:
 
                 # copy data
                 data["node_ns" + str(i+1)][:] = self.ex.data[nodeset_name][:]
+
+                if "dist_fact_ns" + nodeset_name[-1:] in self.ex.data.variables.keys():
+                    data.createVariable("dist_fact_ns" + str(i+1), "float64", dimensions=("num_nod_ns" + str(i+1)))
+                    data["dist_fact_ns" + str(i+1)][:] = self.ex.data["dist_fact_ns" + nodeset_name[-1:]]
+
             # else, create according to np array
             else:
                 data.createDimension("num_nod_ns" + str(i+1),
