@@ -1529,6 +1529,9 @@ class Exodus:
         nodeids = nodeids[:].flatten()
         return nodeids
 
+    def diff(self, other):
+        pass
+
     ################################################################
     #                                                              #
     #                        Write                                 #
