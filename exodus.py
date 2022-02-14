@@ -1125,28 +1125,85 @@ class Exodus:
         internal_id = self._lookup_id('elblock', id)
         try:
             num_entries = self.data.dimensions['num_el_in_blk%d' % internal_id].size
+        except KeyError:
+            raise KeyError("Failed to retrieve numer of elements in element block with id {} ('{}')"
+                           .format(id, 'num_el_in_blk%d' % internal_id))
+        try:
             if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
                 num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
             else:
                 num_node_entry = 0
+        except KeyError:
+            raise KeyError("Failed to retrieve numer of nodes per element in element block with id {} ('{}')"
+                           .format(id, 'num_nod_per_el%d' % internal_id))
+        try:
             if num_node_entry > 0:
                 connect = self.data.variables['connect%d' % internal_id]
                 topology = connect.getncattr('elem_type')
             else:
                 topology = None
-            if ('num_att_in_blk%d' % internal_id) in  self.data.dimensions:
+        except KeyError:
+            raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
+                           .format(id, 'connect%d' % internal_id))
+        try:
+            if ('num_att_in_blk%d' % internal_id) in self.data.dimensions:
                 num_att_blk = self.data.dimensions['num_att_in_blk%d' % internal_id].size
             else:
                 num_att_blk = 0
         except KeyError:
-            # TODO this
-            raise KeyError("Failed to retrieve parameters of element block with id {} ('{}')"
-                           .format(id, 'num_nod_ns%d' % internal_id))
-        # TODO this
+            raise KeyError("Failed to retrieve number of attributes in element block with id {} ('{}')"
+                           .format(id, 'num_att_in_blk%d' % internal_id))
         return num_entries, num_node_entry, topology, num_att_blk
 
-    # elem block stuff here
-    # ID, count, connectivity, type
+    def get_elem_blk_connectivity(self, id):
+        """Returns the connectivity list for the element block with given ID."""
+        internal_id = self._lookup_id('elblock', id)
+        try:
+            if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
+                num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
+            else:
+                num_node_entry = 0
+        except KeyError:
+            raise KeyError("Failed to retrieve numer of nodes per element in element block with id {} ('{}')"
+                           .format(id, 'num_nod_per_el%d' % internal_id))
+        if num_node_entry > 0:
+            try:
+                result = self.data.variables['connect%d' % internal_id][:]
+            except KeyError:
+                raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
+                               .format(id, 'connect%d' % internal_id))
+        else:
+            result = []
+        return result
+
+    def get_partial_elem_blk_connectivity(self, id, start, count):
+        """
+        Returns a partial connectivity list for the element block with given ID.
+
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        """
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        internal_id = self._lookup_id('elblock', id)
+        try:
+            if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
+                num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
+            else:
+                num_node_entry = 0
+        except KeyError:
+            raise KeyError("Failed to retrieve numer of nodes per element in element block with id {} ('{}')"
+                           .format(id, 'num_nod_per_el%d' % internal_id))
+        if num_node_entry > 0:
+            try:
+                result = self.data.variables['connect%d' % internal_id][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
+                               .format(id, 'connect%d' % internal_id))
+        else:
+            result = []
+        return result
 
     # endregion
 
@@ -1273,4 +1330,4 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/can.ex2", 'r')
-    print(ex.data.variables['connect1'])
+    print(ex.get_partial_elem_blk_connectivity(1, 100, 20))
