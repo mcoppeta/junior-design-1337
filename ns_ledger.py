@@ -1,19 +1,26 @@
 import numpy as np
 
 
+# TODO: add node to nodeset, remove node from nodeset
 class NSLedger:
 
     def __init__(self, ex):
         # maps the unique name assigned to each nodeset with the actual nodeset
+        # maps to None if nodeset exists in original file
         self.nodeset_map = {}
         # inorder list of unique program-specified nodeset names
+        # integer value if nodeset is added to existing file
+        # name of form node_ns # if nodeset already exists
         self.nodesets = []
+        # counter to assign unique program-specified names to nodesets
+        self.new_nodeset_name = 0
+
         # keeps track of nodeset ids according to ns_prop1
+        # self.nodeset_ids[i] = j denotes nodeset of id j existing at index i
         self.nodeset_ids = []
         # O(1) lookup for nodeset ids to ensure uniqueness
         self.nodeset_id_set = set()
-        # counter to assign unique names to nodesets
-        self.new_nodeset_id = 0
+
         # inorder list of user-specified nodeset names
         self.nodeset_names = []
         # O(1) lookup for user-specified nodeset names
@@ -60,28 +67,22 @@ class NSLedger:
         if nodeset_name in self.nodeset_name_set or "NodeSet %d" % nodeset_id in self.nodeset_name_set:
             raise KeyError("Nodeset name already in use")
 
-        self.nodesets.append(str(self.new_nodeset_id))
-        self.nodeset_map[str(self.new_nodeset_id)] = np.array(node_ids)
+        self.nodesets.append(str(self.new_nodeset_name))
+        self.nodeset_map[str(self.new_nodeset_name)] = np.array(node_ids)
         self.nodeset_ids.append(nodeset_id)
         self.nodeset_id_set.add(nodeset_id)
 
         if nodeset_name == "":
             self.nodeset_names.append("NodeSet %d" % nodeset_id)
             self.nodeset_name_set.add("NodeSet %d" % nodeset_id)
+        else:
+            self.nodeset_names.append(nodeset_name)
+            self.nodeset_name_set.add(nodeset_name)
 
-        self.new_nodeset_id += 1
+        self.new_nodeset_name += 1
 
     def remove_nodeset(self, nodeset_id):
-        nodeset_num = -1
-        # search for nodeset that corresponds with given ID
-        for i in range(len(self.nodeset_ids)):
-            if self.nodeset_ids[i] == nodeset_id:
-                nodeset_num = i
-                break
-
-        # raise ValueError if no nodeset is found
-        if nodeset_num == -1:
-            raise ValueError("Cannot find nodeset with ID " + str(nodeset_id))
+        nodeset_num = self.find_nodeset_num(nodeset_id)
 
         # remove all references to removed nodeset
         # O(1) with respect to the actual nodesets
@@ -129,6 +130,46 @@ class NSLedger:
         self.remove_nodeset(nodeset_id1)
         self.remove_nodeset(nodeset_id2)
 
+    def add_node_to_nodeset(self, node_id, nodeset_id):
+        self.add_nodes_to_nodeset(np.array(node_id), nodeset_id)
+
+
+    def remove_node_from_nodeset(self, node_id, nodeset_id):
+        self.remove_nodes_from_nodeset(np.array(node_id), nodeset_id)
+
+    # node_ids must be array-like per numpy
+    def add_nodes_to_nodeset(self, node_ids, nodeset_id):
+        nodeset_num = self.find_nodeset_num(nodeset_id)
+
+        # determine whether nodeset exists in memory or still only exists in the exodus object
+        # needs to be pulled into memory regardless
+        program_name = self.nodesets[nodeset_num]
+        curr_nodeset = self.nodeset_map[program_name]
+        if curr_nodeset is None:
+            curr_nodeset = self.ex.data[program_name][:]
+            program_name = str(self.new_nodeset_name)
+            self.nodeset_map[program_name] = curr_nodeset
+            self.new_nodeset_name += 1
+
+        new_nodeset = np.append(curr_nodeset, node_ids)
+        self.nodeset_map[program_name] = new_nodeset
+
+    def remove_nodes_from_nodeset(self, node_ids, nodeset_id):
+        nodeset_num = self.find_nodeset_num(nodeset_id)
+
+        # determine whether nodeset exists in memory or still only exists in the exodus object
+        # needs to be pulled into memory regardless
+        program_name = self.nodesets[nodeset_num]
+        curr_nodeset = self.nodeset_map[program_name]
+        if curr_nodeset is None:
+            curr_nodeset = self.ex.data[program_name][:]
+            program_name = str(self.new_nodeset_name)
+            self.nodeset_map[program_name] = curr_nodeset
+            self.new_nodeset_name += 1
+
+        new_nodeset = np.setdiff1d(curr_nodeset,node_ids)
+        self.nodeset_map[program_name] = new_nodeset
+
     def write(self, data):
 
         # if no nodesets exist, no writing needs to be performed
@@ -174,7 +215,21 @@ class NSLedger:
                                     dimensions=("num_nod_ns" + str(i+1)))
                 data["node_ns"+str(i+1)][:] = self.nodeset_map[nodeset_name][:]
 
-        # TODO: add ns_status, dist_fact_ns
+        # TODO: add ns_status
+
+    def find_nodeset_num(self, nodeset_id):
+        nodeset_num = -1
+        # search for nodeset that corresponds with given ID
+        for i in range(len(self.nodeset_ids)):
+            if self.nodeset_ids[i] == nodeset_id:
+                nodeset_num = i
+                break
+
+        # raise ValueError if no nodeset is found
+        if nodeset_num == -1:
+            raise ValueError("Cannot find nodeset with ID " + str(nodeset_id))
+
+        return nodeset_num
 
     @staticmethod
     def lineparse(line):
