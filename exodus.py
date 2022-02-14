@@ -1118,7 +1118,7 @@ class Exodus:
         """
         Returns a tuple containing the parameters for the element block with given ID.
 
-        Returned tuple is of format (number of nodes, number of distribution factors).
+        Returned tuple is of format (number of elements, nodes per element, topology, number of attributes).
         """
         internal_id = self._lookup_id('elblock', id)
         try:
