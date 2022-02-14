@@ -1114,8 +1114,6 @@ class Exodus:
                     result[i, j] = Exodus.lineparse(qas[i, j])
         return result
 
-    # TODO time, truth table, among others, element stuff
-
     def get_elem_block_params(self, id):
         """
         Returns a tuple containing the parameters for the element block with given ID.
@@ -1204,6 +1202,8 @@ class Exodus:
         else:
             result = []
         return result
+
+    # TODO time
 
     # endregion
 
@@ -1330,4 +1330,3 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/can.ex2", 'r')
-    print(ex.get_partial_elem_blk_connectivity(1, 100, 20))
