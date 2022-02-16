@@ -1,6 +1,8 @@
 import pytest
-import numpy
-import exodus as exo
+import numpy as np
+from exodus import Exodus
+import netCDF4 as nc
+from ns_ledger import NSLedger
 
 # Disables all warnings in this module
 pytestmark = pytest.mark.filterwarnings('ignore')
@@ -8,14 +10,14 @@ pytestmark = pytest.mark.filterwarnings('ignore')
 
 def test_open():
     # Test that we can open a file without any errors
-    exofile = exo.Exodus('sample-files/disk_out_ref.ex2', 'r')
+    exofile = Exodus('sample-files/disk_out_ref.ex2', 'r')
     assert exofile.data
     exofile.close()
 
 
 def test_create(tmpdir):
     # Test that we can create a file without any errors
-    exofile = exo.Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
     assert exofile.data
     exofile.close()
 
@@ -23,27 +25,27 @@ def test_create(tmpdir):
 def test_exodus_init_exceptions(tmp_path, tmpdir):
     # Test that the Exodus.__init__() errors all work
     with pytest.raises(ValueError):
-        exo.Exodus('some fake directory/notafile.xxx', 'r')
+        Exodus('some fake directory/notafile.xxx', 'r')
     with pytest.raises(ValueError):
-        exo.Exodus('sample-files/disk_out_ref.ex2', 'z')
+        Exodus('sample-files/disk_out_ref.ex2', 'z')
     with pytest.raises(ValueError):
-        exo.Exodus(str(tmpdir) + '\\test.ex2', 'w', True, format="NOTAFORMAT")
+        Exodus(str(tmpdir) + '\\test.ex2', 'w', True, format="NOTAFORMAT")
     with pytest.raises(OSError):
-        exo.Exodus('sample-files/can.ex2', 'w', True)
+        Exodus('sample-files/can.ex2', 'w', True)
     with pytest.raises(ValueError):
-        exo.Exodus(str(tmpdir) + '\\test2.ex2', 'w', True, "NETCDF4", 7)
+        Exodus(str(tmpdir) + '\\test2.ex2', 'w', True, "NETCDF4", 7)
 
 
 def test_float(tmpdir):
-    exofile = exo.Exodus(str(tmpdir) + '\\test.ex2', 'w', word_size=4)
-    assert type(exofile.to_float(1.2)) == numpy.single
-    exofile = exo.Exodus(str(tmpdir) + '\\test2.ex2', 'w', word_size=8)
-    assert type(exofile.to_float(1.2)) == numpy.double
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w', word_size=4)
+    assert type(exofile.to_float(1.2)) == np.single
+    exofile = Exodus(str(tmpdir) + '\\test2.ex2', 'w', word_size=8)
+    assert type(exofile.to_float(1.2)) == np.double
     exofile.close()
 
 
 def test_parameters():
-    exofile = exo.Exodus('sample-files/disk_out_ref.ex2', 'r')
+    exofile = Exodus('sample-files/disk_out_ref.ex2', 'r')
     assert exofile.title
     assert exofile.version
     assert exofile.api_version
@@ -54,12 +56,12 @@ def test_parameters():
 def test_get_node_set():
     # Testing that get_node_set returns accurate info based on info from Coreform Cubit
     # 'can.ex2' has 1 nodeset (ID 1) with 444 nodes and 1 nodeset (ID 100) with 164 nodes
-    exofile = exo.Exodus('sample-files/can.ex2', 'r')
+    exofile = Exodus('sample-files/can.ex2', 'r')
     assert len(exofile.get_node_set(1)) == 444
     assert len(exofile.get_node_set(100)) == 164
     exofile.close()
     # 'cube_1ts_mod.e' has 6 nodesets (ID 1-6) with 81 nodes and 1 nodeset (ID 7) with 729 nodes
-    exofile = exo.Exodus('sample-files/cube_1ts_mod.e', 'r')
+    exofile = Exodus('sample-files/cube_1ts_mod.e', 'r')
     i = 1
     while i <= 6:
         nodeset = exofile.get_node_set(i)
@@ -68,7 +70,7 @@ def test_get_node_set():
     assert len(exofile.get_node_set(7)) == 729
     exofile.close()
     # Nodeset 1 in 'disk_out_ref.ex2' has 1 node with ID 7210
-    exofile = exo.Exodus('sample-files/disk_out_ref.ex2', 'r')
+    exofile = Exodus('sample-files/disk_out_ref.ex2', 'r')
     nodeset = exofile.get_node_set(1)
     assert nodeset[0] == 7210
     exofile.close()
@@ -77,14 +79,14 @@ def test_get_node_set():
 def test_get_side_set():
     # Testing that get_side_set returns accurate info based on info from Coreform Cubit
     # 'can.ex2' has 1 sideset (ID 4) with 120 elements and 120 sides
-    exofile = exo.Exodus('sample-files/can.ex2', 'r')
+    exofile = Exodus('sample-files/can.ex2', 'r')
     sideset = exofile.get_side_set(4)
     assert len(sideset[0]) == 120
     assert len(sideset[1]) == 120
     exofile.close()
     # Elem+side counts found in Cubit using "list sideset #" command where # is ID
     # 'disk_out_ref.ex2' has 7 sidesets (ID 1-7) with varying amounts of elements/sides
-    exofile = exo.Exodus('sample-files/disk_out_ref.ex2', 'r')
+    exofile = Exodus('sample-files/disk_out_ref.ex2', 'r')
     # ID 1: 418 elements (209 * 2 surfaces), 418 side count
     sideset = exofile.get_side_set(1)
     assert len(sideset[0]) == 418
@@ -121,7 +123,7 @@ def test_get_side_set():
 def test_get_coords():
     # Testing that get_coords returns accurate info based on info from Coreform Cubit
     # 'cube_1ts_mod.e' has 729 coords (ID 1-729) and 3 dimensions (xyz)
-    exofile = exo.Exodus('sample-files/cube_1ts_mod.e', 'r')
+    exofile = Exodus('sample-files/cube_1ts_mod.e', 'r')
     coords = exofile.get_coords()
     # 3 coordinates per node
     assert len(coords == (729*3))
@@ -143,7 +145,7 @@ def test_get_coords():
 def test_get_coord_x():
     # Testing that get_coord_x returns accurate info based on info from Coreform Cubit
     # 'cube_1ts_mod.e' has 729 coords (ID 1-729) and 3 dimensions (xyz)
-    exofile = exo.Exodus('sample-files/cube_1ts_mod.e', 'r')
+    exofile = Exodus('sample-files/cube_1ts_mod.e', 'r')
     xcoords = exofile.get_coord_x()
     # 729 nodes
     assert len(xcoords == 729)
@@ -159,7 +161,7 @@ def test_get_coord_x():
 def test_get_coord_y():
     # Testing that get_coord_y returns accurate info based on info from Coreform Cubit
     # 'cube_1ts_mod.e' has 729 coords (ID 1-729) and 3 dimensions (xyz)
-    exofile = exo.Exodus('sample-files/cube_1ts_mod.e', 'r')
+    exofile = Exodus('sample-files/cube_1ts_mod.e', 'r')
     ycoords = exofile.get_coord_y()
     # 729 nodes
     assert len(ycoords == 729)
@@ -175,10 +177,10 @@ def test_get_coord_y():
 def test_get_coord_z():
     # Testing that get_coord_z returns accurate info based on info from Coreform Cubit
     # 'cube_1ts_mod.e' has 729 coords (ID 1-729) and 3 dimensions (xyz)
-    exofile = exo.Exodus('sample-files/cube_1ts_mod.e', 'r')
+    exofile = Exodus('sample-files/cube_1ts_mod.e', 'r')
     zcoords = exofile.get_coord_z()
     # 729 nodes
-    assert len(zcoords == 729)
+    assert len(zcoords) == 729
     # Test z coord is read correctly for some nodes
     # (Array index from 0, IDs start at 1)
     # Node ID 365 z coord: -.375
@@ -186,6 +188,54 @@ def test_get_coord_z():
     # Node ID 563 z coord: .25
     assert zcoords[562] == .25
     exofile.close()
+
+
+#############################################################################
+#                                                                           #
+#                            NodeSet Tests                                  #
+#                                                                           #
+#############################################################################
+
+def test_init_ledger(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    assert exofile.ledger
+    exofile.close()
+    exofile = Exodus('sample-files/test_ledger.ex2', 'a')
+    assert exofile.ledger
+    exofile.close()
+
+
+def test_init_ns_ledger(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    assert exofile.ledger.nodeset_ledger
+    exofile.close()
+    exofile = Exodus('sample-files/test_ledger.ex2', 'a')
+    assert exofile.ledger.nodeset_ledger
+    exofile.close()
+
+
+def test_add_ns_write(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+
+    exofile.add_nodeset([10, 11, 12], 50)
+    exofile.write()
+
+    data = nc.Dataset(str(tmpdir) + '\\test.ex2', 'r')
+
+    # check to see the number of node sets increased
+    assert data.dimensions['num_node_sets'].size == 1
+
+    # check to see that there are 3 elements in the added nodeset
+    assert data.dimensions['num_nod_ns1'].size == 3
+
+    # ensure the correct elements are in the new nodeset
+    assert np.array_equal(data['node_ns1'], np.array([10, 11, 12]))
+
+    # ensure the new nodeset has the correct ID
+    assert data['ns_prop1'][0] == 50
+    
+    # ensure the correct default name is assigned to the new nodeset
+    assert NSLedger.lineparse(data['ns_names'][0][:]) == "NodeSet 50"
 
 
 # Below tests are based on what can be read according to current C Exodus API.
