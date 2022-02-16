@@ -1530,7 +1530,31 @@ class Exodus:
         return nodeids
 
     def diff(self, other):
-        pass
+        # # Nodesets
+        selfNS = self.num_node_sets
+        otherNS = other.num_node_sets
+        print("Self # Nodesets:\t{}".format(selfNS))
+        print("Other # Nodesets:\t{}".format(otherNS))
+
+        # # Sidesets
+        selfSS = self.num_side_sets
+        otherSS = other.num_side_sets
+        print("\nSelf # Sidesets:\t{}".format(selfSS))
+        print("Other # Sidesets:\t{}".format(otherSS))
+
+        # # Nodes
+        selfN = self.num_nodes
+        otherN = other.num_nodes
+        print("\nSelf # Nodes:\t\t{}".format(selfN))
+        print("Other # Nodes:\t\t{}".format(otherN))
+
+        # # Elements
+        selfE = self.num_elem
+        otherE = other.num_elem
+        print("\nSelf # Elements:\t{}".format(selfE))
+        print("Other # Elements:\t{}".format(otherE))
+
+        # Length of output variables (nodal/elemental)
 
     ################################################################
     #                                                              #
