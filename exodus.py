@@ -13,6 +13,7 @@ class Exodus:
     _MAX_STR_LENGTH = 32
     _MAX_STR_LENGTH_T = 'U32'
     _MAX_NAME_LENGTH = 32
+    _MAX_NAME_LENGTH_T = 'U32'
     _MAX_LINE_LENGTH = 80
     _MAX_LINE_LENGTH_T = 'U80'
     _EXODUS_VERSION = 7.22
@@ -507,10 +508,259 @@ class Exodus:
             return numpy.arange(1, num_elem + 1, dtype=self.int)
         return self.data.variables['elem_map'][:]
 
+    # TODO what is ex_get_num_map.c?
+
+    def get_nodal_var_at_time(self, time_step, var_index):
+        """
+        Returns the values of the nodal variable with given index at specified time step.
+
+        Time step and variable index are both 1-indexed. First time step is at 1, last at num_time_steps.
+        """
+        return self.get_nodal_var_across_times(time_step, time_step, var_index)[0]
+
+    def get_nodal_var_across_times(self, start_time_step, end_time_step, var_index):
+        """
+        Returns the values of the nodal variable with given index between specified time steps (inclusive).
+
+        Time steps and variable index are both 1-indexed. First time step is at 1, last at num_time_steps.
+        """
+        return self.get_partial_nodal_var_across_times(start_time_step, end_time_step, var_index, 1, self.num_nodes)
+
+    def get_partial_nodal_var_across_times(self, start_time_step, end_time_step, var_index, start_index, count):
+        """
+        Returns partial values of a nodal variable between specified time steps (inclusive).
+
+        Time steps, variable index, ID, and start index are all 1-based. First time step is at 1, last at num_time_steps.
+        Array starts at element number ``start`` (1-based) and contains ``count`` elements.
+        """
+        if self.num_nodes == 0:
+            return [[]]
+        num_steps = self.num_time_steps
+        if num_steps <= 0:
+            raise ValueError("There are no time steps in this database!")
+        if start_time_step <= 0 or start_time_step > num_steps:
+            raise ValueError("Start time step out of range. Got {}".format(start_time_step))
+        if end_time_step <= 0 or end_time_step < start_time_step or end_time_step > num_steps:
+            raise ValueError("End time step out of range. Got {}".format(end_time_step))
+        if var_index <= 0 or var_index > self.num_node_var:
+            raise ValueError("Variable index out of range. Got {}".format(var_index))
+        if start_index <= 0:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        if not self.large_model:
+            # All vars stored in one variable
+            try:
+                # Do not subtract 1 from end (inclusive)
+                result = self.data.variables['vals_nod_var'][
+                         start_time_step - 1:end_time_step, var_index - 1, start_index - 1:start_index + count - 1]
+            except KeyError:
+                raise KeyError("Could not find the nodal variables in this database!")
+        else:
+            # Each var to its own variable
+            try:
+                result = self.data.variables['vals_nod_var%d' % var_index][start_time_step - 1:end_time_step, :]
+            except KeyError:
+                raise KeyError("Could not find nodal variable {} in this database!".format(var_index))
+        return result
+
+    def get_global_vars_at_time(self, time_step):
+        """
+        Returns the values of the all global variables at specified time step.
+
+        Time steps are 1-indexed. First time step is at 1, last at num_time_steps.
+        """
+        return self.get_global_vars_across_times(time_step, time_step)[0]
+
+    def get_global_vars_across_times(self, start_time_step, end_time_step):
+        """
+        Returns the values of the all global variables between specified time steps (inclusive).
+
+        Time steps are 1-indexed. First time step is at 1, last at num_time_steps.
+        """
+        num_steps = self.num_time_steps
+        if num_steps <= 0:
+            raise ValueError("There are no time steps in this database!")
+        if start_time_step <= 0 or start_time_step > num_steps:
+            raise ValueError("Time step out of range. Got {}".format(start_time_step))
+        if end_time_step <= 0 or end_time_step < start_time_step or end_time_step > num_steps:
+            raise ValueError("End time step out of range. Got {}".format(end_time_step))
+        try:
+            # Do not subtract 1 from end (inclusive)
+            result = self.data.variables['vals_glo_var'][start_time_step - 1:end_time_step, :]
+        except KeyError:
+            raise KeyError("Could not find global variables in this database!")
+        return result
+
+    def get_global_var_at_time(self, time_step, var_index):
+        """
+        Returns the values of the global variable with given index at specified time step.
+
+        Time step and variable index are both 1-indexed. First time step is at 1, last at num_time_steps.
+        """
+        return self.get_global_var_across_times(time_step, time_step, var_index)[0]
+
+    def get_global_var_across_times(self, start_time_step, end_time_step, var_index):
+        """
+        Returns the values of the global variable with given index between specified time steps (inclusive).
+
+        Time steps and variable index are both 1-indexed. First time step is at 1, last at num_time_steps.
+        """
+        num_steps = self.num_time_steps
+        if num_steps <= 0:
+            raise ValueError("There are no time steps in this database!")
+        if start_time_step <= 0 or start_time_step > num_steps:
+            raise ValueError("Time step out of range. Got {}".format(start_time_step))
+        if end_time_step <= 0 or end_time_step < start_time_step or end_time_step > num_steps:
+            raise ValueError("End time step out of range. Got {}".format(end_time_step))
+        if var_index <= 0 or var_index > self.num_global_var:
+            raise ValueError("Variable index out of range. Got {}".format(var_index))
+        try:
+            result = self.data.variables['vals_glo_var'][start_time_step - 1:end_time_step, var_index - 1]
+        except KeyError:
+            raise KeyError("Could not find global variables in this database!")
+        return result
+
+    # There might also be support for nodeset and sideset variables but if so it seems new
+    def get_elem_block_var_at_time(self, id, time_step, var_index):
+        """
+        Returns the values of variable with index stored in the element block with id at time step.
+
+        Time step, variable index, and ID are all 1-indexed. First time step is at 1, last at num_time_steps.
+        """
+        return self.get_elem_block_var_across_times(id, time_step, time_step, var_index)[0]
+
+    def get_elem_block_var_across_times(self, id, start_time_step, end_time_step, var_index):
+        """
+        Returns the values of variable with index stored in the element block with id between time steps (inclusive).
+
+        Time steps, variable index, and ID are all 1-indexed. First time step is at 1, last at num_time_steps.
+        """
+        # This method cannot simply call its partial version because we cannot know the number of elements to read
+        #  without looking up the id first. This extra id lookup call is slow, so we get around it with a helper method.
+        internal_id = self._lookup_id('elblock', id)
+        size = self.data.dimensions['num_el_in_blk%d' % internal_id].size
+        return self._int_get_partial_elem_block_var_across_times(internal_id, start_time_step, end_time_step, var_index,
+                                                                 1, size)
+
+    def get_partial_elem_block_var_across_times(self, id, start_time_step, end_time_step, var_index, start_index,
+                                                count):
+        """
+        Returns partial values of an element block variable between specified time steps (inclusive).
+
+        Time steps, variable index, ID, and start index are all 1-based. First time step is at 1, last at num_time_steps.
+        Array starts at element number ``start`` (1-based) and contains ``count`` elements.
+        """
+        internal_id = self._lookup_id('elblock', id)
+        return self._int_get_partial_elem_block_var_across_times(internal_id, start_time_step, end_time_step, var_index,
+                                                                 start_index, count)
+
+    def _int_get_partial_elem_block_var_across_times(self, internal_id, start_time_step, end_time_step, var_index,
+                                                     start_index, count):
+        """
+        Returns partial values of an element block variable between specified time steps (inclusive).
+        :param internal_id: INTERNAL (1-based) id
+        :param start_time_step: start time (inclusive)
+        :param end_time_step:  end time (inclusive)
+        :param var_index: variable index (1-based)
+        :param start_index: element start index (1-based)
+        :param count: number of elements
+        :return: 2d array storing the partial variable array at each time step
+        """
+        num_steps = self.num_time_steps
+        if num_steps <= 0:
+            raise ValueError("There are no time steps in this database!")
+        if start_time_step <= 0 or start_time_step > num_steps:
+            raise ValueError("Time step out of range. Got {}".format(start_time_step))
+        if end_time_step <= 0 or end_time_step < start_time_step or end_time_step > num_steps:
+            raise ValueError("End time step out of range. Got {}".format(end_time_step))
+        if var_index <= 0 or var_index > self.num_elem_block_var:
+            raise ValueError("Variable index out of range. Got {}".format(var_index))
+        if start_index <= 0:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        try:
+            result = self.data.variables['vals_elem_var%deb%d' % (var_index, internal_id)][
+                     start_time_step - 1:end_time_step, start_index - 1:start_index + count - 1]
+        except KeyError:
+            raise KeyError("Could not find global variables in this database!")
+        return result
+
+    def _get_var_names(self, type):
+        # Returns list of variable names for given object type
+        if type == 'global':
+            names = 'name_glo_var'
+        elif type == 'nodal':
+            names = 'name_nod_var'
+        elif type == 'elem':
+            names = 'name_elem_var'
+        else:
+            raise ValueError("Invalid variable type {}!".format(type))
+        try:
+            list = self.data.variables[names][:]
+        except KeyError:
+            raise KeyError("No {} variable names stored in database!".format(type))
+        result = numpy.empty([len(list)], Exodus._MAX_NAME_LENGTH_T)
+        for i in range(len(list)):
+            result[i] = Exodus.lineparse(list[i])
+        return result
+
+    def _get_var_name(self, type, index):
+        # Returns variable name of variable with given index of given object type
+        names = self._get_var_names(type)
+        try:
+            name = names[index - 1]
+        except IndexError:
+            raise IndexError("Variable index out of range. Got {}".format(index))
+        return name
+
+    def get_global_var_names(self):
+        """Returns a list of all global variable names. Index of the variable is the index of the name."""
+        return self._get_var_names('global')
+
+    def get_global_var_name(self, index):
+        """Returns the name of the global variable with the given index."""
+        return self._get_var_name('global', index)
+
+    def get_nodal_var_names(self):
+        """Returns a list of all nodal variable names. Index of the variable is the index of the name."""
+        return self._get_var_names('nodal')
+
+    def get_nodal_var_name(self, index):
+        """Returns the name of the nodal variable with the given index."""
+        return self._get_var_name('nodal', index)
+
+    def get_elem_var_names(self):
+        """Returns a list of all element variable names. Index of the variable is the index of the name."""
+        return self._get_var_names('elem')
+
+    def get_elem_var_name(self, index):
+        """Returns the name of the element variable with the given index."""
+        return self._get_var_name('elem', index)
+
     def get_all_times(self):
-        """"Returns an array of all time steps from this database."""
+        """"Returns an array of all time values from all time steps from this database."""
         try:
             result = self.data.variables['time_whole'][:]
+        except KeyError:
+            raise KeyError("Could not retrieve timesteps from database!")
+        return result
+
+    def get_time(self, time_step):
+        """
+        Returns the time value for specified time step.
+
+        Time steps are 1-indexed. The first time step is at 1, and the last at num_time_steps.
+        """
+        num_steps = self.num_time_steps
+        if num_steps <= 0:
+            raise ValueError("There are no time steps in this database!")
+        if time_step <= 0 or time_step > num_steps:
+            raise ValueError("Time step out of range. Got {}"
+                             .format(time_step))
+        try:
+            result = self.data.variables['time_whole'][time_step - 1]
         except KeyError:
             raise KeyError("Could not retrieve timesteps from database!")
         return result
@@ -540,6 +790,10 @@ class Exodus:
             raise KeyError("Could not find set/block of type {} with id {}".format(type, num))
         return internal_id
         # The C library also does some crazy stuff with what might be the ns_status array
+
+    # TODO implement below comment about having get_sets call get_partial sets.
+    #  Basically, have a 'private' method that's like the get partial one, but it takes the internal id. This way,
+    #  id lookup is called only once and we can figure out the size and everything
 
     # These commented functions are an alternative way to do set related getters. Keeping these here just in case.
     #
@@ -1212,10 +1466,6 @@ class Exodus:
         """Returns list of the time steps, 0-indexed"""
         return [*range(self.num_time_steps)]
 
-    def time_at_step(self, step):
-        """Given an integer time step, return the corresponding float time value"""
-        return float(self.data['time_whole'][step].data)
-
     def step_at_time(self, time):
         """Given a float time value, return the corresponding time step"""
         for index, value in enumerate(self.get_all_times()):
@@ -1330,3 +1580,4 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/can.ex2", 'r')
+    print(ex.get_nodal_var_across_times(1, 2, 1))
