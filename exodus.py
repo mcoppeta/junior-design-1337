@@ -800,119 +800,6 @@ class Exodus:
     # which would require an extra call to _get_set_id(), which is slow, or crazy extra arguments or helper methods
     # that would increase the complexity enough to offset the added simplicity of this.
     # That probably explains why the C library doesn't do that either...
-    # def get_set(self, set_type, id):
-    #     # Returns a tuple containing the entry list and extra list of a set.
-    #     # Node sets do not have an extra list and return None for the second tuple element.
-    #     # Start is 1 based (>0) and count must be positive.
-    #     # Without these requirements, this doesn't behave in a very pythonic way
-    #     if set_type == 'nodeset':
-    #         num_sets = self.num_node_sets
-    #     elif set_type == 'sideset':
-    #         num_sets = self.num_side_sets
-    #     else:
-    #         raise KeyError("Invalid set type {}!".format(set_type))
-    #     if num_sets == 0:
-    #         raise KeyError("No sets of type {} are stored in this database!".format(set_type))
-    #     internal_id = self._get_set_id(set_type, id)
-    #
-    #     if set_type == 'nodeset':
-    #         entry_list = 'node_ns%d' % internal_id
-    #         extra_list = None
-    #     elif set_type == 'sideset':
-    #         entry_list = 'elem_ss%d' % internal_id
-    #         extra_list = 'side_ss%d' % internal_id
-    #     try:
-    #         entry_set = self.data.variables[entry_list][:]
-    #     except KeyError:
-    #         raise KeyError("Failed to retrieve entry set of type {} with id {} ('{}')"
-    #                        .format(set_type, id, entry_list))
-    #
-    #     if set_type == 'nodeset':
-    #         return entry_set, None
-    #     else:
-    #         try:
-    #             extra_set = self.data.variables[extra_list][:]
-    #         except KeyError:
-    #             raise KeyError("Failed to retrieve extra set of type {} with id {} ('{}')"
-    #                            .format(set_type, id, extra_list))
-    #         return entry_set, extra_set
-    #
-    # def get_set_parameters(self, set_type, id):
-    #     # Returns tuple (number of set entries, number of set distribution factors)
-    #     if set_type == 'nodeset':
-    #         num_sets = self.num_node_sets
-    #         entry_name = 'num_nod_ns'
-    #         # Node sets are special and don't have a df dimension. See ex_get_set_param
-    #     elif set_type == 'sideset':
-    #         num_sets = self.num_side_sets
-    #         entry_name = 'num_side_ss'
-    #         df_name = 'num_df_ss'
-    #     else:
-    #         raise KeyError("Invalid set type {}!".format(set_type))
-    #     if num_sets == 0:
-    #         raise KeyError("No sets of type {} are stored in this database!".format(set_type))
-    #     internal_id = self._get_set_id(set_type, id)
-    #     # Set entries
-    #     try:
-    #         num_entries = self.data.dimensions['%s%d' % (entry_name, internal_id)].size
-    #     except KeyError:
-    #         raise KeyError("Failed to retrieve number of entries in set of type {} with id {} ('{}')"
-    #                        .format(set_type, id, '%s%d' % (entry_name, internal_id)))
-    #     # Set dist facts
-    #     if set_type == 'nodeset':
-    #         # If the df variable exists num_df == num_entries, otherwise assume 0 df
-    #         if ('dist_fact_ns%d' % internal_id) in self.data.variables:
-    #             num_df = num_entries
-    #         else:
-    #             num_df = 0
-    #     else:
-    #         try:
-    #             num_df = self.data.dimensions['%s%d' % (df_name, internal_id)].size
-    #         except KeyError:
-    #             raise KeyError("Failed to retrieve number of distribution factors in set of type {} with id {} ('{}')"
-    #                            .format(set_type, id, '%s%d' % (df_name, internal_id)))
-    #     return num_entries, num_df
-    #
-    # def get_partial_set(self, set_type, id, start, count):
-    #     # Returns a tuple containing the entry list and extra list of a set.
-    #     # Node sets do not have an extra list and return None for the second tuple element.
-    #     # Start is 1 based (>0) and count must be positive.
-    #     # Without these requirements, this doesn't behave in a very pythonic way
-    #     if set_type == 'nodeset':
-    #         num_sets = self.num_node_sets
-    #     elif set_type == 'sideset':
-    #         num_sets = self.num_side_sets
-    #     else:
-    #         raise KeyError("Invalid set type {}!".format(set_type))
-    #     if num_sets == 0:
-    #         raise KeyError("No sets of type {} are stored in this database!".format(set_type))
-    #     if start < 1:
-    #         raise ValueError("Start index must be greater than 0")
-    #     if count < 0:
-    #         raise ValueError("Count must be a positive integer")
-    #     internal_id = self._get_set_id(set_type, id)
-    #
-    #     if set_type == 'nodeset':
-    #         entry_list = 'node_ns%d' % internal_id
-    #         extra_list = None
-    #     elif set_type == 'sideset':
-    #         entry_list = 'elem_ss%d' % internal_id
-    #         extra_list = 'side_ss%d' % internal_id
-    #     try:
-    #         entry_set = self.data.variables[entry_list][start - 1:start + count - 1]
-    #     except KeyError:
-    #         raise KeyError("Failed to retrieve entry set of type {} with id {} ('{}')"
-    #                        .format(set_type, id, entry_list))
-    #
-    #     if set_type == 'nodeset':
-    #         return entry_set, None
-    #     else:
-    #         try:
-    #             extra_set = self.data.variables[extra_list][start - 1:start + count - 1]
-    #         except KeyError:
-    #             raise KeyError("Failed to retrieve extra set of type {} with id {} ('{}')"
-    #                            .format(set_type, id, extra_list))
-    #         return entry_set, extra_set
 
     def get_node_set(self, id):
         """Returns an array of the nodes contained in the node set with given ID."""
@@ -940,6 +827,25 @@ class Exodus:
         if count < 0:
             raise ValueError("Count must be a positive integer")
         internal_id = self._lookup_id('nodeset', id)
+        try:
+            set = self.data.variables['node_ns%d' % internal_id][start - 1:start + count - 1]
+        except KeyError:
+            raise KeyError("Failed to retrieve node set with id {} ('{}')".format(id, 'node_ns%d' % internal_id))
+        return set
+
+    def _int_get_partial_node_set(self, internal_id, start, count):
+        """
+        Returns a partial array of the nodes contained in the node set with given internal ID.
+
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        """
+        num_sets = self.num_node_sets
+        if num_sets == 0:
+            raise KeyError("No node sets are stored in this database!")
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
         try:
             set = self.data.variables['node_ns%d' % internal_id][start - 1:start + count - 1]
         except KeyError:
