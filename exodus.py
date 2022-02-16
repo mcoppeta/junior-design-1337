@@ -508,13 +508,11 @@ class Exodus:
             return numpy.arange(1, num_elem + 1, dtype=self.int)
         return self.data.variables['elem_map'][:]
 
-    # TODO what is ex_get_num_map.c?
-
     def get_nodal_var_at_time(self, time_step, var_index):
         """
         Returns the values of the nodal variable with given index at specified time step.
 
-        Time step and variable index are both 1-indexed. First time step is at 1, last at num_time_steps.
+        Time step and variable index are both 1-based. First time step is at 1, last at num_time_steps.
         """
         return self.get_nodal_var_across_times(time_step, time_step, var_index)[0]
 
@@ -522,7 +520,7 @@ class Exodus:
         """
         Returns the values of the nodal variable with given index between specified time steps (inclusive).
 
-        Time steps and variable index are both 1-indexed. First time step is at 1, last at num_time_steps.
+        Time steps and variable index are both 1-based. First time step is at 1, last at num_time_steps.
         """
         return self.get_partial_nodal_var_across_times(start_time_step, end_time_step, var_index, 1, self.num_nodes)
 
@@ -530,7 +528,7 @@ class Exodus:
         """
         Returns partial values of a nodal variable between specified time steps (inclusive).
 
-        Time steps, variable index, ID, and start index are all 1-based. First time step is at 1, last at num_time_steps.
+        Time steps, variable index, ID and start index are all 1-based. First time step is at 1, last at num_time_steps.
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
         if self.num_nodes == 0:
@@ -568,7 +566,7 @@ class Exodus:
         """
         Returns the values of the all global variables at specified time step.
 
-        Time steps are 1-indexed. First time step is at 1, last at num_time_steps.
+        Time steps are 1-based. First time step is at 1, last at num_time_steps.
         """
         return self.get_global_vars_across_times(time_step, time_step)[0]
 
@@ -576,7 +574,7 @@ class Exodus:
         """
         Returns the values of the all global variables between specified time steps (inclusive).
 
-        Time steps are 1-indexed. First time step is at 1, last at num_time_steps.
+        Time steps are 1-based. First time step is at 1, last at num_time_steps.
         """
         num_steps = self.num_time_steps
         if num_steps <= 0:
@@ -596,7 +594,7 @@ class Exodus:
         """
         Returns the values of the global variable with given index at specified time step.
 
-        Time step and variable index are both 1-indexed. First time step is at 1, last at num_time_steps.
+        Time step and variable index are both 1-based. First time step is at 1, last at num_time_steps.
         """
         return self.get_global_var_across_times(time_step, time_step, var_index)[0]
 
@@ -604,7 +602,7 @@ class Exodus:
         """
         Returns the values of the global variable with given index between specified time steps (inclusive).
 
-        Time steps and variable index are both 1-indexed. First time step is at 1, last at num_time_steps.
+        Time steps and variable index are both 1-based. First time step is at 1, last at num_time_steps.
         """
         num_steps = self.num_time_steps
         if num_steps <= 0:
@@ -626,7 +624,7 @@ class Exodus:
         """
         Returns the values of variable with index stored in the element block with id at time step.
 
-        Time step, variable index, and ID are all 1-indexed. First time step is at 1, last at num_time_steps.
+        Time step, variable index, and ID are all 1-based. First time step is at 1, last at num_time_steps.
         """
         return self.get_elem_block_var_across_times(id, time_step, time_step, var_index)[0]
 
@@ -634,7 +632,7 @@ class Exodus:
         """
         Returns the values of variable with index stored in the element block with id between time steps (inclusive).
 
-        Time steps, variable index, and ID are all 1-indexed. First time step is at 1, last at num_time_steps.
+        Time steps, variable index, and ID are all 1-based. First time step is at 1, last at num_time_steps.
         """
         # This method cannot simply call its partial version because we cannot know the number of elements to read
         #  without looking up the id first. This extra id lookup call is slow, so we get around it with a helper method.
@@ -648,7 +646,7 @@ class Exodus:
         """
         Returns partial values of an element block variable between specified time steps (inclusive).
 
-        Time steps, variable index, ID, and start index are all 1-based. First time step is at 1, last at num_time_steps.
+        Time steps, variable index, ID and start index are all 1-based. First time step is at 1, last at num_time_steps.
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
         internal_id = self._lookup_id('elblock', id)
@@ -716,7 +714,7 @@ class Exodus:
         return name
 
     def get_global_var_names(self):
-        """Returns a list of all global variable names. Index of the variable is the index of the name."""
+        """Returns a list of all global variable names. Index of the variable is the index of the name + 1."""
         return self._get_var_names('global')
 
     def get_global_var_name(self, index):
@@ -724,7 +722,7 @@ class Exodus:
         return self._get_var_name('global', index)
 
     def get_nodal_var_names(self):
-        """Returns a list of all nodal variable names. Index of the variable is the index of the name."""
+        """Returns a list of all nodal variable names. Index of the variable is the index of the name + 1."""
         return self._get_var_names('nodal')
 
     def get_nodal_var_name(self, index):
@@ -732,7 +730,7 @@ class Exodus:
         return self._get_var_name('nodal', index)
 
     def get_elem_var_names(self):
-        """Returns a list of all element variable names. Index of the variable is the index of the name."""
+        """Returns a list of all element variable names. Index of the variable is the index of the name + 1."""
         return self._get_var_names('elem')
 
     def get_elem_var_name(self, index):
@@ -1456,8 +1454,6 @@ class Exodus:
         else:
             result = []
         return result
-
-    # TODO time
 
     # endregion
 
