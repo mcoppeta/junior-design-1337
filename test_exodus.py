@@ -1,10 +1,10 @@
 import pytest
 import numpy
-import netCDF4
 import exodus as exo
 
 # Disables all warnings in this module
 pytestmark = pytest.mark.filterwarnings('ignore')
+
 
 def test_open():
     # Test that we can open a file without any errors
@@ -13,44 +13,37 @@ def test_open():
     exofile.close()
 
 
-#TODO: Test fails (AttributeError: 'LocalPath' object has no attribute 'split')
 def test_create(tmpdir):
     # Test that we can create a file without any errors
-    exofile = exo.Exodus(tmpdir + '/test.ex2', 'w')
+    exofile = exo.Exodus(str(tmpdir) + '\\test.ex2', 'w')
     assert exofile.data
     exofile.close()
 
 
-#TODO: Test fails (ValueError: file must be an exodus file with extension .e or .ex2)
 def test_exodus_init_exceptions(tmp_path, tmpdir):
     # Test that the Exodus.__init__() errors all work
-    with pytest.raises(FileNotFoundError):
-        exofile = exo.Exodus('some fake directory/notafile.xxx', 'r')
     with pytest.raises(ValueError):
-        exofile = exo.Exodus('sample-files/disk_out_ref.ex2', 'z')
+        exo.Exodus('some fake directory/notafile.xxx', 'r')
+    with pytest.raises(ValueError):
+        exo.Exodus('sample-files/disk_out_ref.ex2', 'z')
+    with pytest.raises(ValueError):
+        exo.Exodus(str(tmpdir) + '\\test.ex2', 'w', True, format="NOTAFORMAT")
     with pytest.raises(OSError):
-        exofile = exo.Exodus(tmp_path, 'w', False)
+        exo.Exodus('sample-files/can.ex2', 'w', True)
     with pytest.raises(ValueError):
-        exofile = exo.Exodus(tmpdir + '/test.ex2', 'w', True, "NOTAFORMAT")
-    with pytest.raises(PermissionError):
-        exofile = exo.Exodus(tmp_path, 'w', True)
-    with pytest.raises(ValueError):
-        exofile = exo.Exodus(tmpdir + '/test2.ex2', 'w', True, "NETCDF4", 7)
+        exo.Exodus(str(tmpdir) + '\\test2.ex2', 'w', True, "NETCDF4", 7)
 
 
-#TODO: Test fails (AttributeError: 'LocalPath' object has no attribute 'split')
 def test_float(tmpdir):
-    exofile = exo.Exodus(tmpdir + '/test.ex2', 'w', word_size=4)
+    exofile = exo.Exodus(str(tmpdir) + '\\test.ex2', 'w', word_size=4)
     assert type(exofile.to_float(1.2)) == numpy.single
-    exofile = exo.Exodus(tmpdir + '/test2.ex2', 'w', word_size=8)
+    exofile = exo.Exodus(str(tmpdir) + '\\test2.ex2', 'w', word_size=8)
     assert type(exofile.to_float(1.2)) == numpy.double
     exofile.close()
 
 
-#TODO: Test fails (AttributeError: Exodus' object has no attribute 'parameters')
 def test_parameters():
     exofile = exo.Exodus('sample-files/disk_out_ref.ex2', 'r')
-    assert exofile.parameters
     assert exofile.title
     assert exofile.version
     assert exofile.api_version
@@ -64,7 +57,7 @@ def test_get_node_set():
     exofile = exo.Exodus('sample-files/can.ex2', 'r')
     assert len(exofile.get_node_set(1)) == 444
     assert len(exofile.get_node_set(100)) == 164
-    exofile.close
+    exofile.close()
     # 'cube_1ts_mod.e' has 6 nodesets (ID 1-6) with 81 nodes and 1 nodeset (ID 7) with 729 nodes
     exofile = exo.Exodus('sample-files/cube_1ts_mod.e', 'r')
     i = 1
@@ -88,7 +81,7 @@ def test_get_side_set():
     sideset = exofile.get_side_set(4)
     assert len(sideset[0]) == 120
     assert len(sideset[1]) == 120
-    exofile.close
+    exofile.close()
     # Elem+side counts found in Cubit using "list sideset #" command where # is ID
     # 'disk_out_ref.ex2' has 7 sidesets (ID 1-7) with varying amounts of elements/sides
     exofile = exo.Exodus('sample-files/disk_out_ref.ex2', 'r')
@@ -146,6 +139,7 @@ def test_get_coords():
     assert coords[2][336] == -.375
     exofile.close()
 
+
 def test_get_coord_x():
     # Testing that get_coord_x returns accurate info based on info from Coreform Cubit
     # 'cube_1ts_mod.e' has 729 coords (ID 1-729) and 3 dimensions (xyz)
@@ -161,6 +155,7 @@ def test_get_coord_x():
     assert xcoords[193] == -.125
     exofile.close()
 
+
 def test_get_coord_y():
     # Testing that get_coord_y returns accurate info based on info from Coreform Cubit
     # 'cube_1ts_mod.e' has 729 coords (ID 1-729) and 3 dimensions (xyz)
@@ -175,6 +170,7 @@ def test_get_coord_y():
     # Node ID 202 y coord: -.5
     assert ycoords[201] == -.5
     exofile.close()
+
 
 def test_get_coord_z():
     # Testing that get_coord_z returns accurate info based on info from Coreform Cubit

@@ -5,6 +5,7 @@ from ledger import Ledger
 
 
 class Exodus:
+
     _FORMAT_MAP = {'EX_NETCDF4': 'NETCDF4',
                    'EX_LARGE_MODEL': 'NETCDF3_64BIT_OFFSET',
                    'EX_NORMAL_MODEL': 'NETCDF3_CLASSIC',
@@ -22,7 +23,7 @@ class Exodus:
         # clobber and format and word_size only apply to mode w
         if mode not in ['r', 'w', 'a']:
             raise ValueError("mode must be 'w', 'r', or 'a', got '{}'".format(mode))
-        if format not in Exodus._FORMAT_MAP:
+        if format not in Exodus._FORMAT_MAP.keys():
             raise ValueError("invalid file format: '{}'".format(format))
         if word_size not in [4, 8]:
             raise ValueError("word_size must be 4 or 8 bytes, {} is not supported".format(word_size))
