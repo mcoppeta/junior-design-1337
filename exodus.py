@@ -1551,14 +1551,7 @@ class Exodus:
         self.ledger.merge_nodesets(new_id, ns1, ns2)
 
     def write(self):
-        if self.mode == 'w':
-            self.ledger.write(self.path)
-        elif self.mode == 'a':
-            if self.clobber:
-                self.ledger.write(self.path)
-            else:
-                path = self.path.split('.')[:-1]
-                self.ledger.write(path + "_revision.ex2")
+        self.ledger.write()
 
     # prints legacy character array as string
     @staticmethod
