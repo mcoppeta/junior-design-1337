@@ -1536,29 +1536,22 @@ class Exodus:
     ################################################################
 
     def add_nodeset(self, node_ids, nodeset_id):
-        if self.mode != 'w' or self.mode != 'a':
+        if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_nodeset(node_ids, nodeset_id)
 
     def remove_nodeset(self, nodeset_id):
-        if self.mode != 'w' or self.mode != 'a':
+        if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_nodeset(nodeset_id)
 
     def merge_nodeset(self, new_id, ns1, ns2):
-        if self.mode != 'w' or self.mode != 'a':
+        if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.merge_nodesets(new_id, ns1, ns2)
 
     def write(self):
-        if self.mode == 'w':
-            self.ledger.write(self.path)
-        elif self.mode == 'a':
-            if self.clobber:
-                self.ledger.write(self.path)
-            else:
-                path = self.path.split('.')[:-1]
-                self.ledger.write(path + "_revision.ex2")
+        self.ledger.write()
 
     # prints legacy character array as string
     @staticmethod
@@ -1576,5 +1569,5 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/can.ex2", 'r')
-    print(ex.get_nodal_var_across_times(1, 2, 1))
+    ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    print(ex.data['ns_names'])
