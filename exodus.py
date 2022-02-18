@@ -1451,4 +1451,5 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/can.ex2", 'r')
+    ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    print(ex.data.variables['eb_names'][0])
