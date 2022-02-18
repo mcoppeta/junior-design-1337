@@ -14,7 +14,6 @@ class Exodus:
     _MAX_STR_LENGTH = 32
     _MAX_STR_LENGTH_T = 'U32'
     _MAX_NAME_LENGTH = 32
-    _MAX_NAME_LENGTH_T = 'U32'
     _MAX_LINE_LENGTH = 80
     _MAX_LINE_LENGTH_T = 'U80'
     _EXODUS_VERSION = 7.22
@@ -109,6 +108,9 @@ class Exodus:
             self._int = numpy.int32
         else:
             self._int = numpy.int64
+
+        # important for storing names in numpy arrays
+        self._MAX_NAME_LENGTH_T = 'U%s' % self.max_allowed_name_length
 
     def to_float(self, n):
         """Returns ``n`` converted to the floating-point type stored in the database."""
@@ -466,7 +468,6 @@ class Exodus:
         num_nodes = self.num_nodes
         if num_nodes == 0:
             raise KeyError("Cannot retrieve a node id map if there are no nodes!")
-            return
         if start < 1:
             raise ValueError("start index must be greater than 0")
         if start + count - 1 > num_nodes:
@@ -492,7 +493,6 @@ class Exodus:
         num_elem = self.num_elem
         if num_elem == 0:
             raise KeyError("Cannot retrieve a element id map if there are no elements!")
-            return
         if start < 1:
             raise ValueError("start index must be greater than 0")
         if start + count - 1 > num_elem:
@@ -767,7 +767,12 @@ class Exodus:
                                                                  start_index, count)
 
     def _get_var_names(self, type):
-        # Returns list of variable names for given object type
+        """
+        Returns a list of variable names for objects of a given type.
+
+        :param type: 'global', 'nodal', or 'elem'
+        :return: a list of variable names
+        """
         if type == 'global':
             names = 'name_glo_var'
         elif type == 'nodal':
@@ -780,7 +785,7 @@ class Exodus:
             list = self.data.variables[names][:]
         except KeyError:
             raise KeyError("No {} variable names stored in database!".format(type))
-        result = numpy.empty([len(list)], Exodus._MAX_NAME_LENGTH_T)
+        result = numpy.empty([len(list)], self._MAX_NAME_LENGTH_T)
         for i in range(len(list)):
             result[i] = Exodus.lineparse(list[i])
         return result
@@ -1131,6 +1136,69 @@ class Exodus:
                            .format(id, 'num_att_in_blk%d' % internal_id))
         return num_entries, num_node_entry, topology, num_att_blk
 
+    #########
+    # Names #
+    #########
+
+    def _get_set_block_names(self, type):
+        """
+        Returns a list of names for objects of a given type.
+        :param type: 'nodeset', 'sideset', or 'elblock'
+        :return: a list of names
+        """
+        names = []
+        if type == 'nodeset':
+            try:
+                names = self.data.variables['ns_names']
+            except KeyError:
+                warnings.warn("This database does not contain node set names.")
+        elif type == 'sideset':
+            try:
+                names = self.data.variables['ss_names']
+            except KeyError:
+                warnings.warn("This database does not contain side set names.")
+        elif type == 'elblock':
+            try:
+                names = self.data.variables['eb_names']
+            except KeyError:
+                warnings.warn("This database does not contain element block names.")
+        else:
+            raise ValueError("{} is not a valid set/block type!".format(type))
+        result = numpy.empty([len(names)], self._MAX_NAME_LENGTH_T)
+        for i in range(len(names)):
+            result[i] = Exodus.lineparse(names[i])
+        return result
+
+    def get_elem_block_names(self):
+        """Returns an array containing the names of element blocks in this database."""
+        return self._get_set_block_names('elblock')
+
+    def get_elem_block_name(self, id):
+        """Returns the name of the given element block."""
+        internal_id = self._lookup_id('elblock', id)
+        names = self._get_set_block_names('elblock')
+        return names[internal_id - 1]
+
+    def get_node_set_names(self):
+        """Returns an array containing the names of node sets in this database."""
+        return self._get_set_block_names('nodeset')
+
+    def get_node_set_name(self, id):
+        """Returns the name of the given node set."""
+        internal_id = self._lookup_id('nodeset', id)
+        names = self._get_set_block_names('nodeset')
+        return names[internal_id - 1]
+
+    def get_side_set_names(self):
+        """Returns an array containing the names of side sets in this database."""
+        return self._get_set_block_names('sideset')
+
+    def get_side_set_name(self, id):
+        """Returns the name of the given side set."""
+        internal_id = self._lookup_id('sideset', id)
+        names = self._get_set_block_names('sideset')
+        return names[internal_id - 1]
+
     ###############
     # Coordinates #
     ###############
@@ -1281,10 +1349,10 @@ class Exodus:
             names = self.data.variables['coor_names']
         except KeyError:
             raise KeyError("Failed to retrieve coordinate name array!")
-        name = numpy.empty([dim_cnt], 'U%s' % self.max_allowed_name_length)
+        result = numpy.empty([dim_cnt], self._MAX_NAME_LENGTH_T)
         for i in range(dim_cnt):
-            name[i] = self.lineparse(names[i])
-        return name
+            result[i] = Exodus.lineparse(names[i])
+        return result
 
     ################
     # File records #
@@ -1382,14 +1450,6 @@ class Exodus:
             return
         nodeset[:] = node_ids
 
-    def get_nodes_in_elblock(self, id):
-        if "node_num_map" in self.data.variables:
-            raise Exception("Using node num map")
-        nodeids = self.data["connect" + str(id)]
-        # flatten it into 1d
-        nodeids = nodeids[:].flatten()
-        return nodeids
-
     ################################################################
     #                                                              #
     #                        Write                                 #
@@ -1438,4 +1498,3 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
-    print(ex.get_node_id_map())
