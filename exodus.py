@@ -1579,13 +1579,13 @@ class Exodus:
         except KeyError:
             raise KeyError("Other Exodus file does not contain nodeset with ID {}".format(id2))
 
-        equivalent = (ns1 == ns2).all()
+        equivalent = numpy.array_equal(numpy.array(sorted(ns1.tolist())), numpy.array(sorted(ns2.tolist())))
         if equivalent:
             print("Self NS {} contains the same Node IDs as Other NS ID {}".format(id, id2))
         else:
             print("Self NS ID {} does NOT contain the same nodes as Other NS ID {}".format(id, id2))
             intersection = set(ns1) & set(ns2)
-            print("\tBoth nodesets share the following nodes:\n\t{}".format(list(intersection)))
+            print("\tBoth nodesets share the following nodes:\n\t{}".format(sorted(list(intersection))))
             ns1_diff = sorted(list(set(ns1) - intersection))
             print("\tSelf NS ID {} also contains nodes:\n\t{}".format(id, ns1_diff))
             ns2_diff = sorted(list(set(ns2) - intersection))
