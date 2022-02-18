@@ -122,7 +122,7 @@ def test_get_side_set():
 
 def test_get_elem_block():
     # Test that get_elem_blk_connectivity()/params() return accurate results
-    exofile = exo.Exodus('sample-files/can.ex2', 'r')
+    exofile = Exodus('sample-files/can.ex2', 'r')
     # ID 1: 4800 elements, 0 attributes, HEX (8 nodes/elem)
     conn = exofile.get_elem_block_connectivity(1)
     assert len(conn) == 4800
