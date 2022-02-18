@@ -1552,9 +1552,44 @@ class Exodus:
         selfE = self.num_elem
         otherE = other.num_elem
         print("\nSelf # Elements:\t{}".format(selfE))
-        print("Other # Elements:\t{}".format(otherE))
+        print("Other # Elements:\t{}\n".format(otherE))
 
         # Length of output variables (nodal/elemental)
+
+    def diff_nodeset(self, id, other, id2=None):
+        """
+        Prints the overlap and difference between two nodesets
+        :param id: the nodeset ID of the self Exodus object
+        :param other: the other Exodus object to compare to
+        :param id2: optional parameter specifying the nodeset ID of other Exodus object. Default to the first id.
+        """
+
+        if other is None:
+            raise ValueError("Other Exodus file is None")
+
+        if id2 is None:
+            id2 = id
+        try:
+            ns1 = self.get_node_set(id)
+        except KeyError:
+            raise KeyError("Self Exodus file does not contain nodeset with ID {}".format(id))
+
+        try:
+            ns2 = other.get_node_set(id2)
+        except KeyError:
+            raise KeyError("Other Exodus file does not contain nodeset with ID {}".format(id2))
+
+        equivalent = (ns1 == ns2).all()
+        if equivalent:
+            print("Self NS {} contains the same Node IDs as Other NS ID {}".format(id, id2))
+        else:
+            print("Self NS ID {} does NOT contain the same nodes as Other NS ID {}".format(id, id2))
+            intersection = set(ns1) & set(ns2)
+            print("\tBoth nodesets share the following nodes:\n\t{}".format(list(intersection)))
+            ns1_diff = sorted(list(set(ns1) - intersection))
+            print("\tSelf NS ID {} also contains nodes:\n\t{}".format(id, ns1_diff))
+            ns2_diff = sorted(list(set(ns2) - intersection))
+            print("\tOther NS ID {} also contains nodes:\n\t{}\n".format(id2, ns2_diff))
 
     ################################################################
     #                                                              #
