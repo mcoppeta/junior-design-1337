@@ -8,8 +8,8 @@ class Ledger:
         self.nodeset_ledger = NSLedger(ex)
         self.ex = ex
 
-    def add_nodeset(self, node_ids, nodeset_id):
-        self.nodeset_ledger.add_nodeset(node_ids, nodeset_id)
+    def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
+        self.nodeset_ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
 
     def remove_nodeset(self, nodeset_id):
         self.nodeset_ledger.remove_nodeset(nodeset_id)

@@ -1597,10 +1597,10 @@ class Exodus:
     #                                                              #
     ################################################################
 
-    def add_nodeset(self, node_ids, nodeset_id):
+    def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.add_nodeset(node_ids, nodeset_id)
+        self.ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
 
     def remove_nodeset(self, nodeset_id):
         if self.mode != 'w' and self.mode != 'a':
