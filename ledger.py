@@ -17,6 +17,18 @@ class Ledger:
     def merge_nodesets(self, new_id, ns1, ns2, delete):
         self.nodeset_ledger.merge_nodesets(new_id, ns1, ns2, delete)
 
+    def add_node_to_nodeset(self, node_id, nodeset_id):
+        self.nodeset_ledger.add_node_to_nodeset(node_id, nodeset_id)
+
+    def add_nodes_to_nodeset(self, node_ids, nodeset_id):
+        self.nodeset_ledger.add_nodes_to_nodeset(node_ids, nodeset_id)
+
+    def remove_node_from_nodeset(self, node_id, nodeset_id):
+        self.nodeset_ledger.remove_node_from_nodeset(node_id, nodeset_id)
+
+    def remove_nodes_from_nodeset(self, node_ids, nodeset_id):
+        self.nodeset_ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
+
     def write(self):
         if self.ex.mode == 'w':
             self.w_write()
