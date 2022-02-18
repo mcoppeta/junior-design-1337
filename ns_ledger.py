@@ -1,7 +1,6 @@
 import numpy as np
 
 
-# TODO: add node to nodeset, remove node from nodeset
 class NSLedger:
 
     def __init__(self, ex):
@@ -185,7 +184,7 @@ class NSLedger:
         data['ns_prop1'][:] = np.array(self.nodeset_ids)
 
         # add ns_name data
-        data.createVariable("ns_names", "|S1", dimensions=("num_node_sets"))
+        data.createVariable("ns_names", "|S1", dimensions=("num_node_sets", "len_name"))
         for i in range(len(self.nodeset_names)):
             data['ns_names'][i] = NSLedger.convert_string(self.nodeset_names[i])
 
