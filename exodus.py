@@ -1607,10 +1607,10 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_nodeset(nodeset_id)
 
-    def merge_nodeset(self, new_id, ns1, ns2):
+    def merge_nodeset(self, new_id, ns1, ns2, delete):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.merge_nodesets(new_id, ns1, ns2)
+        self.ledger.merge_nodesets(new_id, ns1, ns2, delete)
 
     def write(self):
         self.ledger.write()

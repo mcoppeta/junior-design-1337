@@ -14,15 +14,15 @@ class Ledger:
     def remove_nodeset(self, nodeset_id):
         self.nodeset_ledger.remove_nodeset(nodeset_id)
 
-    def merge_nodesets(self, new_id, ns1, ns2):
-        self.nodeset_ledger.merge_nodesets(new_id, ns1, ns2)
+    def merge_nodesets(self, new_id, ns1, ns2, delete):
+        self.nodeset_ledger.merge_nodesets(new_id, ns1, ns2, delete)
 
     def write(self):
         if self.ex.mode == 'w':
             self.w_write()
         elif self.ex.mode == 'a':
-            path = self.path.split('.')[:-1]
-            self.a_write(path + '_rev.ex2')
+            path = self.ex.path.split('.')[:-1]
+            self.a_write(path[0] + '_rev.ex2')
 
     def w_write(self):
         self.nodeset_ledger.write(self.ex.data)
