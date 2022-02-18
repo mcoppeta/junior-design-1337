@@ -122,7 +122,7 @@ def test_get_elem_block():
     # Test that get_elem_blk_connectivity()/params() return accurate results
     exofile = exo.Exodus('sample-files/can.ex2', 'r')
     # ID 1: 4800 elements, 0 attributes, HEX (8 nodes/elem)
-    conn = exofile.get_elem_blk_connectivity(1)
+    conn = exofile.get_elem_block_connectivity(1)
     assert len(conn) == 4800
     num, node, topo, attrb = exofile.get_elem_block_params(1)
     assert num == 4800
@@ -130,7 +130,7 @@ def test_get_elem_block():
     assert topo == 'HEX'
     assert attrb == 0
     # ID 1: 2352 elements, 0 attributes, HEX (8 nodes/elem)
-    conn = exofile.get_elem_blk_connectivity(2)
+    conn = exofile.get_elem_block_connectivity(2)
     assert len(conn) == 2352
     num, node, topo, attrb = exofile.get_elem_block_params(2)
     assert num == 2352

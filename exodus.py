@@ -454,14 +454,7 @@ class Exodus:
     def get_node_id_map(self):
         """Return the node ID map for this database."""
         num_nodes = self.num_nodes
-        if num_nodes == 0:
-            warnings.warn("Cannot retrieve a node id map if there are no nodes!")
-            return
-        if 'node_num_map' not in self.data.variables:
-            # Return a default array from 1 to the number of nodes
-            warnings.warn("There is no node id map in this database!")
-            return numpy.arange(1, num_nodes + 1, dtype=self.int)
-        return self.data.variables['node_num_map'][:]
+        return self.get_partial_node_id_map(1, num_nodes)
 
     def get_partial_node_id_map(self, start, count):
         """
@@ -472,7 +465,7 @@ class Exodus:
         # Start is 1 based (>0).  start + count - 1 <= number of nodes
         num_nodes = self.num_nodes
         if num_nodes == 0:
-            warnings.warn("Cannot retrieve a node id map if there are no nodes!")
+            raise KeyError("Cannot retrieve a node id map if there are no nodes!")
             return
         if start < 1:
             raise ValueError("start index must be greater than 0")
@@ -487,14 +480,7 @@ class Exodus:
     def get_elem_id_map(self):
         """Return the element ID map for this database."""
         num_elem = self.num_elem
-        if num_elem == 0:
-            warnings.warn("Cannot retrieve an element id map if there are no elements!")
-            return
-        if 'elem_num_map' not in self.data.variables:
-            # Return a default array from 1 to the number of elements
-            warnings.warn("There is no element id map in this database!")
-            return numpy.arange(1, num_elem + 1, dtype=self.int)
-        return self.data.variables['elem_num_map'][:]
+        return self.get_partial_elem_id_map(1, num_elem)
 
     def get_partial_elem_id_map(self, start, count):
         """
@@ -505,7 +491,7 @@ class Exodus:
         # Start is 1 based (>0).  start + count - 1 <= number of nodes
         num_elem = self.num_elem
         if num_elem == 0:
-            warnings.warn("Cannot retrieve an element id map if there are no elements!")
+            raise KeyError("Cannot retrieve a element id map if there are no elements!")
             return
         if start < 1:
             raise ValueError("start index must be greater than 0")
@@ -1058,7 +1044,7 @@ class Exodus:
     # Element blocks #
     ##################
 
-    def _int_get_partial_elem_blk_connectivity(self, internal_id, start, count):
+    def _int_get_partial_elem_block_connectivity(self, internal_id, start, count):
         """
         Returns a partial connectivity list for the element block with given ID.
 
@@ -1091,20 +1077,20 @@ class Exodus:
             result = []
         return result
 
-    def get_elem_blk_connectivity(self, id):
+    def get_elem_block_connectivity(self, id):
         """Returns the connectivity list for the element block with given ID."""
         internal_id = self._lookup_id('elblock', id)
         size = self.data.dimensions['num_el_in_blk%d' % internal_id].size
-        return self._int_get_partial_elem_blk_connectivity(internal_id, 1, size)
+        return self._int_get_partial_elem_block_connectivity(internal_id, 1, size)
 
-    def get_partial_elem_blk_connectivity(self, id, start, count):
+    def get_partial_elem_block_connectivity(self, id, start, count):
         """
         Returns a partial connectivity list for the element block with given ID.
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
         internal_id = self._lookup_id('elblock', id)
-        return self._int_get_partial_elem_blk_connectivity(internal_id, start, count)
+        return self._int_get_partial_elem_block_connectivity(internal_id, start, count)
 
     def get_elem_block_params(self, id):
         """
@@ -1452,4 +1438,4 @@ class Exodus:
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
-    print(ex.data.variables['eb_names'][0])
+    print(ex.get_node_id_map())
