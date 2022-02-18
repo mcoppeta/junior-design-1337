@@ -147,6 +147,9 @@ class Exodus:
 
     # TODO perhaps in-place properties like these could have property setters as well
 
+    # TODO it would be nice to have the return values cached for these so they execute faster and act more like
+    #  properties and less like small functions. This will require some write integration.
+
     @property
     def title(self):
         """The database title."""
@@ -565,7 +568,7 @@ class Exodus:
         try:
             result = self.data.variables['time_whole'][:]
         except KeyError:
-            raise KeyError("Could not retrieve timesteps from database!")
+            raise KeyError("Could not retrieve time steps from database!")
         return result
 
     def get_time(self, time_step):
@@ -583,7 +586,7 @@ class Exodus:
         try:
             result = self.data.variables['time_whole'][time_step - 1]
         except KeyError:
-            raise KeyError("Could not retrieve timesteps from database!")
+            raise KeyError("Could not retrieve time steps from database!")
         return result
 
     def get_nodal_var_at_time(self, time_step, var_index):
