@@ -120,6 +120,28 @@ def test_get_side_set():
     exofile.close()
 
 
+def test_get_elem_block():
+    # Test that get_elem_blk_connectivity()/params() return accurate results
+    exofile = Exodus('sample-files/can.ex2', 'r')
+    # ID 1: 4800 elements, 0 attributes, HEX (8 nodes/elem)
+    conn = exofile.get_elem_block_connectivity(1)
+    assert len(conn) == 4800
+    num, node, topo, attrb = exofile.get_elem_block_params(1)
+    assert num == 4800
+    assert node == 8
+    assert topo == 'HEX'
+    assert attrb == 0
+    # ID 1: 2352 elements, 0 attributes, HEX (8 nodes/elem)
+    conn = exofile.get_elem_block_connectivity(2)
+    assert len(conn) == 2352
+    num, node, topo, attrb = exofile.get_elem_block_params(2)
+    assert num == 2352
+    assert node == 8
+    assert topo == 'HEX'
+    assert attrb == 0
+    exofile.close()
+
+
 def test_get_coords():
     # Testing that get_coords returns accurate info based on info from Coreform Cubit
     # 'cube_1ts_mod.e' has 729 coords (ID 1-729) and 3 dimensions (xyz)
