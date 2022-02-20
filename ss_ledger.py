@@ -29,7 +29,6 @@ class SSLedger:
             else:
                 self.ss_names.append("ss" + str(i))
             self.num_dist_fact.append(ex.data.dimensions["num_df_ss" + str(i + 1)].size)
-            self.ss_names.append(None)
             self.ss_dist_fact.append(None)
             self.ss_elem.append(None) # this is place holder to be filled with real values later
             self.ss_sides.append(None) # this is place holder to be filled with real values later
