@@ -168,6 +168,8 @@ class NSLedger:
             self.new_nodeset_name += 1
 
         new_nodeset = np.setdiff1d(curr_nodeset,node_ids)
+        if len(curr_nodeset) - len(new_nodeset) != len(node_ids):
+            raise IndexError("One or more nodes could not be found in NodeSet " + str(nodeset_id))
         self.nodeset_map[program_name] = new_nodeset
 
     def write(self, data):

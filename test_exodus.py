@@ -310,6 +310,7 @@ def test_add_node_to_nodeset(tmpdir):
     assert exofile.data.dimensions['num_nod_ns1'].size == 4
     assert np.array_equal(exofile.get_node_set(99), np.array([10, 11, 12, 15]))
 
+
 def test_add_nodes_to_nodeset(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
 
@@ -322,6 +323,19 @@ def test_add_nodes_to_nodeset(tmpdir):
     assert exofile.num_node_sets == 1
     assert exofile.data.dimensions['num_nod_ns1'].size == 6
     assert np.array_equal(exofile.get_node_set(99), np.array([10, 11, 12, 15, 16, 17]))
+
+
+def test_remove_from_nonexistant_ns(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+
+    exofile.add_nodeset([10, 11, 12], 99)
+    exofile.add_nodeset([13, 14, 15], 100)
+
+    with pytest.raises(IndexError):
+        exofile.remove_node_from_nodeset(100, 1)
+
+    exofile.close()
+
 
 
 # Below tests are based on what can be read according to current C Exodus API.
