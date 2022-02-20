@@ -8,7 +8,9 @@ class SS_ledger:
         self.ex = ex
 
         # Create lists for sideset data
-        self.num_ss = ex.data.dimensions["num_side_sets"].size
+        self.num_ss = 0
+        if ("num_side_sets" in ex.data.dimensions.keys()):
+            self.num_ss = ex.data.dimensions["num_side_sets"].size
         self.ss_prop1 = [] # this is id for sideset
         self.ss_status = []
         self.ss_sizes = []
@@ -24,8 +26,12 @@ class SS_ledger:
             self.ss_prop1.append(ex.data["ss_prop1"][i]) 
             self.ss_status.append(ex.data["ss_status"][i])
             self.ss_sizes.append(ex.data.dimensions["num_side_ss" + str(i + 1)].size)
-            self.ss_status.append(ex.data["ss_names"][i])
+            if ("ss_names" in ex.data.variables):
+                self.ss_names.append(ex.data["ss_names"][i])
+            else:
+                self.ss_names.append("ss" + str(i))
             self.num_dist_fact.append(ex.data.dimensions["num_df_ss" + str(i + 1)].size)
+            self.ss_names.append(None)
             self.ss_dist_fact.append(None)
             self.ss_elem.append(None) # this is place holder to be filled with real values later
             self.ss_sides.append(None) # this is place holder to be filled with real values later
