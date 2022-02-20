@@ -133,7 +133,6 @@ class NSLedger:
     def add_node_to_nodeset(self, node_id, nodeset_id):
         self.add_nodes_to_nodeset(np.array(node_id), nodeset_id)
 
-
     def remove_node_from_nodeset(self, node_id, nodeset_id):
         self.remove_nodes_from_nodeset(np.array(node_id), nodeset_id)
 
@@ -232,6 +231,26 @@ class NSLedger:
             raise IndexError("Cannot find nodeset with ID " + str(nodeset_id))
 
         return nodeset_num
+
+    def num_node_sets(self):
+        return len(self.nodesets)
+
+    def get_node_set(self, id):
+        num = self.find_nodeset_num(id)
+        name = self.nodesets[num]
+        if name not in self.nodeset_map.keys():
+            raise KeyError(f"NodeSet {id} does not exist")
+
+        if self.nodeset_map[name] is None:
+            return np.array(self.ex.data[name])
+        return np.array(self.nodeset_map[name])
+
+    def get_node_set_name(self, id):
+        num = self.find_nodeset_num(id)
+        return self.nodeset_names[num]
+
+    def get_node_set_names(self):
+        return np.array(self.nodeset_names)
 
     @staticmethod
     def lineparse(line):
