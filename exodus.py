@@ -1453,26 +1453,116 @@ class Exodus:
             return
         nodeset[:] = node_ids
 
+    def get_nodes_in_elblock(self, id):
+        if "node_num_map" in self.data.variables:
+            raise Exception("Using node num map")
+        nodeids = self.data["connect" + str(id)]
+        # flatten it into 1d
+        nodeids = nodeids[:].flatten()
+        return nodeids
+
+    def diff(self, other):
+        # # Nodesets
+        selfNS = self.num_node_sets
+        otherNS = other.num_node_sets
+        print("Self # Nodesets:\t{}".format(selfNS))
+        print("Other # Nodesets:\t{}".format(otherNS))
+
+        # # Sidesets
+        selfSS = self.num_side_sets
+        otherSS = other.num_side_sets
+        print("\nSelf # Sidesets:\t{}".format(selfSS))
+        print("Other # Sidesets:\t{}".format(otherSS))
+
+        # # Nodes
+        selfN = self.num_nodes
+        otherN = other.num_nodes
+        print("\nSelf # Nodes:\t\t{}".format(selfN))
+        print("Other # Nodes:\t\t{}".format(otherN))
+
+        # # Elements
+        selfE = self.num_elem
+        otherE = other.num_elem
+        print("\nSelf # Elements:\t{}".format(selfE))
+        print("Other # Elements:\t{}\n".format(otherE))
+
+        # Length of output variables (nodal/elemental)
+
+    def diff_nodeset(self, id, other, id2=None):
+        """
+        Prints the overlap and difference between two nodesets
+        :param id: the nodeset ID of the self Exodus object
+        :param other: the other Exodus object to compare to
+        :param id2: optional parameter specifying the nodeset ID of other Exodus object. Default to the first id.
+        """
+
+        if other is None:
+            raise ValueError("Other Exodus file is None")
+
+        if id2 is None:
+            id2 = id
+        try:
+            ns1 = self.get_node_set(id)
+        except KeyError:
+            raise KeyError("Self Exodus file does not contain nodeset with ID {}".format(id))
+
+        try:
+            ns2 = other.get_node_set(id2)
+        except KeyError:
+            raise KeyError("Other Exodus file does not contain nodeset with ID {}".format(id2))
+
+        equivalent = numpy.array_equal(numpy.array(sorted(ns1.tolist())), numpy.array(sorted(ns2.tolist())))
+        if equivalent:
+            print("Self NS {} contains the same Node IDs as Other NS ID {}".format(id, id2))
+        else:
+            print("Self NS ID {} does NOT contain the same nodes as Other NS ID {}".format(id, id2))
+            intersection = set(ns1) & set(ns2)
+            print("\tBoth nodesets share the following nodes:\n\t{}".format(sorted(list(intersection))))
+            ns1_diff = sorted(list(set(ns1) - intersection))
+            print("\tSelf NS ID {} also contains nodes:\n\t{}".format(id, ns1_diff))
+            ns2_diff = sorted(list(set(ns2) - intersection))
+            print("\tOther NS ID {} also contains nodes:\n\t{}\n".format(id2, ns2_diff))
+
     ################################################################
     #                                                              #
     #                        Write                                 #
     #                                                              #
     ################################################################
 
-    def add_nodeset(self, node_ids, nodeset_id):
+    def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.add_nodeset(node_ids, nodeset_id)
+        self.ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
 
     def remove_nodeset(self, nodeset_id):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_nodeset(nodeset_id)
 
-    def merge_nodeset(self, new_id, ns1, ns2):
+    def merge_nodeset(self, new_id, ns1, ns2, delete):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.merge_nodesets(new_id, ns1, ns2)
+        self.ledger.merge_nodesets(new_id, ns1, ns2, delete)
+
+    def add_node_to_nodeset(self, node_id, nodeset_id):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.add_node_to_nodeset(node_id, nodeset_id)
+
+    def add_nodes_to_nodeset(self, node_ids, nodeset_id):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.add_nodes_to_nodeset(node_ids, nodeset_id)
+
+    def remove_node_from_nodeset(self, node_id, nodeset_id):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.remove_node_from_nodeset(node_id, nodeset_id)
+
+    def remove_nodes_from_nodeset(self, node_ids, nodeset_id):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
 
     def write(self):
         self.ledger.write()

@@ -8,21 +8,33 @@ class Ledger:
         self.nodeset_ledger = NSLedger(ex)
         self.ex = ex
 
-    def add_nodeset(self, node_ids, nodeset_id):
-        self.nodeset_ledger.add_nodeset(node_ids, nodeset_id)
+    def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
+        self.nodeset_ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
 
     def remove_nodeset(self, nodeset_id):
         self.nodeset_ledger.remove_nodeset(nodeset_id)
 
-    def merge_nodesets(self, new_id, ns1, ns2):
-        self.nodeset_ledger.merge_nodesets(new_id, ns1, ns2)
+    def merge_nodesets(self, new_id, ns1, ns2, delete):
+        self.nodeset_ledger.merge_nodesets(new_id, ns1, ns2, delete)
+
+    def add_node_to_nodeset(self, node_id, nodeset_id):
+        self.nodeset_ledger.add_node_to_nodeset(node_id, nodeset_id)
+
+    def add_nodes_to_nodeset(self, node_ids, nodeset_id):
+        self.nodeset_ledger.add_nodes_to_nodeset(node_ids, nodeset_id)
+
+    def remove_node_from_nodeset(self, node_id, nodeset_id):
+        self.nodeset_ledger.remove_node_from_nodeset(node_id, nodeset_id)
+
+    def remove_nodes_from_nodeset(self, node_ids, nodeset_id):
+        self.nodeset_ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
 
     def write(self):
         if self.ex.mode == 'w':
             self.w_write()
         elif self.ex.mode == 'a':
-            path = self.path.split('.')[:-1]
-            self.a_write(path + '_rev.ex2')
+            path = self.ex.path.split('.')[:-1]
+            self.a_write(path[0] + '_rev.ex2')
 
     def w_write(self):
         self.nodeset_ledger.write(self.ex.data)

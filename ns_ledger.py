@@ -94,7 +94,7 @@ class NSLedger:
         name = self.nodeset_names.pop(nodeset_num)
         self.nodeset_name_set.remove(name)
 
-    def merge_nodesets(self, new_id, nodeset_id1, nodeset_id2):
+    def merge_nodesets(self, new_id, nodeset_id1, nodeset_id2, delete):
         if new_id in self.nodeset_id_set:
             raise KeyError("Nodeset ID already in use")
 
@@ -126,8 +126,9 @@ class NSLedger:
                 n3.append(i)
 
         self.add_nodeset(n3, new_id)
-        self.remove_nodeset(nodeset_id1)
-        self.remove_nodeset(nodeset_id2)
+        if delete:
+            self.remove_nodeset(nodeset_id1)
+            self.remove_nodeset(nodeset_id2)
 
     def add_node_to_nodeset(self, node_id, nodeset_id):
         self.add_nodes_to_nodeset(np.array(node_id), nodeset_id)
@@ -204,7 +205,7 @@ class NSLedger:
 
                 if "dist_fact_ns" + nodeset_name[-1:] in self.ex.data.variables.keys():
                     data.createVariable("dist_fact_ns" + str(i+1), "float64", dimensions=("num_nod_ns" + str(i+1)))
-                    data["dist_fact_ns" + str(i+1)][:] = self.ex.data["dist_fact_ns" + nodeset_name[-1:]]
+                    data["dist_fact_ns" + str(i+1)][:] = self.ex.data["dist_fact_ns" + nodeset_name[-1:]][:]
 
             # else, create according to np array
             else:
