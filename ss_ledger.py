@@ -1,8 +1,6 @@
-from ast import Pass
-from logging import raiseExceptions
 import numpy as np
 
-class SS_ledger:
+class SSLedger:
 
     def __init__(self, ex):
         self.ex = ex
@@ -114,7 +112,7 @@ class SS_ledger:
         # copy over names
         data.createVariable("ss_names", "|S1", dimensions=("num_side_sets"))
         for i in range(len(self.ss_names)):
-            data['ss_names'][i] = SS_ledger.convert_string(self.ss_names[i])
+            data['ss_names'][i] = SSLedger.convert_string(self.ss_names[i])
 
         for i in range(self.num_ss):
             # create elem, sides, and dist facts

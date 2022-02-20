@@ -1,5 +1,5 @@
 from ns_ledger import NSLedger
-from ss_ledger import SS_ledger
+from ss_ledger import SSLedger
 import netCDF4 as nc
 
 
@@ -7,7 +7,7 @@ class Ledger:
 
     def __init__(self, ex):
         self.nodeset_ledger = NSLedger(ex)
-        self.sideset_ledger = SS_ledger(ex)
+        self.sideset_ledger = SSLedger(ex)
         self.ex = ex
 
     def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
