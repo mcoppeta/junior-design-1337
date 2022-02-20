@@ -148,7 +148,7 @@ def test_get_coords():
     exofile = Exodus('sample-files/cube_1ts_mod.e', 'r')
     coords = exofile.get_coords()
     # 3 coordinates per node
-    assert len(coords == (729*3))
+    assert sum(len(dim_arr) for dim_arr in coords) == (729*3)
     # x, y, and z coordinates for each node
     assert len(coords[0]) == len(coords[1]) == len(coords[2])
     # Test coords read correctly for some nodes
@@ -170,7 +170,7 @@ def test_get_coord_x():
     exofile = Exodus('sample-files/cube_1ts_mod.e', 'r')
     xcoords = exofile.get_coord_x()
     # 729 nodes
-    assert len(xcoords == 729)
+    assert len(xcoords) == 729
     # Test x coord is read correctly for some nodes
     # (Array index from 0, IDs start at 1)
     # Node ID 11 x coord: .375
@@ -186,7 +186,7 @@ def test_get_coord_y():
     exofile = Exodus('sample-files/cube_1ts_mod.e', 'r')
     ycoords = exofile.get_coord_y()
     # 729 nodes
-    assert len(ycoords == 729)
+    assert len(ycoords) == 729
     # Test y coord is read correctly for some nodes
     # (Array index from 0, IDs start at 1)
     # Node ID 22 y coord: 0
@@ -272,7 +272,7 @@ def test_remove_ns_empty(tmpdir):
         exofile.remove_nodeset(1)
 
 
-def test_remove_ns_nonexistant(tmpdir):
+def test_remove_ns_nonexistent(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
     exofile.add_nodeset([1, 2, 3], 0, "Test Name")
     with pytest.raises(IndexError):
@@ -325,7 +325,7 @@ def test_add_nodes_to_nodeset(tmpdir):
     assert np.array_equal(exofile.get_node_set(99), np.array([10, 11, 12, 15, 16, 17]))
 
 
-def test_remove_from_nonexistant_ns(tmpdir):
+def test_remove_from_nonexistent_ns(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
 
     exofile.add_nodeset([10, 11, 12], 99)

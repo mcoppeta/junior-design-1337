@@ -227,7 +227,7 @@ class NSLedger:
                 nodeset_num = i
                 break
 
-        # raise ValueError if no nodeset is found
+        # raise IndexError if no nodeset is found
         if nodeset_num == -1:
             raise IndexError("Cannot find nodeset with ID " + str(nodeset_id))
 
