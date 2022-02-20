@@ -5,12 +5,6 @@ import numpy as np
 class SS_ledger:
 
     def __init__(self, ex):
-        print(ex.data)
-        print(ex.data["elem_ss1"][:])
-        print(ex.data["side_ss1"][:])
-        print(ex.data["ss_status"][0])
-        print(ex.data["ss_names"][0])
-
         self.ex = ex
 
         # Create lists for sideset data
