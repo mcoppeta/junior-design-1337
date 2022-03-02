@@ -255,6 +255,9 @@ class Exodus:
     @property
     def num_node_sets(self):
         """Number of node sets stored in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_node_sets()
+
         try:
             result = self.data.dimensions['num_node_sets'].size
         except KeyError:
@@ -508,6 +511,9 @@ class Exodus:
 
     def get_node_set_id_map(self):
         """Returns the id map for node sets (ns_prop1)."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_node_set_id_map()
+
         try:
             table = self.data.variables['ns_prop1']
         except KeyError:
@@ -885,6 +891,10 @@ class Exodus:
 
     def get_node_set(self, id):
         """Returns an array of the nodes contained in the node set with given ID."""
+
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_node_set(id)
+
         internal_id = self._lookup_id('nodeset', id)
         size = self.data.dimensions['num_nod_ns%d' % internal_id].size
         return self._int_get_partial_node_set(internal_id, 1, size)
@@ -1184,10 +1194,15 @@ class Exodus:
 
     def get_node_set_names(self):
         """Returns an array containing the names of node sets in this database."""
+        if self.mode == 'a' or self.mode == 'w':
+            return self.ledger.get_node_set_names()
         return self._get_set_block_names('nodeset')
 
     def get_node_set_name(self, id):
         """Returns the name of the given node set."""
+        if self.mode == 'a' or self.mode == 'w':
+            return self.ledger.get_node_set_name(id)
+
         internal_id = self._lookup_id('nodeset', id)
         names = self._get_set_block_names('nodeset')
         return names[internal_id - 1]

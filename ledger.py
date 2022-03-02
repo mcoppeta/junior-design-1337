@@ -10,6 +10,18 @@ class Ledger:
         self.sideset_ledger = SSLedger(ex)
         self.ex = ex
 
+    def num_node_sets(self):
+        return self.nodeset_ledger.num_node_sets()
+
+    def get_node_set(self, id):
+        return self.nodeset_ledger.get_node_set(id)
+
+    def get_node_set_name(self, id):
+        return self.nodeset_ledger.get_node_set_name(id)
+
+    def get_node_set_names(self):
+        return self.nodeset_ledger.get_node_set_names()
+
     def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
         self.nodeset_ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
 

@@ -337,6 +337,26 @@ def test_remove_from_nonexistent_ns(tmpdir):
     exofile.close()
 
 
+def test_ns_prewrite_read(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+
+    assert exofile.num_node_sets == 0
+
+    exofile.add_nodeset([10, 11, 12], 99)
+
+    assert exofile.num_node_sets == 1
+    assert np.array_equal(exofile.get_node_set(99), np.array([10, 11, 12]))
+
+    exofile.add_nodeset([13, 14, 15], 100)
+
+    assert exofile.num_node_sets == 2
+    assert np.array_equal(exofile.get_node_set(100), np.array([13, 14, 15]))
+
+    assert np.array_equal(exofile.get_node_set_names(), np.array(['NodeSet 99', 'NodeSet 100']))
+
+    assert exofile.get_node_set_name(99) == 'NodeSet 99'
+    assert exofile.get_node_set_name(100) == 'NodeSet 100'
+
 
 # Below tests are based on what can be read according to current C Exodus API.
 # The contents, names, and number of tests are subject to change as work on the library progresses
