@@ -47,8 +47,8 @@ class Ledger:
         if self.ex.mode == 'w':
             self.w_write()
         elif self.ex.mode == 'a':
-            path = self.ex.path.split('.')[:-1]
-            self.a_write(path[0] + '_rev.ex2')
+            path = self.ex.path.split('.')
+            self.a_write(path[0] + '_rev.' + path[1])
 
     def w_write(self):
         self.nodeset_ledger.write(self.ex.data)

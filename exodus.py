@@ -27,8 +27,8 @@ class Exodus:
             raise ValueError("invalid file format: '{}'".format(format))
         if word_size not in [4, 8]:
             raise ValueError("word_size must be 4 or 8 bytes, {} is not supported".format(word_size))
-        if path.split(".")[-1] not in ['e', 'ex2']:
-            raise ValueError("file must be an exodus file with extension .e or .ex2")
+        # if path.split(".")[-1] not in ['e', 'ex2']:
+        #     raise ValueError("file must be an exodus file with extension .e or .ex2")
         nc_format = Exodus._FORMAT_MAP[format]
         # Sets shared mode if the user asked for it. I have no idea what this does :)
         if shared:
@@ -1598,4 +1598,5 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    ex = Exodus("sample-files/tube_rbar_conmass.exo", 'a')
+    ex.write()
