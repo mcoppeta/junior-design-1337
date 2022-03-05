@@ -33,7 +33,6 @@ class SSLedger:
             self.ss_elem.append(None) # this is place holder to be filled with real values later
             self.ss_sides.append(None) # this is place holder to be filled with real values later
 
-
     def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact):
 
         if (ss_id in self.ss_prop1):
@@ -61,17 +60,9 @@ class SSLedger:
         self.ss_dist_fact.append(dist_fact)
         self.num_ss += 1 
 
+    #TODO Replaced start of this with find_sideset_num, we should check that this still works
     def remove_sideset(self, ss_id):
-        # find sideset id
-        ndx = -1
-        for i in range(self.num_ss):
-            if ss_id == self.ss_prop1[i]:
-                # found id
-                ndx = i
-                break
-
-        if ndx == -1:
-            raise Exception("Sideset with given id does not exist")
+        ndx = self.find_sideset_num(ss_id)
         
         # remove sideset from lists
         self.ss_prop1.pop(ndx)
@@ -89,6 +80,59 @@ class SSLedger:
     
     def remove_side_from_ss(self, elem_id, side_id, ss_id):
         pass
+
+    # Creates a new sideset from sides in old sideset based on x-coordinate values
+    #TODO Would this work as a way to implement this function?
+    #And what is the best way to get and check all nodes in the sideset?
+    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id, ss_name, delete):
+        # Set comparison that will be used
+        if comparison == '<':
+          compare = lambda coord : coord < x_value
+        elif comparison == '>':
+          compare = lambda coord : coord > x_value
+        elif comparison == '<=':
+          compare = lambda coord : coord <= x_value
+        elif comparison == '>=':
+          compare = lambda coord : coord >= x_value
+        elif comparison == '=':
+          compare = lambda coord : coord == x_value
+        elif comparison == '!=':
+          compare = lambda coord : coord != x_value
+        else:
+          raise Exception("Comparison not valid. Valid comparison inputs: '<', '>', '<=', '>=', '=', '!='")
+
+        # Get sideset that will be split
+        ss_num = self.find_sideset_num(old_ss)
+        
+        # Create new sideset that will contain sides meeting user-specifiec criteria
+        # dist_fact? create sideset before or after elems/sides found?
+        #self.add_sideset([], [], ss_id, ss_name, [])
+
+        # Get all sides in old sideset
+        # ???
+
+        # Either add sides to new sideset if all nodes in a given side meet x-coord criteria
+        #if all_nodes:
+        #   For each side in old sideset
+        #       flag = True
+        #       For each node in side
+        #           if not compare(current node x-coord):
+        #               flag = False
+        #               break
+        #       if flag:
+        #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id)
+
+        # Or add sides to new sideset if at least one node in a given side meets x-coord criteria
+        #else:
+        #   For each side in old sideset
+        #       For each node in side
+        #           if compare(current node x-coord):
+        #               self.add_side_to_ss(elem id of curr side, curr side id, ss_id)
+        #               break
+
+        #Delete old sideset if desired by user
+        # if delete:
+        #    self.remove_sideset(old_ss)
 
     def write(self, data):
 
@@ -136,7 +180,21 @@ class SSLedger:
             else:
                 data["dist_fact_ss" + str(i+1)][:] = self.ss_dist_fact[i][:]
 
-            
+    # (Based on find_nodeset_num in ns_ledger)
+    def find_sideset_num(self, ss_id):
+        ndx = -1
+        # search for sideset that corresponds with given ID
+        for i in range(self.num_ss):
+            if ss_id == self.ss_prop1[i]:
+                # found id
+                ndx = i
+                break
+
+        # raise IndexError if no nodeset is found
+        if ndx == -1:
+            raise IndexError("Cannot find sideset with ID " + str(ss_id))
+
+        return ndx
 
 
     # method to convert python string to netcdf4 compatible character array
