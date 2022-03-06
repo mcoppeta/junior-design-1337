@@ -75,8 +75,23 @@ class SSLedger:
         self.ss_dist_fact.pop(ndx)
         self.num_ss -= 1
 
-    def add_side_to_ss(self, elem_id, side_id, ss_id):
-        pass
+    def add_side_to_ss(self, elem_id, side_id, dist_fact, ss_id):
+        ndx = self.find_sideset_num(ss_id)
+
+        # if not loaded in yet, need to load in 
+        if (self.ss_elem[ndx] is None):
+            ss = self.ex.get_side_set(ss_id)
+            elems = ss[0]
+            sides = ss[1]
+            self.ss_elem[ndx] = elems
+            self.ss_sides[ndx] = sides
+            self.ss_dist_fact[ndx] = self.ex.get_side_set_df(ss_id)
+        
+        self.ss_elem[ndx] = np.append(self.ss_elem[ndx], elem_id)
+        self.ss_sides[ndx] = np.append(self.ss_sides[ndx], side_id)
+        self.ss_dist_fact[ndx] = np.append(self.ss_dist_fact[ndx], dist_fact)
+        self.ss_sizes[ndx] += 1
+        self.num_dist_fact[ndx] += len(dist_fact)
     
     def remove_side_from_ss(self, elem_id, side_id, ss_id):
         pass

@@ -51,6 +51,11 @@ class Ledger:
     def remove_sideset(self, ss_id):
         self.sideset_ledger.remove_sideset(ss_id)
 
+    def add_side_to_ss(self, elem_id, side_id, dist_fact, ss_id):
+        self.sideset_ledger.add_side_to_ss(elem_id, side_id, dist_fact, ss_id)
+
+    def remove_side_from_ss(self, elem_id, side_id, ss_id):
+        self.sideset_ledger.remove_side_from_ss(elem_id, side_id, ss_id)
 
     def write(self):
         if self.ex.mode == 'w':
