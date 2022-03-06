@@ -145,7 +145,7 @@ class Ledger:
 
             # ignore dimensions that will be written by elem ledger
             if dimension == "num_elem" or dimension == "num_el_blk" or dimension[:13] == "num_el_in_blk" \
-                    or dimension[:13] == "num_nod_per_el" or dimension == "num_elem_var":
+                    or dimension[:14] == "num_nod_per_el" or dimension == "num_elem_var":
                 continue
 
             out.createDimension(dimension, old.dimensions[dimension].size)
