@@ -3,6 +3,7 @@ import numpy as np
 from exodus import Exodus
 import netCDF4 as nc
 from ns_ledger import NSLedger
+import util
 
 # Disables all warnings in this module
 pytestmark = pytest.mark.filterwarnings('ignore')
@@ -24,7 +25,7 @@ def test_create(tmpdir):
 
 def test_exodus_init_exceptions(tmp_path, tmpdir):
     # Test that the Exodus.__init__() errors all work
-    with pytest.raises(ValueError):
+    with pytest.raises(FileNotFoundError):
         Exodus('some fake directory/notafile.xxx', 'r')
     with pytest.raises(ValueError):
         Exodus('sample-files/disk_out_ref.ex2', 'z')
@@ -261,9 +262,9 @@ def test_add_ns_write(tmpdir):
     # ensure the 2nd new nodeset has the correct ID
     assert data['ns_prop1'][1] == 51
     # ensure the correct default name is assigned to the new nodeset
-    assert NSLedger.lineparse(data['ns_names'][0][:]) == "NodeSet 50"
+    assert util.lineparse(data['ns_names'][0][:]) == "NodeSet 50"
     # ensure the correct specified name is assigned to the new nodeset
-    assert NSLedger.lineparse(data['ns_names'][1][:]) == "2nd NodeSet"
+    assert util.lineparse(data['ns_names'][1][:]) == "2nd NodeSet"
 
 
 def test_remove_ns_empty(tmpdir):
