@@ -143,6 +143,11 @@ class Ledger:
             if dimension == "num_side_sets" or dimension[:11] == "num_side_ss" or dimension[:9] == "num_df_ss":
                 continue
 
+            # ignore dimensions that will be written by elem ledger
+            if dimension == "num_elem" or dimension == "num_el_blk" or dimension[:13] == "num_el_in_blk" \
+                    or dimension[:13] == "num_nod_per_el":  # or dimension == "num_elem_var"
+                continue
+
             out.createDimension(dimension, old.dimensions[dimension].size)
 
         # copy variables
@@ -153,8 +158,13 @@ class Ledger:
                     or var[:12] == "dist_fact_ns":
                 continue
 
-            # ingore variables that will be written by ss ledger
+            # ignore variables that will be written by ss ledger
             if var[:3] == "ss_" or var[:7] == "side_ss" or var[:7] == "elem_ss" or var[:12] == "dist_fact_ss":
+                continue
+
+            # ignore variables that will be written by elem ledger
+            # or var == "name_elem_var" or var[:13] == "vals_elem_var" or var == "elem_var_tab"
+            if var[:3] == "eb_" or var == "elem_map" or var[:7] == "connect":
                 continue
 
             var_data = old[var]
@@ -169,4 +179,5 @@ class Ledger:
 
         self.nodeset_ledger.write(out)
         self.sideset_ledger.write(out)
+        self.element_ledger.write(out)
         out.close()
