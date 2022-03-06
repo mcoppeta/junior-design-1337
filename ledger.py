@@ -10,6 +10,7 @@ class Ledger:
         self.sideset_ledger = SSLedger(ex)
         self.ex = ex
 
+
     def num_node_sets(self):
         return self.nodeset_ledger.num_node_sets()
 
@@ -42,6 +43,14 @@ class Ledger:
 
     def remove_nodes_from_nodeset(self, node_ids, nodeset_id):
         self.nodeset_ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
+
+    # sideset methods
+    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact):
+        self.sideset_ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact)
+
+    def remove_sideset(self, ss_id):
+        self.sideset_ledger.remove_sideset(ss_id)
+
 
     def write(self):
         if self.ex.mode == 'w':
