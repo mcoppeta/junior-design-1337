@@ -25,7 +25,7 @@ class SSLedger:
             self.ss_status.append(ex.data["ss_status"][i])
             self.ss_sizes.append(ex.data.dimensions["num_side_ss" + str(i + 1)].size)
             if ("ss_names" in ex.data.variables):
-                self.ss_names.append(ex.data["ss_names"][i])
+                self.ss_names.append(self.ex.lineparse(ex.data["ss_names"][i]))
             else:
                 self.ss_names.append("ss" + str(i))
             self.num_dist_fact.append(ex.data.dimensions["num_df_ss" + str(i + 1)].size)
@@ -158,15 +158,18 @@ class SSLedger:
             data.createDimension("num_side_ss" + str(i+1), self.ss_sizes[i])
 
         # write each variable
+        # copy over statuses
+        data.createVariable("ss_status", "int32", dimensions=("num_side_sets"))
+        data["ss_status"][:] = np.array(self.ss_status)
         # copy over ids
         data.createVariable("ss_prop1", "int32", dimensions=("num_side_sets"))
         data['ss_prop1'].setncattr('name', 'ID')
         data['ss_prop1'][:] = np.array(self.ss_prop1)
 
         # copy over names
-        data.createVariable("ss_names", "|S1", dimensions=("num_side_sets"))
+        data.createVariable("ss_names", "|S1", dimensions=("num_side_sets", "len_name"))
         for i in range(len(self.ss_names)):
-            data['ss_names'][i] = SSLedger.convert_string(self.ss_names[i])
+            data['ss_names'][i] = SSLedger.convert_string(self.ss_names[i] + str('\0'))
 
         for i in range(self.num_ss):
             # create elem, sides, and dist facts
@@ -175,18 +178,17 @@ class SSLedger:
             data.createVariable("side_ss" + str(i+1), "float64", dimensions=("num_side_ss" + str(i+1)))
             
             # if None, just copy over old data, otherwise copy over new stuff
-            if (self.ss_elem[i] == None):
+            if (self.ss_elem[i] is None):
                  data["elem_ss" + str(i+1)][:] = self.ex.get_side_set(self.ss_prop1[i])[0][:]
             else:
                 data["elem_ss" + str(i+1)][:] = self.ss_elem[i][:]
 
-
-            if (self.ss_sides[i] == None):
+            if (self.ss_sides[i] is None):
                 data["side_ss" + str(i+1)][:] = self.ex.get_side_set(self.ss_prop1[i])[1][:]
             else:
                 data["side_ss" + str(i+1)][:] = self.ss_sides[i][:]
             
-            if (self.ss_dist_fact[i] == None):
+            if (self.ss_dist_fact[i] is None):
                 data["dist_fact_ss" + str(i+1)][:] = self.ex.get_side_set_df(self.ss_prop1[i])[:]
             else:
                 data["dist_fact_ss" + str(i+1)][:] = self.ss_dist_fact[i][:]
