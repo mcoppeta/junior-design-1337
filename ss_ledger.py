@@ -81,10 +81,10 @@ class SSLedger:
     def remove_side_from_ss(self, elem_id, side_id, ss_id):
         pass
 
-    # Creates a new sideset from sides in old sideset based on x-coordinate values
+    # Creates 2 new sidesets from sides in old sideset based on x-coordinate values
     #TODO Would this work as a way to implement this function?
     #And what is the best way to get and check all nodes in the sideset?
-    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id, ss_name, delete):
+    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ss_name1, ssid_2, ss_name2, delete):
         # Set comparison that will be used
         if comparison == '<':
           compare = lambda coord : coord < x_value
@@ -104,9 +104,13 @@ class SSLedger:
         # Get sideset that will be split
         ss_num = self.find_sideset_num(old_ss)
         
-        # Create new sideset that will contain sides meeting user-specifiec criteria
+        # Create new sideset that will contain sides meeting user-specified criteria
         # dist_fact? create sideset before or after elems/sides found?
-        #self.add_sideset([], [], ss_id, ss_name, [])
+        #self.add_sideset([], [], ss_id1, ss_name1, [])
+
+        # Create new sideset that will contain sides NOT meeting user-specified criteria
+        # dist_fact? create sideset before or after elems/sides found?
+        #self.add_sideset([], [], ss_id2, ss_name2, [])
 
         # Get all sides in old sideset
         # ???
@@ -120,15 +124,22 @@ class SSLedger:
         #               flag = False
         #               break
         #       if flag:
-        #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id)
+        #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id1)
+        #       else:
+        #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id2)
 
         # Or add sides to new sideset if at least one node in a given side meets x-coord criteria
         #else:
         #   For each side in old sideset
+        #       flag = False
         #       For each node in side
         #           if compare(current node x-coord):
-        #               self.add_side_to_ss(elem id of curr side, curr side id, ss_id)
+        #               flag = True
         #               break
+        #       if flag:
+        #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id1)
+        #       else:
+        #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id2)
 
         #Delete old sideset if desired by user
         # if delete:
