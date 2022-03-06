@@ -150,6 +150,10 @@ class Ledger:
 
             out.createDimension(dimension, old.dimensions[dimension].size)
 
+        # TODO this is a quick fix -> append mode doesn't ensure all dimensions exist
+        if 'len_name' not in out.dimensions.keys():
+            out.createDimension('len_name', 33)
+
         # copy variables
         for var in old.variables:
 
