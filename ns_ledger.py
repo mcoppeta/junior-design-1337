@@ -168,6 +168,10 @@ class NSLedger:
         data['ns_prop1'].setncattr('name', 'ID')
         data['ns_prop1'][:] = np.array(self.nodeset_ids)
 
+        # TODO this is a quick fix -> append mode doesn't ensure all dimensions exist
+        if 'len_name' not in data.dimensions.keys():
+            data.createDimension('len_name', 33)
+
         # add ns_name data
         data.createVariable("ns_names", "|S1", dimensions=("num_node_sets", "len_name"))
         for i in range(len(self.nodeset_names)):
