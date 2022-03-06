@@ -47,35 +47,85 @@ class ElemLedger:
             self.num_blocks += 1
 
         self.eb_status = self.ex.data.variables['eb_status'][:]
+        # print(self.blocks)
 
-        print(self.blocks)
-
-
+    # Writes out element data to the new dataset
     def write(self, data):
+
+        # Creates dimension for number of elements
         elem_count = 0
         for i in self.blocks:
             elem_count += self.blocks[i]['num_el_blk']
         data.createDimension("num_elem", elem_count)
 
+        # Create dimension for number of element blocks
         data.createDimension("num_el_blk", self.num_blocks)
 
+        names = []
         for i in self.blocks:
             blk_num = self.blocks[i]['blk_num']
+            names.append(self.convert_string(self.blocks[i]['name']))
 
+            # Creates dimension for how many elements are in this element block
             el_in_blk_title = "num_el_in_blk{}".format(blk_num)
             data.createDimension(el_in_blk_title, self.blocks[i]['num_el_blk'])
 
+            # Creates dimension for how many nodes are in each element in this element block
             nod_per_el_title = "num_nod_per_el{}".format(blk_num)
             data.createDimension(nod_per_el_title, self.blocks[i]['num_nod_per_el'])
 
+        # Creates dimension for the number of elemental variables
         data.createDimension("num_elem_var", self.ex.data.dimensions['num_elem_var'].size)  # TODO -> figure this out
 
 
-        #TODO VAR: eb_status -> [1 for i in range(num_el_blk)] ?
-        #TODO VAR: eb_prop1 -> construct from blk_num in self.blocks
-        #TODO VAR: eb_names -> construct from name in self.blocks
-        #TODO VAR: elem_num_map -> should be maintained already
-        #TODO VAR: connectX -> construct from self.blocks
+        #TODO Make sure this implementation makes sense
+        data.createVariable("eb_status", "int32", dimensions=("num_el_blk"))
+        data['eb_status'][:] = np.array([1 for i in range(self.num_blocks)])
+
+
+        #TODO Make sure this stays consistent with implementation above
+        data.createVariable("eb_prop1", "int32", dimensions=("num_el_blk"))
+        data['eb_prop1'].setncattr('name', 'ID')
+        data['eb_prop1'][:] = np.array([i for i in range(1, self.num_blocks + 1)])
+
+        # Creates variable with names of each element block
+        data.createVariable("eb_names", "|S1", dimensions=("num_el_blk", "len_name"))
+        data['eb_names'][:] = np.array(names)
+
+        #TODO Make sure this is maintained above
+        data.createVariable("elem_num_map", "int32", dimensions=("num_elem"))
+        data['elem_num_map'][:] = np.array(self.elem_num_map)
+
+        # Creates connectX variable for each of X element blocks. This describes the nodes forming each element in block
+        for connectX in self.blocks:
+            blk_num = self.blocks[connectX]['blk_num']
+            data.createVariable(connectX, "int32", dimensions=("num_el_in_blk" + str(blk_num),
+                                                               "num_nod_per_el" + str(blk_num)))
+            data[connectX].setncattr('elem_type', self.blocks[connectX]['elem_type'])
+            data[connectX][:] = np.array(self.blocks[connectX]['elements'])
+
         #TODO VAR: name_elem_var -> ???
+        # TODO ACTUALLY IMPLEMENT THIS
+
         #TODO VAR: vals_elem_varNebX -> ???
+        # TODO ACTUALLY IMPLEMENT THIS
         #TODO VAR: elem_var_tab -> ???
+        # TODO ACTUALLY IMPLEMENT THIS
+
+
+    # method to convert python string to netcdf4 compatible character array
+    @staticmethod
+    def convert_string(s):
+        arr = np.empty(33, '|S1')
+        for i in range(len(s)):
+            arr[i] = s[i]
+
+        mask = np.empty(33, bool)
+        for i in range(33):
+            if i < len(s):
+                mask[i] = False
+            else:
+                mask[i] = True
+
+        out = np.ma.core.MaskedArray(arr, mask)
+        return out
