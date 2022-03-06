@@ -145,7 +145,7 @@ class Ledger:
 
             # ignore dimensions that will be written by elem ledger
             if dimension == "num_elem" or dimension == "num_el_blk" or dimension[:13] == "num_el_in_blk" \
-                    or dimension[:13] == "num_nod_per_el":  # or dimension == "num_elem_var"
+                    or dimension[:13] == "num_nod_per_el" or dimension == "num_elem_var":
                 continue
 
             out.createDimension(dimension, old.dimensions[dimension].size)
@@ -163,8 +163,8 @@ class Ledger:
                 continue
 
             # ignore variables that will be written by elem ledger
-            # or var == "name_elem_var" or var[:13] == "vals_elem_var" or var == "elem_var_tab"
-            if var[:3] == "eb_" or var == "elem_map" or var[:7] == "connect":
+            if var[:3] == "eb_" or var == "elem_map" or var[:7] == "connect" or var == "elem_num_map" \
+                    or var == "name_elem_var" or var[:13] == "vals_elem_var" or var == "elem_var_tab":
                 continue
 
             var_data = old[var]
