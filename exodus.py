@@ -38,11 +38,11 @@ class Exodus:
         try:
             self.data = nc.Dataset(path, smode, clobber, format=nc_format)
         except FileNotFoundError:
-            raise FileNotFoundError("file '{}' does not exist".format(path))
+            raise FileNotFoundError("file '{}' does not exist".format(path)) from None
         except PermissionError:
-            raise PermissionError("You do not have access to '{}'".format(path))
+            raise PermissionError("You do not have access to '{}'".format(path)) from None
         except OSError:
-            raise OSError("file '{}' exists, but clobber is set to False".format(path))
+            raise OSError("file '{}' exists, but clobber is set to False".format(path)) from None
 
         self.mode = mode
         self.path = path
