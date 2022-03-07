@@ -372,6 +372,7 @@ def test_add_duplicate_nodes(tmpdir):
     assert data.dimensions['num_nod_ns1'].size == 3
     assert np.array_equal(np.array([10, 11, 12]), data['node_ns1'])
 
+
 def test_merge_ns_with_duplicate_nodes(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
     exofile.add_nodeset([12, 11, 10], 1)
@@ -388,15 +389,13 @@ def test_merge_ns_with_duplicate_nodes(tmpdir):
     assert len(exofile.get_node_set(3)) == 9
     assert np.array_equal([1, 5, 6, 7, 8, 9, 10, 11, 12], exofile.get_node_set(3))
 
+
 def test_remove_duplicate_nodes(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
     exofile.add_nodeset([10, 9, 8, 7, 6, 5, 1], 2)
-    exofile.remove_nodes_from_nodeset([8,9], 2)
 
     with pytest.raises(IndexError):
         exofile.remove_nodes_from_nodeset([8], 1)
-
-
 
 
 # Below tests are based on what can be read according to current C Exodus API.
