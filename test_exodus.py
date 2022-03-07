@@ -358,6 +358,37 @@ def test_ns_prewrite_read(tmpdir):
     assert exofile.get_node_set_name(100) == 'NodeSet 100'
 
 
+def test_add_duplicate_nodes(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+
+    exofile.add_nodeset([10,  11, 12], 99)
+    exofile.add_nodes_to_nodeset([10, 11, 12], 99)
+    exofile.add_node_to_nodeset(11, 99)
+    exofile.add_node_to_nodeset(12, 99)
+    exofile.add_node_to_nodeset(10, 99)
+
+    exofile.write()
+    data = nc.Dataset(str(tmpdir) + '\\test.ex2', 'r')
+    assert data.dimensions['num_nod_ns1'].size == 3
+    assert np.array_equal(np.array([10, 11, 12]), data['node_ns1'])
+
+def test_merge_ns_with_duplicate_nodes(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    exofile.add_nodeset([12, 11, 10], 1)
+    exofile.add_nodeset([10, 9, 8, 7, 6, 5, 1], 2)
+
+    # test pre-write read
+    exofile.merge_nodeset(3, 1, 2)
+    assert len(exofile.get_node_set(3)) == 9
+    assert np.array_equal([1, 5, 6, 7, 8, 9, 10, 11, 12], exofile.get_node_set(3))
+
+    # test post write read
+    exofile.write()
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'r')
+    assert len(exofile.get_node_set(3)) == 9
+    assert np.array_equal([1, 5, 6, 7, 8, 9, 10, 11, 12], exofile.get_node_set(3))
+
+
 # Below tests are based on what can be read according to current C Exodus API.
 # The contents, names, and number of tests are subject to change as work on the library progresses
 # and we figure out how closely the functions in this library match the C one.
