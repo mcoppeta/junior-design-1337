@@ -269,14 +269,16 @@ def test_add_ns_write(tmpdir):
 
 def test_remove_ns_empty(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
-    with pytest.raises(IndexError):
+    with pytest.raises(KeyError):
         exofile.remove_nodeset(1)
+
 
 
 def test_remove_ns_nonexistent(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
     exofile.add_nodeset([1, 2, 3], 0, "Test Name")
-    with pytest.raises(IndexError):
+
+    with pytest.raises(KeyError):
         exofile.remove_nodeset(1)
 
 
@@ -286,6 +288,14 @@ def test_remove_ns_existing(tmpdir):
     exofile.add_nodeset([10, 11, 12], 50)
     exofile.add_nodeset([13, 14, 15, 100], 51, "2nd NodeSet")
     exofile.remove_nodeset(51)
+
+    # ensure only one node set remains
+    assert exofile.num_node_sets == 1
+
+    # ensure old ID (51) is gone
+    with pytest.raises(KeyError):
+        exofile.get_node_set(51)
+
     exofile.write()
     exofile.close()
 
@@ -306,9 +316,14 @@ def test_add_node_to_nodeset(tmpdir):
     exofile.add_node_to_nodeset(15, 99)
     exofile.write()
 
+    assert exofile.num_node_sets == 1
+    assert len(exofile.get_node_set(99)) == 4
+    assert np.array_equal(exofile.get_node_set(99), np.array([10, 11, 12, 15]))
+
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'r')
     assert exofile.num_node_sets == 1
     assert exofile.data.dimensions['num_nod_ns1'].size == 4
+    assert len(exofile.get_node_set(99)) == 4
     assert np.array_equal(exofile.get_node_set(99), np.array([10, 11, 12, 15]))
 
 
@@ -319,10 +334,15 @@ def test_add_nodes_to_nodeset(tmpdir):
     exofile.add_nodes_to_nodeset([15, 16, 17], 99)
     exofile.write()
 
+    assert exofile.num_node_sets == 1
+    assert exofile.data.dimensions['num_nod_ns1'].size == 6
+    assert np.array_equal(exofile.get_node_set(99), np.array([10, 11, 12, 15, 16, 17]))
+
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'r')
 
     assert exofile.num_node_sets == 1
     assert exofile.data.dimensions['num_nod_ns1'].size == 6
+    assert len(exofile.get_node_set(99)) == 6
     assert np.array_equal(exofile.get_node_set(99), np.array([10, 11, 12, 15, 16, 17]))
 
 
@@ -332,7 +352,7 @@ def test_remove_from_nonexistent_ns(tmpdir):
     exofile.add_nodeset([10, 11, 12], 99)
     exofile.add_nodeset([13, 14, 15], 100)
 
-    with pytest.raises(IndexError):
+    with pytest.raises(KeyError):
         exofile.remove_node_from_nodeset(100, 1)
 
     exofile.close()
@@ -357,6 +377,48 @@ def test_ns_prewrite_read(tmpdir):
 
     assert exofile.get_node_set_name(99) == 'NodeSet 99'
     assert exofile.get_node_set_name(100) == 'NodeSet 100'
+
+
+def test_add_duplicate_nodes(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+
+    exofile.add_nodeset([10,  11, 12], 99)
+    exofile.add_nodes_to_nodeset([10, 11, 12], 99)
+    exofile.add_node_to_nodeset(11, 99)
+    exofile.add_node_to_nodeset(12, 99)
+    exofile.add_node_to_nodeset(10, 99)
+
+
+
+    exofile.write()
+    data = nc.Dataset(str(tmpdir) + '\\test.ex2', 'r')
+    assert data.dimensions['num_nod_ns1'].size == 3
+    assert np.array_equal(np.array([10, 11, 12]), data['node_ns1'])
+
+
+def test_merge_ns_with_duplicate_nodes(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    exofile.add_nodeset([12, 11, 10], 1)
+    exofile.add_nodeset([10, 9, 8, 7, 6, 5, 1], 2)
+
+    # test pre-write read
+    exofile.merge_nodeset(3, 1, 2)
+    assert len(exofile.get_node_set(3)) == 9
+    assert np.array_equal([1, 5, 6, 7, 8, 9, 10, 11, 12], exofile.get_node_set(3))
+
+    # test post write read
+    exofile.write()
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'r')
+    assert len(exofile.get_node_set(3)) == 9
+    assert np.array_equal([1, 5, 6, 7, 8, 9, 10, 11, 12], exofile.get_node_set(3))
+
+
+def test_remove_duplicate_nodes(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    exofile.add_nodeset([10, 9, 8, 7, 6, 5, 1], 2)
+
+    with pytest.raises(IndexError):
+        exofile.remove_nodes_from_nodeset([8, 8], 2)
 
 
 # Below tests are based on what can be read according to current C Exodus API.
