@@ -2,6 +2,7 @@ import warnings
 import netCDF4 as nc
 import numpy
 from ledger import Ledger
+import util
 
 
 class Exodus:
@@ -27,8 +28,8 @@ class Exodus:
             raise ValueError("invalid file format: '{}'".format(format))
         if word_size not in [4, 8]:
             raise ValueError("word_size must be 4 or 8 bytes, {} is not supported".format(word_size))
-        if path.split(".")[-1] not in ['e', 'ex2']:
-            raise ValueError("file must be an exodus file with extension .e or .ex2")
+        # if path.split(".")[-1] not in ['e', 'ex2']:
+        #     raise ValueError("file must be an exodus file with extension .e or .ex2")
         nc_format = Exodus._FORMAT_MAP[format]
         # Sets shared mode if the user asked for it. I have no idea what this does :)
         if shared:
@@ -38,11 +39,11 @@ class Exodus:
         try:
             self.data = nc.Dataset(path, smode, clobber, format=nc_format)
         except FileNotFoundError:
-            raise FileNotFoundError("file '{}' does not exist".format(path))
+            raise FileNotFoundError("file '{}' does not exist".format(path)) from None
         except PermissionError:
-            raise PermissionError("You do not have access to '{}'".format(path))
+            raise PermissionError("You do not have access to '{}'".format(path)) from None
         except OSError:
-            raise OSError("file '{}' exists, but clobber is set to False".format(path))
+            raise OSError("file '{}' exists, but clobber is set to False".format(path)) from None
 
         self.mode = mode
         self.path = path
@@ -796,7 +797,7 @@ class Exodus:
             raise KeyError("No {} variable names stored in database!".format(type))
         result = numpy.empty([len(list)], self._MAX_NAME_LENGTH_T)
         for i in range(len(list)):
-            result[i] = Exodus.lineparse(list[i])
+            result[i] = util.lineparse(list[i])
         return result
 
     def get_global_var_names(self):
@@ -1179,7 +1180,7 @@ class Exodus:
             raise ValueError("{} is not a valid set/block type!".format(type))
         result = numpy.empty([len(names)], self._MAX_NAME_LENGTH_T)
         for i in range(len(names)):
-            result[i] = Exodus.lineparse(names[i])
+            result[i] = util.lineparse(names[i])
         return result
 
     def get_elem_block_names(self):
@@ -1369,7 +1370,7 @@ class Exodus:
             raise KeyError("Failed to retrieve coordinate name array!")
         result = numpy.empty([dim_cnt], self._MAX_NAME_LENGTH_T)
         for i in range(dim_cnt):
-            result[i] = Exodus.lineparse(names[i])
+            result[i] = util.lineparse(names[i])
         return result
 
     ################
@@ -1386,7 +1387,7 @@ class Exodus:
             except KeyError:
                 raise KeyError("Failed to retrieve info records from database!")
             for i in range(num):
-                result[i] = Exodus.lineparse(infos[i])
+                result[i] = util.lineparse(infos[i])
         return result
 
     def get_qa(self):
@@ -1400,7 +1401,7 @@ class Exodus:
                 raise KeyError("Failed to retrieve qa records from database!")
             for i in range(num):
                 for j in range(4):
-                    result[i, j] = Exodus.lineparse(qas[i, j])
+                    result[i, j] = util.lineparse(qas[i, j])
         return result
 
     # endregion
@@ -1588,25 +1589,11 @@ class Exodus:
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_sideset(ss_id)
-    
 
     def write(self):
         self.ledger.write()
 
-    # prints legacy character array as string
-    @staticmethod
-    def print(line):
-        print(Exodus.lineparse(line))
-
-    @staticmethod
-    def lineparse(line):
-        s = ""
-        for c in line:
-            if str(c) != '--':
-                s += str(c)[2]
-
-        return s
-
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    ex = Exodus("sample-files/tube_rbar_conmass.exo", 'a')
+    ex.write()

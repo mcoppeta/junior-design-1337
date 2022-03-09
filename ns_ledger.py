@@ -1,4 +1,5 @@
 import numpy as np
+import util
 
 
 class NSLedger:
@@ -51,7 +52,7 @@ class NSLedger:
         # setup user-specified nodeset names
         if "ns_names" in ex.data.variables.keys():
             for name in ex.data.variables['ns_names']:
-                n = self.lineparse(name)
+                n = util.lineparse(name)
                 self.nodeset_names.append(n)
                 self.nodeset_name_set.add(n)
         else:
@@ -188,7 +189,7 @@ class NSLedger:
         # add ns_name data
         data.createVariable("ns_names", "|S1", dimensions=("num_node_sets", "len_name"))
         for i in range(len(self.nodeset_names)):
-            data['ns_names'][i] = NSLedger.convert_string(self.nodeset_names[i])
+            data['ns_names'][i] = util.convert_string(self.nodeset_names[i], self.ex.max_allowed_name_length)
 
         # add nodeset data
         for i in range(len(self.nodesets)):
@@ -251,29 +252,3 @@ class NSLedger:
 
     def get_node_set_names(self):
         return np.array(self.nodeset_names)
-
-    @staticmethod
-    def lineparse(line):
-        s = ""
-        for c in line:
-            if str(c) != '--':
-                s += str(c)[2]
-
-        return s
-
-    # method to convert python string to netcdf4 compatible character array
-    @staticmethod
-    def convert_string(s):
-        arr = np.empty(33, '|S1')
-        for i in range(len(s)):
-            arr[i] = s[i]
-
-        mask = np.empty(33, bool)
-        for i in range(33):
-            if i < len(s):
-                mask[i] = False
-            else:
-                mask[i] = True
-
-        out = np.ma.core.MaskedArray(arr, mask)
-        return out

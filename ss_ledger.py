@@ -1,4 +1,5 @@
 import numpy as np
+import util
 
 class SSLedger:
 
@@ -25,7 +26,7 @@ class SSLedger:
             self.ss_status.append(ex.data["ss_status"][i])
             self.ss_sizes.append(ex.data.dimensions["num_side_ss" + str(i + 1)].size)
             if ("ss_names" in ex.data.variables):
-                self.ss_names.append(self.ex.lineparse(ex.data["ss_names"][i]))
+                self.ss_names.append(util.lineparse(ex.data["ss_names"][i]))
             else:
                 self.ss_names.append("ss" + str(i))
             self.num_dist_fact.append(ex.data.dimensions["num_df_ss" + str(i + 1)].size)
@@ -114,7 +115,7 @@ class SSLedger:
         # copy over names
         data.createVariable("ss_names", "|S1", dimensions=("num_side_sets", "len_name"))
         for i in range(len(self.ss_names)):
-            data['ss_names'][i] = SSLedger.convert_string(self.ss_names[i] + str('\0'))
+            data['ss_names'][i] = util.convert_string(self.ss_names[i] + str('\0'), self.ex.max_allowed_name_length)
 
         for i in range(self.num_ss):
             # create elem, sides, and dist facts
@@ -137,25 +138,4 @@ class SSLedger:
                 data["dist_fact_ss" + str(i+1)][:] = self.ex.get_side_set_df(self.ss_prop1[i])[:]
             else:
                 data["dist_fact_ss" + str(i+1)][:] = self.ss_dist_fact[i][:]
-
-            
-
-
-    # method to convert python string to netcdf4 compatible character array
-    @staticmethod
-    def convert_string(s):
-        arr = np.empty(33, '|S1')
-        for i in range(len(s)):
-            arr[i] = s[i]
-
-        mask = np.empty(33, bool)
-        for i in range(33):
-            if i < len(s):
-                mask[i] = False
-            else:
-                mask[i] = True
-
-        out = np.ma.core.MaskedArray(arr, mask)
-        return out  
-
 
