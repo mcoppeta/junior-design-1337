@@ -10,10 +10,12 @@ class ElemLedger:
 
         #TODO consider making self.blocks an array
         self.blocks = {}  # connectX: data and details of element block X
-        self.eb_status = []
-        self.eb_prop1 = []  # each block from here gets corresponding entry in self.blocks
+        self.eb_status = self.ex.data.variables['eb_status'][:]
+        self.eb_prop1 = self.ex.data.variables['eb_prop1'][:]  # each block from here gets entry in self.blocks
         self.elem_num_map = []  # id's of elements
         self.num_blocks = 0
+        self.name_elem_var = self.ex.data.variables['name_elem_var'][:]
+        self.elem_var_tab = self.ex.data.variables['elem_var_tab'][:]  # # elem blocks x num_elem_var -- 1's only
 
         # Assumes all elements must exist in some block
         if 'num_el_blk' not in self.ex.data.dimensions.keys():
@@ -28,9 +30,8 @@ class ElemLedger:
         else:
             self.elem_num_map = [i for i in range(self.ex.data.dimensions['num_elem'].size)]
 
-        existing_prop1 = self.ex.data.variables['eb_prop1'][:]
         for i in range(self.ex.data.dimensions['num_el_blk'].size):
-            blk_num = existing_prop1[i]
+            blk_num = self.eb_prop1[i]
             connect_title = "connect{}".format(blk_num)
 
             block_data = {}
@@ -43,12 +44,17 @@ class ElemLedger:
                 block_data['name'] = util.lineparse(self.ex.data.variables['eb_names'][i])
             else:
                 block_data['name'] = "Block {}".format(blk_num)
-            self.blocks[connect_title] = block_data
 
+            variables = {}  # self.blocks['connect1']['variables']['vals_elem_var1eb1']
+            for j in range(self.ex.data.dimensions['num_elem_var'].size):
+                current_var_name = "vals_elem_var{}eb{}".format(j + 1, blk_num)
+                variables[current_var_name] = self.ex.data.variables[current_var_name][:]
+            block_data['variables'] = variables
+
+            self.blocks[connect_title] = block_data
             self.num_blocks += 1
 
-        self.eb_status = self.ex.data.variables['eb_status'][:]
-        # print(self.blocks)
+        #print(self.blocks)
 
     # Writes out element data to the new dataset
     def write(self, data):
@@ -81,13 +87,13 @@ class ElemLedger:
 
         #TODO Make sure this implementation makes sense
         data.createVariable("eb_status", "int32", dimensions=("num_el_blk"))
-        data['eb_status'][:] = np.array([1 for i in range(self.num_blocks)])
+        data['eb_status'][:] = np.array(self.eb_status)
 
 
         #TODO Make sure this stays consistent with implementation above
         data.createVariable("eb_prop1", "int32", dimensions=("num_el_blk"))
         data['eb_prop1'].setncattr('name', 'ID')
-        data['eb_prop1'][:] = np.array([i for i in range(1, self.num_blocks + 1)])
+        data['eb_prop1'][:] = np.array(self.eb_prop1)
 
         # Creates variable with names of each element block
         data.createVariable("eb_names", "|S1", dimensions=("num_el_blk", "len_name"))
@@ -106,9 +112,17 @@ class ElemLedger:
             data[connectX][:] = np.array(self.blocks[connectX]['elements'])
 
         #TODO VAR: name_elem_var -> ???
-        # TODO ACTUALLY IMPLEMENT THIS
+        data.createVariable("name_elem_var", "|S1", dimensions=("num_elem_var", "len_name"), fill_value=b'\x00')
+        data["name_elem_var"][:] = np.array(self.name_elem_var)
 
         #TODO VAR: vals_elem_varNebX -> ???
-        # TODO ACTUALLY IMPLEMENT THIS
-        #TODO VAR: elem_var_tab -> ???
-        # TODO ACTUALLY IMPLEMENT THIS
+        for connectX in self.blocks:
+            num = self.blocks[connectX]["blk_num"]
+            for variable in self.blocks[connectX]['variables']:
+                var_data = self.blocks[connectX]['variables'][variable]
+                data.createVariable(variable, "float64", dimensions=("time_step", "num_el_in_blk{}".format(num)))
+                data[variable][:] = np.array(var_data)
+
+        #TODO VAR: maintain with new functions
+        data.createVariable("elem_var_tab", "int32", dimensions=("num_el_blk", "num_elem_var"))
+        data["elem_var_tab"][:] = np.array(self.elem_var_tab)
