@@ -42,6 +42,7 @@ class Exodus:
             raise FileNotFoundError("file '{}' does not exist".format(path)) from None
         except PermissionError:
             raise PermissionError("You do not have access to '{}'".format(path)) from None
+        # TODO this can actually hide some errors which is bad. This check should be done explicitly
         except OSError:
             raise OSError("file '{}' exists, but clobber is set to False".format(path)) from None
 
@@ -888,13 +889,37 @@ class Exodus:
             set = []
         return set
 
+    def _int_get_node_set_params(self, obj_id, internal_id):
+        """
+        Returns a tuple containing the parameters for the node set with given ID.
+
+        FOR INTERNAL USE ONLY
+
+        :param obj_id: EXTERNAL (user-defined) id
+        :param internal_id: INTERNAL (1-based) id
+        :return: (number of nodes, number of distribution factors)
+        """
+        num_sets = self.num_node_sets
+        if num_sets == 0:
+            raise KeyError("No node sets are stored in this database!")
+        try:
+            num_entries = self.data.dimensions['num_nod_ns%d' % internal_id].size
+        except KeyError:
+            raise KeyError("Failed to retrieve number of entries in node set with id {} ('{}')"
+                           .format(obj_id, 'num_nod_ns%d' % internal_id))
+        if ('dist_fact_ns%d' % internal_id) in self.data.variables:
+            num_df = num_entries
+        else:
+            num_df = 0
+        return num_entries, num_df
+
     def get_node_set(self, obj_id):
         """Returns an array of the nodes contained in the node set with given ID."""
         if self.mode == 'w' or self.mode == 'a':
             return self.ledger.get_node_set(obj_id)
 
         internal_id = self._lookup_id('nodeset', obj_id)
-        size = self.data.dimensions['num_nod_ns%d' % internal_id].size
+        size = self._int_get_node_set_params(obj_id, internal_id)[0]
         return self._int_get_partial_node_set(obj_id, internal_id, 1, size)
 
     def get_partial_node_set(self, obj_id, start, count):
@@ -909,7 +934,7 @@ class Exodus:
     def get_node_set_df(self, obj_id):
         """Returns an array containing the distribution factors in the node set with given ID."""
         internal_id = self._lookup_id('nodeset', obj_id)
-        size = self.data.dimensions['num_nod_ns%d' % internal_id].size
+        size = self._int_get_node_set_params(obj_id, internal_id)[1]
         return self._int_get_partial_node_set_df(obj_id, internal_id, 1, size)
 
     def get_partial_node_set_df(self, obj_id, start, count):
@@ -927,21 +952,8 @@ class Exodus:
 
         Returned tuple is of format (number of nodes, number of distribution factors).
         """
-        # Returns tuple (number of set entries, number of set distribution factors)
-        num_sets = self.num_node_sets
-        if num_sets == 0:
-            raise KeyError("No node sets are stored in this database!")
         internal_id = self._lookup_id('nodeset', obj_id)
-        try:
-            num_entries = self.data.dimensions['num_nod_ns%d' % internal_id].size
-        except KeyError:
-            raise KeyError("Failed to retrieve number of entries in node set with id {} ('{}')"
-                           .format(obj_id, 'num_nod_ns%d' % internal_id))
-        if ('dist_fact_ns%d' % internal_id) in self.data.variables:
-            num_df = num_entries
-        else:
-            num_df = 0
-        return num_entries, num_df
+        return self._int_get_node_set_params(obj_id, internal_id)
 
     def _int_get_partial_side_set(self, obj_id, internal_id, start, count):
         """
@@ -1000,6 +1012,31 @@ class Exodus:
                            .format(obj_id, 'dist_fact_ss%d' % internal_id))
         return set
 
+    def _int_get_side_set_params(self, obj_id, internal_id):
+        """
+        Returns a tuple containing the parameters for the side set with given ID.
+
+        FOR INTERNAL USE ONLY
+
+        :param obj_id: EXTERNAL (user-defined) id
+        :param internal_id: INTERNAL (1-based) id
+        :return: (number of elements, number of distribution factors)
+        """
+        num_sets = self.num_side_sets
+        if num_sets == 0:
+            raise KeyError("No side sets are stored in this database!")
+        try:
+            num_entries = self.data.dimensions['num_side_ss%d' % internal_id].size
+        except KeyError:
+            raise KeyError("Failed to retrieve number of entries in side set with id {} ('{}')"
+                           .format(obj_id, 'num_side_ss%d' % internal_id))
+        try:
+            num_df = self.data.dimensions['num_df_ss%d' % internal_id].size
+        except KeyError:
+            raise KeyError("Failed to retrieve number of distribution factors in side set with id {} ('{}')"
+                           .format(obj_id, 'num_df_ss%d' % internal_id))
+        return num_entries, num_df
+
     def get_side_set(self, obj_id):
         """
         Returns tuple containing the elements and sides contained in the side set with given ID.
@@ -1007,7 +1044,7 @@ class Exodus:
         Returned tuple is of format (elements in side set, sides in side set).
         """
         internal_id = self._lookup_id('sideset', obj_id)
-        size = self.data.dimensions['num_side_ss%d' % internal_id].size
+        size = self._int_get_side_set_params(obj_id, internal_id)[0]
         return self._int_get_partial_side_set(obj_id, internal_id, 1, size)
 
     def get_partial_side_set(self, obj_id, start, count):
@@ -1023,7 +1060,7 @@ class Exodus:
     def get_side_set_df(self, obj_id):
         """Returns an array containing the distribution factors in the side set with given ID."""
         internal_id = self._lookup_id('sideset', obj_id)
-        size = self.data.dimensions['num_df_ss%d' % internal_id].size
+        size = self._int_get_side_set_params(obj_id, internal_id)[1]
         return self._int_get_partial_side_set_df(obj_id, internal_id, 1, size)
 
     def get_partial_side_set_df(self, obj_id, start, count):
@@ -1041,22 +1078,8 @@ class Exodus:
 
         Returned tuple is of format (number of elements, number of distribution factors).
         """
-        # Returns tuple (number of set entries, number of set distribution factors)
-        num_sets = self.num_side_sets
-        if num_sets == 0:
-            raise KeyError("No side sets are stored in this database!")
         internal_id = self._lookup_id('sideset', obj_id)
-        try:
-            num_entries = self.data.dimensions['num_side_ss%d' % internal_id].size
-        except KeyError:
-            raise KeyError("Failed to retrieve number of entries in side set with id {} ('{}')"
-                           .format(obj_id, 'num_side_ss%d' % internal_id))
-        try:
-            num_df = self.data.dimensions['num_df_ss%d' % internal_id].size
-        except KeyError:
-            raise KeyError("Failed to retrieve number of distribution factors in side set with id {} ('{}')"
-                           .format(obj_id, 'num_df_ss%d' % internal_id))
-        return num_entries, num_df
+        return self._int_get_side_set_params(obj_id, internal_id)
 
     ##################
     # Element blocks #
@@ -1092,29 +1115,17 @@ class Exodus:
             result = []
         return result
 
-    def get_elem_block_connectivity(self, obj_id):
-        """Returns the connectivity list for the element block with given ID."""
-        internal_id = self._lookup_id('elblock', obj_id)
-        # TODO this should just call the param function
-        size = self.data.dimensions['num_el_in_blk%d' % internal_id].size
-        return self._int_get_partial_elem_block_connectivity(obj_id, internal_id, 1, size)
-
-    def get_partial_elem_block_connectivity(self, obj_id, start, count):
-        """
-        Returns a partial connectivity list for the element block with given ID.
-
-        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
-        """
-        internal_id = self._lookup_id('elblock', obj_id)
-        return self._int_get_partial_elem_block_connectivity(obj_id, internal_id, start, count)
-
-    def get_elem_block_params(self, obj_id):
+    def _int_get_elem_block_params(self, obj_id, internal_id):
         """
         Returns a tuple containing the parameters for the element block with given ID.
 
-        Returned tuple is of format (number of elements, nodes per element, topology, number of attributes).
+        FOR INTERNAL USE ONLY
+
+        :param obj_id: EXTERNAL (user-defined) id
+        :param internal_id: INTERNAL (1-based) id
+        :return: (number of elements, nodes per element, topology, number of attributes)
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        # TODO this will be way faster with caching
         try:
             num_entries = self.data.dimensions['num_el_in_blk%d' % internal_id].size
         except KeyError:
@@ -1138,6 +1149,30 @@ class Exodus:
         else:
             num_att_blk = 0
         return num_entries, num_node_entry, topology, num_att_blk
+
+    def get_elem_block_connectivity(self, obj_id):
+        """Returns the connectivity list for the element block with given ID."""
+        internal_id = self._lookup_id('elblock', obj_id)
+        size = self._int_get_elem_block_params(obj_id, internal_id)[0]
+        return self._int_get_partial_elem_block_connectivity(obj_id, internal_id, 1, size)
+
+    def get_partial_elem_block_connectivity(self, obj_id, start, count):
+        """
+        Returns a partial connectivity list for the element block with given ID.
+
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        """
+        internal_id = self._lookup_id('elblock', obj_id)
+        return self._int_get_partial_elem_block_connectivity(obj_id, internal_id, start, count)
+
+    def get_elem_block_params(self, obj_id):
+        """
+        Returns a tuple containing the parameters for the element block with given ID.
+
+        Returned tuple is of format (number of elements, nodes per element, topology, number of attributes).
+        """
+        internal_id = self._lookup_id('elblock', obj_id)
+        return self._int_get_elem_block_params(obj_id, internal_id)
 
     #########
     # Names #
@@ -1669,10 +1704,9 @@ class Exodus:
     def write(self):
         self.ledger.write()
 
+def lol(ex):
+    ex.get_elem_block_connectivity(1)
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/tube_rbar_conmass.exo", 'a')
-    print(ex.get_elem_block_id_map())
-    print(ex.get_elem_attrib_names(1001))
-    print(ex.get_elem_attrib(1001))
-    print(ex.data.variables['attrib6'][:])
+    pass
+    #use netcdf methods
