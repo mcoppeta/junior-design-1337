@@ -65,7 +65,7 @@ class ElemLedger:
         names = []
         for i in self.blocks:
             blk_num = self.blocks[i]['blk_num']
-            names.append(util.convert_string(self.blocks[i]['name'] + str('\0')))
+            names.append(util.convert_string(self.blocks[i]['name'] + str('\0'), self.ex.max_allowed_name_length))
 
             # Creates dimension for how many elements are in this element block
             el_in_blk_title = "num_el_in_blk{}".format(blk_num)
