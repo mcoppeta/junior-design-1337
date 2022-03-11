@@ -1,4 +1,5 @@
 import numpy as np
+import util
 
 
 # Ledger for both element blocks and elements
@@ -39,7 +40,7 @@ class ElemLedger:
             block_data['num_nod_per_el'] = self.ex.data.dimensions['num_nod_per_el' + str(blk_num)].size
             block_data['num_el_blk'] = self.ex.data.dimensions['num_el_in_blk' + str(blk_num)].size
             if 'eb_names' in self.ex.data.variables.keys():
-                block_data['name'] = self.ex.lineparse(self.ex.data.variables['eb_names'][i])
+                block_data['name'] = util.lineparse(self.ex.data.variables['eb_names'][i])
             else:
                 block_data['name'] = "Block {}".format(blk_num)
             self.blocks[connect_title] = block_data
@@ -64,7 +65,7 @@ class ElemLedger:
         names = []
         for i in self.blocks:
             blk_num = self.blocks[i]['blk_num']
-            names.append(self.convert_string(self.blocks[i]['name'] + str('\0')))
+            names.append(util.convert_string(self.blocks[i]['name'] + str('\0')))
 
             # Creates dimension for how many elements are in this element block
             el_in_blk_title = "num_el_in_blk{}".format(blk_num)
@@ -111,21 +112,3 @@ class ElemLedger:
         # TODO ACTUALLY IMPLEMENT THIS
         #TODO VAR: elem_var_tab -> ???
         # TODO ACTUALLY IMPLEMENT THIS
-
-
-    # method to convert python string to netcdf4 compatible character array
-    @staticmethod
-    def convert_string(s):
-        arr = np.empty(33, '|S1')
-        for i in range(len(s)):
-            arr[i] = s[i]
-
-        mask = np.empty(33, bool)
-        for i in range(33):
-            if i < len(s):
-                mask[i] = False
-            else:
-                mask[i] = True
-
-        out = np.ma.core.MaskedArray(arr, mask)
-        return out
