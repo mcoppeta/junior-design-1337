@@ -761,7 +761,7 @@ class Exodus:
         # This method cannot simply call its partial version because we cannot know the number of elements to read
         #  without looking up the id first. This extra id lookup call is slow, so we get around it with a helper method.
         internal_id = self._lookup_id('elblock', obj_id)
-        size = self.data.dimensions['num_el_in_blk%d' % internal_id].size
+        size = self._int_get_elem_block_params(obj_id, internal_id)[0]
         return self._int_get_partial_elem_block_var_across_times(internal_id, start_time_step, end_time_step, var_index,
                                                                  1, size)
 
@@ -1704,9 +1704,6 @@ class Exodus:
     def write(self):
         self.ledger.write()
 
-def lol(ex):
-    ex.get_elem_block_connectivity(1)
 
 if __name__ == "__main__":
     pass
-    #use netcdf methods
