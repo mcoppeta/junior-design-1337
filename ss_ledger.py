@@ -75,7 +75,7 @@ class SSLedger:
         self.ss_dist_fact.pop(ndx)
         self.num_ss -= 1
 
-    def add_side_to_ss(self, elem_id, side_id, dist_fact, ss_id):
+    def add_sides_to_sideset(self, elem_ids, side_ids, dist_facts, ss_id):
         ndx = self.find_sideset_num(ss_id)
 
         # if not loaded in yet, need to load in 
@@ -83,18 +83,23 @@ class SSLedger:
             ss = self.ex.get_side_set(ss_id)
             elems = ss[0]
             sides = ss[1]
-            self.ss_elem[ndx] = elems
-            self.ss_sides[ndx] = sides
-            self.ss_dist_fact[ndx] = self.ex.get_side_set_df(ss_id)
+            self.ss_elem[ndx] = np.array(elems)
+            self.ss_sides[ndx] = np.array(sides)
+            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(ss_id))
+
         
-        self.ss_elem[ndx] = np.append(self.ss_elem[ndx], elem_id)
-        self.ss_sides[ndx] = np.append(self.ss_sides[ndx], side_id)
-        self.ss_dist_fact[ndx] = np.append(self.ss_dist_fact[ndx], dist_fact)
-        self.ss_sizes[ndx] += 1
-        self.num_dist_fact[ndx] += len(dist_fact)
+        self.ss_elem[ndx] = np.append(self.ss_elem[ndx], elem_ids)
+        self.ss_sides[ndx] = np.append(self.ss_sides[ndx], side_ids)
+        self.ss_dist_fact[ndx] = np.append(self.ss_dist_fact[ndx], dist_facts)
+        self.ss_sizes[ndx] += len(elem_ids)
+        self.num_dist_fact[ndx] += len(dist_facts)
     
-    def remove_side_from_ss(self, elem_id, side_id, ss_id):
+    def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
         pass
+
+
+
+
 
     # Creates 2 new sidesets from sides in old sideset based on x-coordinate values
     #TODO Would this work as a way to implement this function?
@@ -194,7 +199,7 @@ class SSLedger:
             
             # if None, just copy over old data, otherwise copy over new stuff
             if (self.ss_elem[i] is None):
-                 data["elem_ss" + str(i+1)][:] = self.ex.get_side_set(self.ss_prop1[i])[0][:]
+                data["elem_ss" + str(i+1)][:] = self.ex.get_side_set(self.ss_prop1[i])[0][:]
             else:
                 data["elem_ss" + str(i+1)][:] = self.ss_elem[i][:]
 
