@@ -1262,7 +1262,7 @@ class Exodus:
 
     def _int_get_partial_elem_attrib(self, obj_id, internal_id, start, count):
         """
-        Returns a partial list of attributes for each element in the element block with given ID.
+        Returns a partial list of all attributes for the element block with given ID.
 
         Returns an empty array if the element block doesn't have attributes.
 
@@ -1280,25 +1280,74 @@ class Exodus:
             raise ValueError("Count must be a positive integer")
         varname = 'attrib%d' % internal_id
         if varname in self.data.variables:
-            result = self.data.variables['attrib%d' % internal_id][start - 1:start + count - 1, :]
+            result = self.data.variables[varname][start - 1:start + count - 1, :]
         else:
             result = []
             warnings.warn("Element block {} has no attributes.".format(obj_id))
         return result
 
-    def get_elem_attrib(self, obj_id):
+    def _int_get_partial_one_elem_attrib(self, obj_id, internal_id, attrib_index, start, count):
         """
-        Returns a list of attributes for each element in the element block with given ID.
+        Returns a partial list of one attribute for the element block with given ID.
+
+        Returns an empty array if the element block doesn't have attributes.
+
+        FOR INTERNAL USE ONLY
+
+        :param obj_id: EXTERNAL (user-defined) id
+        :param internal_id: INTERNAL (1-based) id
+        :param attrib_index: attribute index (1-based)
+        :param start: element start index (1-based)
+        :param count: number of elements
+        :return: array containing the selected part of the attribute list
+        """
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+        num_attrib = self._int_get_num_elem_attrib(internal_id)
+        if num_attrib > 0:  # faster to check this than if the variable exists like in the function above this one
+            if attrib_index < 1 or attrib_index > num_attrib:
+                raise ValueError("Attribute index out of range. Got {}".format(attrib_index))
+            result = self.data.variables['attrib%d' % internal_id][start - 1:start + count - 1, attrib_index - 1]
+        else:
+            result = []
+            warnings.warn("Element block {} has no attributes.".format(obj_id))
+        return result
+
+    def get_partial_one_elem_attrib(self, obj_id, attrib_index, start, count):
+        """
+        Returns a partial list of one attribute for the specified elements in the element block with given ID.
+
+        Array starts at element number ``start`` (1-based) and contains ``count`` elements.
+        Returns an empty array if the element block doesn't have attributes.
+        """
+        internal_id = self._lookup_id('elblock', obj_id)
+        return self._int_get_partial_one_elem_attrib(obj_id, internal_id, attrib_index, start, count)
+
+    def get_one_elem_attrib(self, obj_id, attrib_index):
+        """
+        Returns a list of one attribute for each element in the element block with given ID.
 
         Returns an empty array if the element block doesn't have attributes.
         """
         internal_id = self._lookup_id('elblock', obj_id)
-        num_attrib = self._int_get_num_elem_attrib(internal_id)
-        return self._int_get_partial_elem_attrib(obj_id, internal_id, 1, num_attrib)
+        size = self._int_get_elem_block_params(obj_id, internal_id)[0]
+        return self._int_get_partial_one_elem_attrib(obj_id, internal_id, attrib_index, 1, size)
+
+    def get_elem_attrib(self, obj_id):
+        """
+        Returns a list of all attributes for each element in the element block with given ID.
+
+        Returns an empty array if the element block doesn't have attributes.
+        """
+        internal_id = self._lookup_id('elblock', obj_id)
+        size = self._int_get_elem_block_params(obj_id, internal_id)[0]
+        return self._int_get_partial_elem_attrib(obj_id, internal_id, 1, size)
 
     def get_partial_elem_attrib(self, obj_id, start, count):
         """
-        Returns a partial list of attributes for each element in the element block with given ID.
+        Returns a partial list of all attributes for the specified elements in the element block with given ID.
 
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         Returns an empty array if the element block doesn't have attributes.
@@ -1319,6 +1368,7 @@ class Exodus:
             warnings.warn("Element block {} has no attributes.".format(obj_id))
         else:
             varname = 'attrib_name%d' % internal_id
+            # Older datasets don't have attribute names
             if varname in self.data.variables:
                 names = self.data.variables[varname][:]
                 result = util.arrparse(names, len(names), self._MAX_NAME_LENGTH_T)
@@ -1706,4 +1756,6 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    pass
+    ex = Exodus("sample-files/cube_with_data - Copy.exo", 'r')
+
+    ex.close()

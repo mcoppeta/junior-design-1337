@@ -31,7 +31,7 @@ def convert_string(s, length):
     Converts a Python string to a NetCDF4 compatible character array.
 
     :param s: python string
-    :param length: length of the output string (not including null terminator)
+    :param length: length of the output string
     :return: character array
     """
     length += 1  # we've got to add the null character
