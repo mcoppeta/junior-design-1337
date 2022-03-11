@@ -112,6 +112,10 @@ class Ledger:
     def remove_sideset(self, ss_id):
         self.sideset_ledger.remove_sideset(ss_id)
 
+    # element methods
+    def remove_element(self, elem_id):
+        self.element_ledger.remove_element(elem_id)
+
 
     def write(self):
         """

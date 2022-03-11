@@ -8,7 +8,6 @@ class ElemLedger:
     def __init__(self, ex):
         self.ex = ex
 
-        #TODO consider making self.blocks an array
         self.blocks = {}  # connectX: data and details of element block X
         self.eb_status = self.ex.data.variables['eb_status'][:]
         self.eb_prop1 = self.ex.data.variables['eb_prop1'][:]  # each block from here gets entry in self.blocks
@@ -24,9 +23,9 @@ class ElemLedger:
         if 'elem_map' in self.ex.data.variables.keys() and 'elem_num_map' in self.ex.data.variables.keys():
             raise ValueError('Dataset contains both an elem_num_map and elem_map - causes ambiguity')
         elif 'elem_map' in self.ex.data.variables.keys():
-            self.elem_num_map = self.ex.data.variables['elem_map'][:]
+            self.elem_num_map = self.ex.data.variables['elem_map'][:].tolist()
         elif 'elem_num_map' in self.ex.data.variables.keys():
-            self.elem_num_map = self.ex.data.variables['elem_num_map'][:]
+            self.elem_num_map = self.ex.data.variables['elem_num_map'][:].tolist()
         else:
             self.elem_num_map = [i for i in range(self.ex.data.dimensions['num_elem'].size)]
 
@@ -53,8 +52,57 @@ class ElemLedger:
 
             self.blocks[connect_title] = block_data
             self.num_blocks += 1
-
         #print(self.blocks)
+
+    # finds index of element in element number map
+    def find_element_num(self, id):
+        num = -1
+        for i in range(len(self.elem_num_map)):
+            if self.elem_num_map[i] == id:
+                num = i
+                break
+
+        if num == -1:
+            raise KeyError("Cannot find element with ID " + str(id))
+
+        return num
+
+    # returns the block its in, and the INDEX to the element within the block
+    def find_element_location(self, iid):
+        relative_id = iid
+        for connectX in self.blocks:
+            if relative_id >= self.blocks[connectX]['num_el_blk']:
+                relative_id -= self.blocks[connectX]['num_el_blk']
+            else:
+                return connectX, relative_id
+
+    def get_element_nodes(self, id):
+        connect, ndx = self.find_element_location(self.find_element_num(id))
+        return self.blocks[connect]['elements'][ndx]
+
+    def remove_element(self, id):
+        internal_id = self.find_element_num(id)
+        e_block, e_id = self.find_element_location(internal_id)
+
+        # Valid element at this point
+
+        self.blocks[e_block]['num_el_blk'] -= 1  # 1 fewer element in block
+
+        try:
+            index = self.elem_num_map.index(id)
+        except ValueError:
+            raise ValueError("Element number map does not have entry for node ID {}".format(id))
+        self.elem_num_map.pop(index)  # removes element reference from the number map
+
+        connect = self.blocks[e_block]['elements'].tolist()
+        connect.pop(e_id)  # removes element from connectX
+        self.blocks[e_block]['elements'] = np.array(connect)
+
+        for variable in self.blocks[e_block]['variables']:
+            var_data = self.blocks[e_block]['variables'][variable].tolist()
+            for i in range(len(var_data)):
+                var_data[i].pop(e_id)  # Removes associated data from each elemental variable
+            self.blocks[e_block]['variables'][variable] = np.array(var_data)
 
     # Writes out element data to the new dataset
     def write(self, data):
@@ -82,7 +130,7 @@ class ElemLedger:
             data.createDimension(nod_per_el_title, self.blocks[i]['num_nod_per_el'])
 
         # Creates dimension for the number of elemental variables
-        data.createDimension("num_elem_var", self.ex.data.dimensions['num_elem_var'].size)  # TODO -> figure this out
+        data.createDimension("num_elem_var", self.ex.data.dimensions['num_elem_var'].size)
 
 
         #TODO Make sure this implementation makes sense
@@ -111,11 +159,11 @@ class ElemLedger:
             data[connectX].setncattr('elem_type', self.blocks[connectX]['elem_type'])
             data[connectX][:] = np.array(self.blocks[connectX]['elements'])
 
-        #TODO VAR: name_elem_var -> ???
+        # name_elem_var
         data.createVariable("name_elem_var", "|S1", dimensions=("num_elem_var", "len_name"), fill_value=b'\x00')
         data["name_elem_var"][:] = np.array(self.name_elem_var)
 
-        #TODO VAR: vals_elem_varNebX -> ???
+        # vals_elem_varNebX
         for connectX in self.blocks:
             num = self.blocks[connectX]["blk_num"]
             for variable in self.blocks[connectX]['variables']:
@@ -123,6 +171,6 @@ class ElemLedger:
                 data.createVariable(variable, "float64", dimensions=("time_step", "num_el_in_blk{}".format(num)))
                 data[variable][:] = np.array(var_data)
 
-        #TODO VAR: maintain with new functions
+        #TODO: maintain with new functions
         data.createVariable("elem_var_tab", "int32", dimensions=("num_el_blk", "num_elem_var"))
         data["elem_var_tab"][:] = np.array(self.elem_var_tab)
