@@ -882,15 +882,11 @@ class Exodus:
         if count < 0:
             raise ValueError("Count must be a positive integer")
         if ('dist_fact_ns%d' % internal_id) in self.data.variables:
-            try:
-                set = self.data.variables['dist_fact_ns%d' % internal_id][start - 1:start + count - 1]
-            except KeyError:
-                raise KeyError("Failed to retrieve distribution factors of nodeset with id {} ('{}')"
-                               .format(id, 'dist_fact_ns%d' % internal_id))
-            return set
+            set = self.data.variables['dist_fact_ns%d' % internal_id][start - 1:start + count - 1]
         else:
             warnings.warn("This database does not contain dist factors for node set {}".format(id))
-            return []
+            set = []
+        return set
 
     def get_node_set(self, id):
         """Returns an array of the nodes contained in the node set with given ID."""
@@ -1083,15 +1079,10 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        try:
-            if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
-                num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
-            else:
-                num_node_entry = 0
-        except KeyError:
-            # TODO unreachable except clause
-            raise KeyError("Failed to retrieve number of nodes per element in element block with id {} ('{}')"
-                           .format(id, 'num_nod_per_el%d' % internal_id))
+        if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
+            num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
+        else:
+            num_node_entry = 0
         if num_node_entry > 0:
             try:
                 result = self.data.variables['connect%d' % internal_id][start - 1:start + count - 1]
@@ -1130,14 +1121,10 @@ class Exodus:
         except KeyError:
             raise KeyError("Failed to retrieve number of elements in element block with id {} ('{}')"
                            .format(id, 'num_el_in_blk%d' % internal_id))
-        try:
-            if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
-                num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
-            else:
-                num_node_entry = 0
-        except KeyError:
-            raise KeyError("Failed to retrieve number of nodes per element in element block with id {} ('{}')"
-                           .format(id, 'num_nod_per_el%d' % internal_id))
+        if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
+            num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
+        else:
+            num_node_entry = 0
         try:
             if num_node_entry > 0:
                 connect = self.data.variables['connect%d' % internal_id]
@@ -1147,14 +1134,10 @@ class Exodus:
         except KeyError:
             raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
                            .format(id, 'connect%d' % internal_id))
-        try:
-            if ('num_att_in_blk%d' % internal_id) in self.data.dimensions:
-                num_att_blk = self.data.dimensions['num_att_in_blk%d' % internal_id].size
-            else:
-                num_att_blk = 0
-        except KeyError:
-            raise KeyError("Failed to retrieve number of attributes in element block with id {} ('{}')"
-                           .format(id, 'num_att_in_blk%d' % internal_id))
+        if ('num_att_in_blk%d' % internal_id) in self.data.dimensions:
+            num_att_blk = self.data.dimensions['num_att_in_blk%d' % internal_id].size
+        else:
+            num_att_blk = 0
         return num_entries, num_node_entry, topology, num_att_blk
 
     #########
