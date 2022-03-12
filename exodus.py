@@ -1381,6 +1381,139 @@ class Exodus:
         internal_id = self._lookup_id('elblock', obj_id)
         return self._int_get_num_elem_attrib(internal_id)
 
+    #####################
+    # Object properties #
+    #####################
+
+    # We need to know the number of properties in advance for _get_object_property_names.
+    # Since this function is here, we might as well use it elsewhere too.
+    def _get_num_object_properties(self, varname):
+        """
+        Returns the number of properties an object has.
+
+        :param varname: the netCDF variable name of the property. ("xx_prop_%d") where xx is ns, ss, or eb
+        :return: number of properties
+        """
+        # loop over the prop variables and count how many there are
+        n = 0
+        while True:
+            if varname % (n + 1) in self.data.variables:
+                n += 1
+            else:
+                break
+        return n
+
+    def _get_object_property(self, obj_type, obj_id, name):
+        """
+        Returns the value of a specific object's property.
+
+        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_id: EXTERNAL (user-defined) id
+        :param name: name of the property
+        :return: value of the property for the specified object
+        """
+        internal_id = self._lookup_id(obj_type, obj_id)
+        prop = self._get_object_property_array(obj_type, name)
+        # We don't want to index into prop if it's empty
+        if len(prop) > 0:
+            return prop[internal_id - 1]
+        else:
+            return None
+
+    def get_node_set_property(self, obj_id, name):
+        """Returns the value of the specified property for the node set with the given ID."""
+        return self._get_object_property('nodeset', obj_id, name)
+
+    def get_side_set_property(self, obj_id, name):
+        """Returns the value of the specified property for the side set with the given ID."""
+        return self._get_object_property('sideset', obj_id, name)
+
+    def get_elem_block_property(self, obj_id, name):
+        """Returns the value of the specified property for the element block with the given ID."""
+        return self._get_object_property('elblock', obj_id, name)
+
+    def _get_object_property_array(self, obj_type, name):
+        """
+        Returns a list containing all the values of a particular property for objects of a given type.
+
+        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param name: name of the property
+        :return: array containing values of the property for objects of the given type
+        """
+        if obj_type == 'nodeset':
+            varname = 'ns_prop%d'
+        elif obj_type == 'sideset':
+            varname = 'ss_prop%d'
+        elif obj_type == 'elblock':
+            varname = 'eb_prop%d'
+        else:
+            raise ValueError("Invalid variable type {}!".format(obj_type))
+        prop = []
+        # Search for the property for the right name
+        # We don't use a for loop over the number of props because that would cost a second loop over the props
+        n = 1
+        while True:
+            if varname % n in self.data.variables:
+                propname = self.data.variables[varname % n].getncattr('name')
+                if propname == name:
+                    # we've found our property
+                    prop = self.data.variables[varname % n][:]
+                    break
+                else:
+                    # check next property
+                    n += 1
+                    continue
+            else:
+                # "xx_prop_n" doesn't exist. name doesn't exist in file
+                warnings.warn("Property {} does not exist!".format(name))
+                break
+        return prop
+
+    def get_node_set_property_array(self, name):
+        """Returns a list containing the values of the specified property for all node sets."""
+        return self._get_object_property_array('nodeset', name)
+
+    def get_side_set_property_array(self, name):
+        """Returns a list containing the values of the specified property for all side sets."""
+        return self._get_object_property_array('sideset', name)
+
+    def get_elem_block_property_array(self, name):
+        """Returns a list containing the values of the specified property for all element blocks."""
+        return self._get_object_property_array('elblock', name)
+
+    def _get_object_property_names(self, obj_type):
+        """
+        Returns a list containing the names of properties defined for objects of a given type.
+
+        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :return: array of property names
+        """
+        if obj_type == 'nodeset':
+            varname = 'ns_prop%d'
+        elif obj_type == 'sideset':
+            varname = 'ss_prop%d'
+        elif obj_type == 'elblock':
+            varname = 'eb_prop%d'
+        else:
+            raise ValueError("Invalid variable type {}!".format(obj_type))
+        num_props = self._get_num_object_properties(varname)
+        result = numpy.empty([num_props], self._MAX_NAME_LENGTH_T)
+        for n in range(num_props):
+            result[n] = self.data.variables[varname % (n + 1)].getncattr('name')
+        return result
+
+    def get_node_set_property_names(self):
+        """Returns a list of node set property names."""
+        return self._get_object_property_names('nodeset')
+
+    def get_side_set_property_names(self):
+        """Returns a list of side set property names."""
+        return self._get_object_property_names('sideset')
+
+    def get_elem_block_property_names(self):
+        """Returns a list of element block property names."""
+        return self._get_object_property_names('elblock')
+
     ###############
     # Coordinates #
     ###############
@@ -1756,6 +1889,6 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/cube_with_data - Copy.exo", 'r')
+    ex = Exodus("sample-files/cube_with_data.exo", 'r')
 
     ex.close()
