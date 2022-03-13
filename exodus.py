@@ -906,11 +906,15 @@ class Exodus:
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_partial_node_set(id, start, count)
+
         internal_id = self._lookup_id('nodeset', id)
         return self._int_get_partial_node_set(internal_id, start, count)
 
     def get_node_set_df(self, id):
         """Returns an array containing the distribution factors in the node set with given ID."""
+
         internal_id = self._lookup_id('nodeset', id)
         size = self.data.dimensions['num_nod_ns%d' % internal_id].size
         return self._int_get_partial_node_set_df(internal_id, 1, size)
@@ -921,6 +925,7 @@ class Exodus:
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
+
         internal_id = self._lookup_id('nodeset', id)
         return self._int_get_partial_node_set_df(internal_id, start, count)
 
@@ -1594,9 +1599,11 @@ class Exodus:
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_element(elem_id)
-
-    def write(self):
-        self.ledger.write()
+        
+    def write(self, path=None):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to write")
+        self.ledger.write(path)
 
 
 if __name__ == "__main__":

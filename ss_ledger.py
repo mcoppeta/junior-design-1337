@@ -72,7 +72,7 @@ class SSLedger:
                 break
 
         if ndx == -1:
-            raise Exception("Sideset with given id does not exist")
+            raise IndexError("Sideset with given id does not exist")
         
         # remove sideset from lists
         self.ss_prop1.pop(ndx)
