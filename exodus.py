@@ -906,11 +906,18 @@ class Exodus:
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_partial_nodeset(id, start, count)
+
         internal_id = self._lookup_id('nodeset', id)
         return self._int_get_partial_node_set(internal_id, start, count)
 
     def get_node_set_df(self, id):
         """Returns an array containing the distribution factors in the node set with given ID."""
+
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_node_set_df(id)
+
         internal_id = self._lookup_id('nodeset', id)
         size = self.data.dimensions['num_nod_ns%d' % internal_id].size
         return self._int_get_partial_node_set_df(internal_id, 1, size)
@@ -921,6 +928,10 @@ class Exodus:
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
+
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_partial_node_set_df(id, start, count)
+
         internal_id = self._lookup_id('nodeset', id)
         return self._int_get_partial_node_set_df(internal_id, start, count)
 

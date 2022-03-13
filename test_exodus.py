@@ -2,8 +2,9 @@ import pytest
 import numpy as np
 from exodus import Exodus
 import netCDF4 as nc
-from ns_ledger import NSLedger
 import util
+from iterate import SampleFiles
+
 
 # Disables all warnings in this module
 pytestmark = pytest.mark.filterwarnings('ignore')
@@ -273,7 +274,6 @@ def test_remove_ns_empty(tmpdir):
         exofile.remove_nodeset(1)
 
 
-
 def test_remove_ns_nonexistent(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
     exofile.add_nodeset([1, 2, 3], 0, "Test Name")
@@ -388,8 +388,6 @@ def test_add_duplicate_nodes(tmpdir):
     exofile.add_node_to_nodeset(12, 99)
     exofile.add_node_to_nodeset(10, 99)
 
-
-
     exofile.write()
     data = nc.Dataset(str(tmpdir) + '\\test.ex2', 'r')
     assert data.dimensions['num_nod_ns1'].size == 3
@@ -421,12 +419,30 @@ def test_remove_duplicate_nodes(tmpdir):
         exofile.remove_nodes_from_nodeset([8, 8], 2)
 
 
+#############################################################################
+#                                                                           #
+#                            SideSet Tests                                  #
+#                                                                           #
+#############################################################################
+
+def test_empty_sideset_remove(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    with pytest.raises(IndexError):
+        exofile.remove_sideset(10)
+
+
 # Below tests are based on what can be read according to current C Exodus API.
 # The contents, names, and number of tests are subject to change as work on the library progresses
 # and we figure out how closely the functions in this library match the C one.
 
 # MODEL DESCRIPTION READ TESTS
-# def test_get_coords():
+def test_get_coords_comprehensive():
+    for file in SampleFiles():
+        ex = Exodus(file, 'r')
+        data = nc.Dataset(file, 'r')
+        if 'coord' in data.variables:
+            assert np.array_equal(ex.get_coords(), data['coord'][:])
+
 # def test_get_coord_names():
 # def test_get_node_num_map():
 # def test_get_elem_num_map():

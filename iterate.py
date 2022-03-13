@@ -8,7 +8,8 @@ class SampleFiles:
         self.file_list = []
         for filename in os.listdir(self.directory):
             f = os.path.join(self.directory, filename)
-            self.file_list.append(f)
+            if len(f.split('.')) > 1:
+                self.file_list.append(f)
 
         self.index = 0
         return self
