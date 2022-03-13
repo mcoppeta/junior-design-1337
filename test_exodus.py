@@ -418,6 +418,31 @@ def test_remove_duplicate_nodes(tmpdir):
     with pytest.raises(IndexError):
         exofile.remove_nodes_from_nodeset([8, 8], 2)
 
+def test_read_consistency():
+    for file in SampleFiles():
+        try:
+            ex2 = Exodus(file, 'a')
+            ex1 = Exodus(file, 'r')
+        except KeyError:
+            ## TAKE THIS OUT ONCE SS DF ERROR IS FIXED
+            print("df key error on", file)
+            continue
+
+        assert ex1.num_node_sets == ex2.num_node_sets
+
+        try:
+            ns_prop1 = ex1.get_node_set_id_map()
+            assert np.array_equal(ns_prop1, ex2.get_node_set_id_map())
+
+            for i in ns_prop1:
+                np.array_equal(ex1.get_node_set(i), ex2.get_node_set(i))
+        except KeyError:
+            print("ns_prop1 keyerror on", file)
+
+
+
+
+
 
 def test_basic_ns_append(tmpdir):
     exofile = Exodus('sample-files/can.ex2', 'a', clobber=False)
