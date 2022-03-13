@@ -1,3 +1,4 @@
+from lib2to3.pytree import convert
 import numpy as np
 import util
 
@@ -11,13 +12,13 @@ class SSLedger:
         if ("num_side_sets" in ex.data.dimensions.keys()):
             self.num_ss = ex.data.dimensions["num_side_sets"].size
         self.ss_prop1 = [] # this is id for sideset
-        self.ss_status = []
-        self.ss_sizes = []
-        self.ss_names = []
-        self.num_dist_fact = []
-        self.ss_dist_fact = []
-        self.ss_elem = []
-        self.ss_sides = []
+        self.ss_status = [] # status for each sideset
+        self.ss_sizes = [] # number of sides in each sideset
+        self.ss_names = [] # name of each sideset
+        self.num_dist_fact = [] # number of distribution factors in each sideset
+        self.ss_dist_fact = [] # distribution factors in each sideset
+        self.ss_elem = [] # internal elem ids of each sideset, each index in this is an array of elem ids
+        self.ss_sides = [] # side ids of each sideset, each index in this is an array of side ids
 
 
         # Fill in lists with sideset data
@@ -30,7 +31,7 @@ class SSLedger:
             else:
                 self.ss_names.append("")
             # if df do not exist, add size 0 arrays for them
-            self.num_dist_fact.append(ex.get_sideset_params(self.ss_prop1[i])[1])
+            self.num_dist_fact.append(ex.get_side_set_params(self.ss_prop1[i])[1])
             self.ss_dist_fact.append(None)
             self.ss_elem.append(None) # this is place holder to be filled with real values later
             self.ss_sides.append(None) # this is place holder to be filled with real values later
@@ -48,8 +49,12 @@ class SSLedger:
         if len(ss_name) > self.ex._MAX_NAME_LENGTH:
             raise Exception("Passed in name is too long")
         
-        converted_elem_ids = elem_ids
-        # converted_elem_ids = self.ex.lookup_id(elem_ids)
+        # need to convert elem_ids to internal ids
+        map = self.ex.get_elem_id_map()
+        converted_elem_ids = []
+        for id in elem_ids:
+            internal_id = np.where(map == id)[0][0] + 1
+            converted_elem_ids.append(internal_id)
 
         # add sidesets to list
         self.ss_elem.append(converted_elem_ids)
@@ -89,18 +94,43 @@ class SSLedger:
             self.ss_sides[ndx] = np.array(sides)
             self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(ss_id))
 
+        # need to convert elem_ids to internal ids
+        map = self.ex.get_elem_id_map()
+        converted_elem_ids = []
+        for id in elem_ids:
+            internal_id = np.where(map == id)[0][0] + 1
+            converted_elem_ids.append(internal_id)
         
-        self.ss_elem[ndx] = np.append(self.ss_elem[ndx], elem_ids)
+        self.ss_elem[ndx] = np.append(self.ss_elem[ndx], converted_elem_ids)
         self.ss_sides[ndx] = np.append(self.ss_sides[ndx], side_ids)
         self.ss_dist_fact[ndx] = np.append(self.ss_dist_fact[ndx], dist_facts)
         self.ss_sizes[ndx] += len(elem_ids)
         self.num_dist_fact[ndx] += len(dist_facts)
     
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
+        # ndx = self.find_sideset_num(ss_id)
+
+        # # if not loaded in yet, need to load in 
+        # if (self.ss_elem[ndx] is None):
+        #     ss = self.ex.get_side_set(ss_id)
+        #     elems = ss[0]
+        #     sides = ss[1]
+        #     self.ss_elem[ndx] = np.array(elems)
+        #     self.ss_sides[ndx] = np.array(sides)
+        #     self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(ss_id))
+
+        # num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
+
+        # # iterate through each side in sideset
+        # # if it matches one of the passed in sides, mark for removal
+        # for i in range(self.ss_sizes[ndx]):
+        #     self.ss_elem[]
+        pass
+            
+
+
         
-
-
-
+        
 
 
     # Creates 2 new sidesets from sides in old sideset based on x-coordinate values
