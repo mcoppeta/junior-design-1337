@@ -418,23 +418,62 @@ def test_remove_duplicate_nodes(tmpdir):
     with pytest.raises(IndexError):
         exofile.remove_nodes_from_nodeset([8, 8], 2)
 
-def test_get_ns_consistency():
-    for file in SampleFiles():
-        ex1 = Exodus(file, 'r', clobber=False)
-        ex2 = Exodus(file, 'a', clobber=False)
 
-        assert ex1.num_node_sets == ex2.num_node_sets
+def test_basic_ns_append(tmpdir):
+    exofile = Exodus('sample-files/can.ex2', 'a', clobber=False)
+    exofile.add_nodeset([1, 2, 3, 4, 5], 10)
 
-        ns_prop1 = ex1.get_node_id_map()
-        assert np.array_equal(ns_prop1, ex2.get_node_id_map())
+    with pytest.raises(OSError):
+        exofile.write()
+
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'r')
+    original = Exodus('sample-files/can.ex2', 'r', clobber=False)
+
+    print("\n", exofile.data.dimensions['num_node_sets'])
+
+    assert original.num_node_sets + 1 == exofile.num_node_sets
+    assert np.array_equal(exofile.get_node_set(10), np.array([1, 2, 3, 4, 5]))
 
 
+def test_permissions():
+    exofile = Exodus('sample-files/cube_1ts_mod.e', 'r')
+
+    with pytest.raises(PermissionError):
+        exofile.add_nodeset([1, 2, 3, 4], 10)
+
+    with pytest.raises(PermissionError):
+        exofile.remove_nodeset(10)
+
+    with pytest.raises(PermissionError):
+        exofile.write()
+
+    with pytest.raises(PermissionError):
+        exofile.add_sideset([10, 11, 12, 13, 14, 15], [1, 2, 3, 4], 3, "sideset1", [10, 1, 1, 1, 1])
+
+    with pytest.raises(PermissionError):
+        exofile.remove_sideset(10)
+
+    with pytest.raises(PermissionError):
+        exofile.add_node_to_nodeset(11, 3)
+
+    with pytest.raises(PermissionError):
+        exofile.add_nodes_to_nodeset([10, 11, 12], 3)
+
+    with pytest.raises(PermissionError):
+        exofile.remove_node_from_nodeset(13, 14)
+
+    with pytest.raises(PermissionError):
+        exofile.remove_nodes_from_nodeset([12, 13, 14], 12)
 
 #############################################################################
 #                                                                           #
 #                            SideSet Tests                                  #
 #                                                                           #
 #############################################################################
+
 
 def test_empty_sideset_remove(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
