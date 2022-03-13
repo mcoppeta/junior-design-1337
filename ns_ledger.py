@@ -1,4 +1,5 @@
 import numpy as np
+import util
 
 
 class NSLedger:
@@ -51,7 +52,7 @@ class NSLedger:
         # setup user-specified nodeset names
         if "ns_names" in ex.data.variables.keys():
             for name in ex.data.variables['ns_names']:
-                n = self.lineparse(name)
+                n = util.lineparse(name)
                 self.nodeset_names.append(n)
                 self.nodeset_name_set.add(n)
         else:
@@ -67,7 +68,7 @@ class NSLedger:
             raise KeyError("Nodeset name already in use")
 
         self.nodesets.append(str(self.new_nodeset_name))
-        self.nodeset_map[str(self.new_nodeset_name)] = np.array(node_ids)
+        self.nodeset_map[str(self.new_nodeset_name)] = np.unique(np.array(node_ids))
         self.nodeset_ids.append(nodeset_id)
         self.nodeset_id_set.add(nodeset_id)
 
@@ -94,30 +95,12 @@ class NSLedger:
         name = self.nodeset_names.pop(nodeset_num)
         self.nodeset_name_set.remove(name)
 
-    def merge_nodesets(self, new_id, nodeset_id1, nodeset_id2, delete):
+    def merge_nodesets(self, new_id, nodeset_id1, nodeset_id2, delete=True):
         if new_id in self.nodeset_id_set:
             raise KeyError("Nodeset ID already in use")
 
-        ns1 = -1
-        ns2 = -1
-        # search for nodeset that corresponds with given IDs
-        for i in range(len(self.nodeset_ids)):
-            if self.nodeset_ids[i] == nodeset_id1:
-                ns1 = i + 1
-            elif self.nodeset_ids[i] == nodeset_id2:
-                ns2 = i + 1
-            if ns1 != -1 and ns2 != -1:
-                break
-
-        # raise ValueError if no nodeset is found
-        if ns1 == -1:
-            raise ValueError("Cannot find nodeset with ID " + str(ns1))
-        if ns2 == -1:
-            raise ValueError("Cannot find nodeset with ID " + str(ns2))
-
-        # merge ns2 into ns1
-        n1 = self.ex.data.variables['node_ns%d' % ns1][:]
-        n2 = self.ex.data.variables['node_ns%d' % ns2][:]
+        n1 = self.get_node_set(nodeset_id1)
+        n2 = self.get_node_set(nodeset_id2)
         n3 = []
         for i in n1:
             n3.append(i)
@@ -150,7 +133,7 @@ class NSLedger:
             self.nodeset_map[program_name] = curr_nodeset
             self.new_nodeset_name += 1
 
-        new_nodeset = np.append(curr_nodeset, node_ids)
+        new_nodeset = np.unique(np.append(curr_nodeset, node_ids))
         self.nodeset_map[program_name] = new_nodeset
 
     def remove_nodes_from_nodeset(self, node_ids, nodeset_id):
@@ -166,7 +149,7 @@ class NSLedger:
             self.nodeset_map[program_name] = curr_nodeset
             self.new_nodeset_name += 1
 
-        new_nodeset = np.setdiff1d(curr_nodeset,node_ids)
+        new_nodeset = np.setdiff1d(curr_nodeset, node_ids)
         if len(curr_nodeset) - len(new_nodeset) != len(node_ids):
             raise IndexError("One or more nodes could not be found in NodeSet " + str(nodeset_id))
         self.nodeset_map[program_name] = new_nodeset
@@ -188,7 +171,7 @@ class NSLedger:
         # add ns_name data
         data.createVariable("ns_names", "|S1", dimensions=("num_node_sets", "len_name"))
         for i in range(len(self.nodeset_names)):
-            data['ns_names'][i] = NSLedger.convert_string(self.nodeset_names[i])
+            data['ns_names'][i] = util.convert_string(self.nodeset_names[i], self.ex.max_allowed_name_length)
 
         # add nodeset data
         for i in range(len(self.nodesets)):
@@ -207,6 +190,10 @@ class NSLedger:
                 if "dist_fact_ns" + nodeset_name[-1:] in self.ex.data.variables.keys():
                     data.createVariable("dist_fact_ns" + str(i+1), "float64", dimensions=("num_nod_ns" + str(i+1)))
                     data["dist_fact_ns" + str(i+1)][:] = self.ex.data["dist_fact_ns" + nodeset_name[-1:]][:]
+                else:
+                    data.createVariable("dist_fact_ns" + str(i + 1), "float64", dimensions=("num_nod_ns" + str(i + 1)))
+                    ns_size = data.dimensions['num_nod_ns' + str(i+1)].size
+                    data["dist_fact_ns" + str(i+1)][:] = np.ones(ns_size, dtype=np.float64)[:]
 
             # else, create according to np array
             else:
@@ -215,6 +202,9 @@ class NSLedger:
                 data.createVariable("node_ns" + str(i+1), "int32",
                                     dimensions=("num_nod_ns" + str(i+1)))
                 data["node_ns"+str(i+1)][:] = self.nodeset_map[nodeset_name][:]
+                data.createVariable("dist_fact_ns" + str(i + 1), "float64", dimensions=("num_nod_ns" + str(i + 1)))
+                ns_size = data.dimensions['num_nod_ns' + str(i + 1)].size
+                data["dist_fact_ns" + str(i + 1)][:] = np.ones(ns_size, dtype=np.float64)[:]
 
         # TODO: add ns_status
 
@@ -228,7 +218,7 @@ class NSLedger:
 
         # raise IndexError if no nodeset is found
         if nodeset_num == -1:
-            raise IndexError("Cannot find nodeset with ID " + str(nodeset_id))
+            raise KeyError("Cannot find nodeset with ID " + str(nodeset_id))
 
         return nodeset_num
 
@@ -251,29 +241,3 @@ class NSLedger:
 
     def get_node_set_names(self):
         return np.array(self.nodeset_names)
-
-    @staticmethod
-    def lineparse(line):
-        s = ""
-        for c in line:
-            if str(c) != '--':
-                s += str(c)[2]
-
-        return s
-
-    # method to convert python string to netcdf4 compatible character array
-    @staticmethod
-    def convert_string(s):
-        arr = np.empty(33, '|S1')
-        for i in range(len(s)):
-            arr[i] = s[i]
-
-        mask = np.empty(33, bool)
-        for i in range(33):
-            if i < len(s):
-                mask[i] = False
-            else:
-                mask[i] = True
-
-        out = np.ma.core.MaskedArray(arr, mask)
-        return out
