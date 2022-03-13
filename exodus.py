@@ -1101,11 +1101,11 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        try:
+        if ('dist_fact_ss%d' % internal_id) in self.data.variables:
             set = self.data.variables['dist_fact_ss%d' % internal_id][start - 1:start + count - 1]
-        except KeyError:
-            raise KeyError("Failed to retrieve distribution factors of sideset with id {} ('{}')"
-                           .format(obj_id, 'dist_fact_ss%d' % internal_id))
+        else:
+            warnings.warn("This database does not contain dist factors for side set {}".format(obj_id))
+            set = []
         return set
 
     def _int_get_side_set_params(self, obj_id, internal_id):
@@ -1126,11 +1126,10 @@ class Exodus:
         except KeyError:
             raise KeyError("Failed to retrieve number of entries in side set with id {} ('{}')"
                            .format(obj_id, 'num_side_ss%d' % internal_id))
-        try:
+        if 'num_df_ss%d' % internal_id in self.data.dimensions:
             num_df = self.data.dimensions['num_df_ss%d' % internal_id].size
-        except KeyError:
-            raise KeyError("Failed to retrieve number of distribution factors in side set with id {} ('{}')"
-                           .format(obj_id, 'num_df_ss%d' % internal_id))
+        else:
+            num_df = 0
         return num_entries, num_df
 
     def get_side_set(self, obj_id):
@@ -1996,6 +1995,6 @@ class Exodus:
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/cube_with_data.exo", 'r')
-
+    ex = Exodus("sample-files/disk_out_ref.ex2", 'r')
+    print(ex.data)
     ex.close()
