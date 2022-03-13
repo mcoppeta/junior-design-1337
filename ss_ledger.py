@@ -96,7 +96,7 @@ class SSLedger:
         self.num_dist_fact[ndx] += len(dist_facts)
     
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
-        pass
+        print("Apples")
 
 
 
