@@ -418,6 +418,17 @@ def test_remove_duplicate_nodes(tmpdir):
     with pytest.raises(IndexError):
         exofile.remove_nodes_from_nodeset([8, 8], 2)
 
+def test_get_ns_consistency():
+    for file in SampleFiles():
+        ex1 = Exodus(file, 'r', clobber=False)
+        ex2 = Exodus(file, 'a', clobber=False)
+
+        assert ex1.num_node_sets == ex2.num_node_sets
+
+        ns_prop1 = ex1.get_node_id_map()
+        assert np.array_equal(ns_prop1, ex2.get_node_id_map())
+
+
 
 #############################################################################
 #                                                                           #

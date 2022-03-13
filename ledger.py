@@ -10,26 +10,33 @@ class Ledger:
         self.sideset_ledger = SSLedger(ex)
         self.ex = ex
 
-
     def num_node_sets(self):
         """ Returns the number of nodesets present in the file"""
         return self.nodeset_ledger.num_node_sets()
 
-    def get_node_set(self, id):
-        """
+    def get_node_set(self, nodeset_id):
+        """Returns an array of the nodes contained in the node set with given ID."""
+        return self.nodeset_ledger.get_node_set(nodeset_id)
 
-        :param id: the id of the requested node set
-        :return: ndarray of all of the node ids that belong to the specified node set
+    def get_partial_node_set(self, nodeset_id, start, count):
         """
-        return self.nodeset_ledger.get_node_set(id)
+        Returns a partial array of the nodes contained in the node set with given ID.
 
-    def get_node_set_name(self, id):
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
+        return self.nodeset_ledger.get_partial_node_set(nodeset_id, start, count)
 
-        :param id: the id of the requested node set
+    def get_node_set_name(self, nodeset_id):
+        """
+        Get name of nodeset
+        :param nodeset_id: the id of the requested node set
         :return: the name of the specified node set
         """
-        return self.nodeset_ledger.get_node_set_name(id)
+        return self.nodeset_ledger.get_node_set_name(nodeset_id)
+
+    def get_node_set_id_map(self):
+        """Returns the id map for node sets (ns_prop1)."""
+        return self.nodeset_ledger.get_node_set_id_map()
 
     def get_node_set_names(self):
         """
@@ -40,7 +47,7 @@ class Ledger:
 
     def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
         """
-
+        add nodeset to file
         :param node_ids: the node ids which will be contained within the new nodeset
         :param nodeset_id: the intended id for the new nodeset
         :param nodeset_name: the intended name for the new nodeset
@@ -110,7 +117,6 @@ class Ledger:
     def remove_sideset(self, ss_id):
         self.sideset_ledger.remove_sideset(ss_id)
 
-
     def write(self):
         """
         Write from the ledger
@@ -151,7 +157,7 @@ class Ledger:
                     or var[:12] == "dist_fact_ns":
                 continue
 
-            # ingore variables that will be written by ss ledger
+            # ignore variables that will be written by ss ledger
             if var[:3] == "ss_" or var[:7] == "side_ss" or var[:7] == "elem_ss" or var[:12] == "dist_fact_ss":
                 continue
 
