@@ -28,7 +28,7 @@ class SSLedger:
             if ("ss_names" in ex.data.variables):
                 self.ss_names.append(util.lineparse(ex.data["ss_names"][i]))
             else:
-                self.ss_names.append("ss" + str(i))
+                self.ss_names.append("")
             # if df do not exist, add size 0 arrays for them
             self.num_dist_fact.append(ex.get_sideset_params(self.ss_prop1[i])[1])
             self.ss_dist_fact.append(None)
@@ -97,7 +97,7 @@ class SSLedger:
         self.num_dist_fact[ndx] += len(dist_facts)
     
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
-        print("Changes")
+        
 
 
 
@@ -231,22 +231,5 @@ class SSLedger:
 
         return ndx
 
-
-    # method to convert python string to netcdf4 compatible character array
-    @staticmethod
-    def convert_string(s):
-        arr = np.empty(33, '|S1')
-        for i in range(len(s)):
-            arr[i] = s[i]
-
-        mask = np.empty(33, bool)
-        for i in range(33):
-            if i < len(s):
-                mask[i] = False
-            else:
-                mask[i] = True
-
-        out = np.ma.core.MaskedArray(arr, mask)
-        return out  
 
 
