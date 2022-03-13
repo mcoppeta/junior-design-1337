@@ -9,12 +9,20 @@ class ElemLedger:
         self.ex = ex
 
         self.blocks = {}  # connectX: data and details of element block X
-        self.eb_status = self.ex.data.variables['eb_status'][:]
-        self.eb_prop1 = self.ex.data.variables['eb_prop1'][:]  # each block from here gets entry in self.blocks
+        self.eb_status = []
+        if 'eb_status' in self.ex.data.variables.keys():
+            self.eb_status = self.ex.data.variables['eb_status'][:]
+        self.eb_prop1 = []
+        if 'eb_prop1' in self.ex.data.variables.keys():
+            self.eb_prop1 = self.ex.data.variables['eb_prop1'][:]  # each block from here gets entry in self.blocks
         self.elem_num_map = []  # id's of elements
         self.num_blocks = 0
-        self.name_elem_var = self.ex.data.variables['name_elem_var'][:]
-        self.elem_var_tab = self.ex.data.variables['elem_var_tab'][:]  # # elem blocks x num_elem_var -- 1's only
+        self.name_elem_var = []
+        if 'name_elem_var' in self.ex.data.variables.keys():
+            self.name_elem_var = self.ex.data.variables['name_elem_var'][:]
+        self.elem_var_tab = []
+        if 'elem_var_tab' in self.ex.data.variables.keys():
+            self.elem_var_tab = self.ex.data.variables['elem_var_tab'][:]  # # elem blocks x num_elem_var -- 1's only
 
         # Assumes all elements must exist in some block
         if 'num_el_blk' not in self.ex.data.dimensions.keys():
