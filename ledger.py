@@ -5,31 +5,50 @@ import netCDF4 as nc
 
 class Ledger:
 
+    _FORMAT_MAP = {'EX_NETCDF4': 'NETCDF4',
+                   'EX_LARGE_MODEL': 'NETCDF3_64BIT_OFFSET',
+                   'EX_NORMAL_MODEL': 'NETCDF3_CLASSIC',
+                   'EX_64BIT_DATA': 'NETCDF3_64BIT_DATA'}
+    # Default values
+    _MAX_STR_LENGTH = 32
+    _MAX_STR_LENGTH_T = 'U32'
+    _MAX_NAME_LENGTH = 32
+    _MAX_LINE_LENGTH = 80
+    _MAX_LINE_LENGTH_T = 'U80'
+    _EXODUS_VERSION = 7.22
+
     def __init__(self, ex):
         self.nodeset_ledger = NSLedger(ex)
         self.sideset_ledger = SSLedger(ex)
         self.ex = ex
 
-
     def num_node_sets(self):
         """ Returns the number of nodesets present in the file"""
         return self.nodeset_ledger.num_node_sets()
 
-    def get_node_set(self, id):
-        """
+    def get_node_set(self, nodeset_id):
+        """Returns an array of the nodes contained in the node set with given ID."""
+        return self.nodeset_ledger.get_node_set(nodeset_id)
 
-        :param id: the id of the requested node set
-        :return: ndarray of all of the node ids that belong to the specified node set
+    def get_partial_node_set(self, nodeset_id, start, count):
         """
-        return self.nodeset_ledger.get_node_set(id)
+        Returns a partial array of the nodes contained in the node set with given ID.
 
-    def get_node_set_name(self, id):
+        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
+        return self.nodeset_ledger.get_partial_node_set(nodeset_id, start, count)
 
-        :param id: the id of the requested node set
+    def get_node_set_name(self, nodeset_id):
+        """
+        Get name of nodeset
+        :param nodeset_id: the id of the requested node set
         :return: the name of the specified node set
         """
-        return self.nodeset_ledger.get_node_set_name(id)
+        return self.nodeset_ledger.get_node_set_name(nodeset_id)
+
+    def get_node_set_id_map(self):
+        """Returns the id map for node sets (ns_prop1)."""
+        return self.nodeset_ledger.get_node_set_id_map()
 
     def get_node_set_names(self):
         """
@@ -40,7 +59,7 @@ class Ledger:
 
     def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
         """
-
+        add nodeset to file
         :param node_ids: the node ids which will be contained within the new nodeset
         :param nodeset_id: the intended id for the new nodeset
         :param nodeset_name: the intended name for the new nodeset
@@ -110,8 +129,7 @@ class Ledger:
     def remove_sideset(self, ss_id):
         self.sideset_ledger.remove_sideset(ss_id)
 
-
-    def write(self):
+    def write(self, path):
         """
         Write from the ledger
         :return: None
@@ -119,11 +137,13 @@ class Ledger:
         if self.ex.mode == 'w':
             self.w_write()
         elif self.ex.mode == 'a':
-            path = self.ex.path.split('.')
-            self.a_write(path[0] + '_rev.' + path[-1])
+            if path is None:
+                raise OSError("no path specified")
+            self.a_write(path)
 
     def w_write(self):
         self.nodeset_ledger.write(self.ex.data)
+        self.sideset_ledger.write(self.ex.data)
 
     def a_write(self, path):
         out = nc.Dataset(path, "w", True, format="NETCDF3_CLASSIC")
@@ -143,6 +163,15 @@ class Ledger:
 
             out.createDimension(dimension, old.dimensions[dimension].size)
 
+        if 'len_name' not in out.dimensions:
+            out.createDimension('len_name', self._MAX_NAME_LENGTH + 1)
+
+        if 'len_string' not in out.dimensions:
+            out.createDimension('len_string', self._MAX_STR_LENGTH + 1)
+
+        if 'len_line' not in out.dimensions:
+            out.createDimension('len_line', self._MAX_LINE_LENGTH + 1)
+
         # copy variables
         for var in old.variables:
 
@@ -151,7 +180,7 @@ class Ledger:
                     or var[:12] == "dist_fact_ns":
                 continue
 
-            # ingore variables that will be written by ss ledger
+            # ignore variables that will be written by ss ledger
             if var[:3] == "ss_" or var[:7] == "side_ss" or var[:7] == "elem_ss" or var[:12] == "dist_fact_ss":
                 continue
 

@@ -2,8 +2,9 @@ import pytest
 import numpy as np
 from exodus import Exodus
 import netCDF4 as nc
-from ns_ledger import NSLedger
 import util
+from iterate import SampleFiles
+
 
 # Disables all warnings in this module
 pytestmark = pytest.mark.filterwarnings('ignore')
@@ -273,7 +274,6 @@ def test_remove_ns_empty(tmpdir):
         exofile.remove_nodeset(1)
 
 
-
 def test_remove_ns_nonexistent(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
     exofile.add_nodeset([1, 2, 3], 0, "Test Name")
@@ -388,8 +388,6 @@ def test_add_duplicate_nodes(tmpdir):
     exofile.add_node_to_nodeset(12, 99)
     exofile.add_node_to_nodeset(10, 99)
 
-
-
     exofile.write()
     data = nc.Dataset(str(tmpdir) + '\\test.ex2', 'r')
     assert data.dimensions['num_nod_ns1'].size == 3
@@ -421,12 +419,102 @@ def test_remove_duplicate_nodes(tmpdir):
         exofile.remove_nodes_from_nodeset([8, 8], 2)
 
 
+def test_read_consistency():
+    for file in SampleFiles():
+        try:
+            ex2 = Exodus(file, 'a')
+            ex1 = Exodus(file, 'r')
+        except KeyError:
+            # TAKE THIS OUT ONCE SS DF ERROR IS FIXED
+            print("df key error on", file)
+            continue
+
+        assert ex1.num_node_sets == ex2.num_node_sets
+
+        try:
+            ns_prop1 = ex1.get_node_set_id_map()
+            assert np.array_equal(ns_prop1, ex2.get_node_set_id_map())
+
+            for i in ns_prop1:
+                np.array_equal(ex1.get_node_set(i), ex2.get_node_set(i))
+        except KeyError:
+            print("ns_prop1 keyerror on", file)
+
+
+def test_basic_ns_append(tmpdir):
+    exofile = Exodus('sample-files/can.ex2', 'a', clobber=False)
+    exofile.add_nodeset([1, 2, 3, 4, 5], 10)
+
+    with pytest.raises(OSError):
+        exofile.write()
+
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'r')
+    original = Exodus('sample-files/can.ex2', 'r', clobber=False)
+
+    print("\n", exofile.data.dimensions['num_node_sets'])
+
+    assert original.num_node_sets + 1 == exofile.num_node_sets
+    assert np.array_equal(exofile.get_node_set(10), np.array([1, 2, 3, 4, 5]))
+
+
+def test_permissions():
+    exofile = Exodus('sample-files/cube_1ts_mod.e', 'r')
+
+    with pytest.raises(PermissionError):
+        exofile.add_nodeset([1, 2, 3, 4], 10)
+
+    with pytest.raises(PermissionError):
+        exofile.remove_nodeset(10)
+
+    with pytest.raises(PermissionError):
+        exofile.write()
+
+    with pytest.raises(PermissionError):
+        exofile.add_sideset([10, 11, 12, 13, 14, 15], [1, 2, 3, 4], 3, "sideset1", [10, 1, 1, 1, 1])
+
+    with pytest.raises(PermissionError):
+        exofile.remove_sideset(10)
+
+    with pytest.raises(PermissionError):
+        exofile.add_node_to_nodeset(11, 3)
+
+    with pytest.raises(PermissionError):
+        exofile.add_nodes_to_nodeset([10, 11, 12], 3)
+
+    with pytest.raises(PermissionError):
+        exofile.remove_node_from_nodeset(13, 14)
+
+    with pytest.raises(PermissionError):
+        exofile.remove_nodes_from_nodeset([12, 13, 14], 12)
+
+#############################################################################
+#                                                                           #
+#                            SideSet Tests                                  #
+#                                                                           #
+#############################################################################
+
+
+def test_empty_sideset_remove(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    with pytest.raises(IndexError):
+        exofile.remove_sideset(10)
+
+
 # Below tests are based on what can be read according to current C Exodus API.
 # The contents, names, and number of tests are subject to change as work on the library progresses
 # and we figure out how closely the functions in this library match the C one.
 
 # MODEL DESCRIPTION READ TESTS
-# def test_get_coords():
+def test_get_coords_comprehensive():
+    for file in SampleFiles():
+        ex = Exodus(file, 'r')
+        data = nc.Dataset(file, 'r')
+        if 'coord' in data.variables:
+            assert np.array_equal(ex.get_coords(), data['coord'][:])
+
 # def test_get_coord_names():
 # def test_get_node_num_map():
 # def test_get_elem_num_map():
