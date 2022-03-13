@@ -18,12 +18,20 @@ def lineparse(line):
     return s
 
 
+def arrparse(array, size, type):
+    """Returns a Python string array from an array of C 'strings'."""
+    result = np.empty([size], type)
+    for i in range(size):
+        result[i] = lineparse(array[i])
+    return result
+
+
 def convert_string(s, length):
     """
     Converts a Python string to a NetCDF4 compatible character array.
 
     :param s: python string
-    :param length: length of the output string (not including null terminator)
+    :param length: length of the output string
     :return: character array
     """
     length += 1  # we've got to add the null character
