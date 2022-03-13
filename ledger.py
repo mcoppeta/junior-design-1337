@@ -1,5 +1,6 @@
 from ns_ledger import NSLedger
 from ss_ledger import SSLedger
+from elem_ledger import ElemLedger
 import netCDF4 as nc
 
 
@@ -20,6 +21,7 @@ class Ledger:
     def __init__(self, ex):
         self.nodeset_ledger = NSLedger(ex)
         self.sideset_ledger = SSLedger(ex)
+        self.element_ledger = ElemLedger(ex)
         self.ex = ex
 
     def num_node_sets(self):
@@ -129,6 +131,10 @@ class Ledger:
     def remove_sideset(self, ss_id):
         self.sideset_ledger.remove_sideset(ss_id)
 
+    # element methods
+    def remove_element(self, elem_id):
+        self.element_ledger.remove_element(elem_id)
+
     def write(self, path):
         """
         Write from the ledger
@@ -161,8 +167,13 @@ class Ledger:
             if dimension == "num_side_sets" or dimension[:11] == "num_side_ss" or dimension[:9] == "num_df_ss":
                 continue
 
-            out.createDimension(dimension, old.dimensions[dimension].size)
+            # ignore dimensions that will be written by elem ledger
+            if dimension == "num_elem" or dimension == "num_el_blk" or dimension[:13] == "num_el_in_blk" \
+                    or dimension[:14] == "num_nod_per_el" or dimension == "num_elem_var":
+                continue
 
+            out.createDimension(dimension, old.dimensions[dimension].size)
+            
         if 'len_name' not in out.dimensions:
             out.createDimension('len_name', self._MAX_NAME_LENGTH + 1)
 
@@ -184,6 +195,12 @@ class Ledger:
             if var[:3] == "ss_" or var[:7] == "side_ss" or var[:7] == "elem_ss" or var[:12] == "dist_fact_ss":
                 continue
 
+            #TODO -> elem_map is not for IDs
+            # ignore variables that will be written by elem ledger
+            if var[:3] == "eb_" or var == "elem_map" or var[:7] == "connect" or var == "elem_num_map" \
+                    or var == "name_elem_var" or var[:13] == "vals_elem_var" or var == "elem_var_tab":
+                continue
+
             var_data = old[var]
 
             # variable creation data
@@ -196,4 +213,5 @@ class Ledger:
 
         self.nodeset_ledger.write(out)
         self.sideset_ledger.write(out)
+        self.element_ledger.write(out)
         out.close()
