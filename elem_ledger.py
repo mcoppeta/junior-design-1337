@@ -20,6 +20,7 @@ class ElemLedger:
         if 'num_el_blk' not in self.ex.data.dimensions.keys():
             return
 
+        # TODO: elem_map is not for IDs, do the [1...n] if no elem_num_map
         if 'elem_map' in self.ex.data.variables.keys() and 'elem_num_map' in self.ex.data.variables.keys():
             raise ValueError('Dataset contains both an elem_num_map and elem_map - causes ambiguity')
         elif 'elem_map' in self.ex.data.variables.keys():
@@ -132,13 +133,9 @@ class ElemLedger:
         # Creates dimension for the number of elemental variables
         data.createDimension("num_elem_var", self.ex.data.dimensions['num_elem_var'].size)
 
-
-        #TODO Make sure this implementation makes sense
         data.createVariable("eb_status", "int32", dimensions=("num_el_blk"))
         data['eb_status'][:] = np.array(self.eb_status)
 
-
-        #TODO Make sure this stays consistent with implementation above
         data.createVariable("eb_prop1", "int32", dimensions=("num_el_blk"))
         data['eb_prop1'].setncattr('name', 'ID')
         data['eb_prop1'][:] = np.array(self.eb_prop1)
@@ -147,7 +144,7 @@ class ElemLedger:
         data.createVariable("eb_names", "|S1", dimensions=("num_el_blk", "len_name"))
         data['eb_names'][:] = np.array(names)
 
-        #TODO Make sure this is maintained above
+        #TODO Make sure this is maintained when adding elements
         data.createVariable("elem_num_map", "int32", dimensions=("num_elem"))
         data['elem_num_map'][:] = np.array(self.elem_num_map)
 
@@ -174,3 +171,5 @@ class ElemLedger:
         #TODO: maintain with new functions
         data.createVariable("elem_var_tab", "int32", dimensions=("num_el_blk", "num_elem_var"))
         data["elem_var_tab"][:] = np.array(self.elem_var_tab)
+
+        #TODO: Add write functionality for element attributes

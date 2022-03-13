@@ -170,6 +170,7 @@ class Ledger:
             if var[:3] == "ss_" or var[:7] == "side_ss" or var[:7] == "elem_ss" or var[:12] == "dist_fact_ss":
                 continue
 
+            #TODO -> elem_map is not for IDs
             # ignore variables that will be written by elem ledger
             if var[:3] == "eb_" or var == "elem_map" or var[:7] == "connect" or var == "elem_num_map" \
                     or var == "name_elem_var" or var[:13] == "vals_elem_var" or var == "elem_var_tab":
