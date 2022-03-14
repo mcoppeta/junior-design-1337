@@ -108,29 +108,55 @@ class SSLedger:
         self.num_dist_fact[ndx] += len(dist_facts)
     
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
-        # ndx = self.find_sideset_num(ss_id)
+        ndx = self.find_sideset_num(ss_id)
 
-        # # if not loaded in yet, need to load in 
-        # if (self.ss_elem[ndx] is None):
-        #     ss = self.ex.get_side_set(ss_id)
-        #     elems = ss[0]
-        #     sides = ss[1]
-        #     self.ss_elem[ndx] = np.array(elems)
-        #     self.ss_sides[ndx] = np.array(sides)
-        #     self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(ss_id))
+        # if not loaded in yet, need to load in 
+        if (self.ss_elem[ndx] is None):
+            ss = self.ex.get_side_set(ss_id)
+            elems = ss[0]
+            sides = ss[1]
+            self.ss_elem[ndx] = np.array(elems)
+            self.ss_sides[ndx] = np.array(sides)
+            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(ss_id))
 
-        # num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
+        num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
 
-        # # iterate through each side in sideset
-        # # if it matches one of the passed in sides, mark for removal
-        # for i in range(self.ss_sizes[ndx]):
-        #     self.ss_elem[]
-        pass
-            
+        # convert elem_ids
+        # need to convert elem_ids to internal ids
+        map = self.ex.get_elem_id_map()
+        converted_elem_ids = []
+        for id in elem_ids:
+            internal_id = np.where(map == id)[0][0] + 1
+            converted_elem_ids.append(internal_id)
 
-
+        # create set of tuples of side and elem ids for quick lookup
+        tuple_set = set()
+        for i in range(len(converted_elem_ids)):
+            tuple_set.add((converted_elem_ids[i], side_ids[i]))
         
+        # iterate through each side in sideset
+        # if it matches one of the passed in sides, mark for removal
+        elem_side_remove_ndx = []
+        df_remove_ndx = []
+        print(num_df_per_side)
+        for i in range(self.ss_sizes[ndx]):
+            side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+            if (side_tuple in tuple_set):
+                elem_side_remove_ndx.append(i)
+                adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                df_remove_ndx.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
         
+        print(elem_side_remove_ndx)
+        print(df_remove_ndx)
+
+
+        # remove all marked indices from arrays
+        self.ss_elem[ndx] = np.delete(self.ss_elem[ndx], elem_side_remove_ndx)
+        self.ss_sides[ndx] = np.delete(self.ss_sides[ndx], elem_side_remove_ndx)
+        self.ss_sizes[ndx] -= len(elem_side_remove_ndx)
+
+        self.ss_dist_fact[ndx] = np.delete(self.ss_dist_fact[ndx], df_remove_ndx)
+        self.num_dist_fact[ndx] -= len(df_remove_ndx)
 
 
     # Creates 2 new sidesets from sides in old sideset based on x-coordinate values
