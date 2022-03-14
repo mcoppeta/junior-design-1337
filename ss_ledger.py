@@ -144,7 +144,8 @@ class SSLedger:
             if (side_tuple in tuple_set):
                 elem_side_remove_ndx.append(i)
                 adjusted_i = i * num_df_per_side # adjust i to account for multiple df
-                df_remove_ndx.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+                if (num_df_per_side != 0):
+                    df_remove_ndx.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
         
         print(elem_side_remove_ndx)
         print(df_remove_ndx)
