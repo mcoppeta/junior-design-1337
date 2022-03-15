@@ -116,6 +116,9 @@ class Ledger:
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
         self.sideset_ledger.remove_sides_from_sideset(elem_ids, side_ids, ss_id)
 
+    def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2):
+        self.sideset_ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+
 
     def write(self):
         """

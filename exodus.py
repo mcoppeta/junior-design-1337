@@ -1599,6 +1599,11 @@ class Exodus:
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_sides_from_sideset(elem_ids, side_ids, ss_id)
+
+    def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to split sideset")
+        self.ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
     
 
     def write(self):
