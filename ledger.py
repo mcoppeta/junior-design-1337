@@ -104,13 +104,13 @@ class Ledger:
         self.nodeset_ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
 
     # sideset methods
-    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact):
+    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None):
         self.sideset_ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact)
 
     def remove_sideset(self, ss_id):
         self.sideset_ledger.remove_sideset(ss_id)
 
-    def add_sides_to_sideset(self, elem_ids, side_ids, dist_facts, ss_id):
+    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None):
         self.sideset_ledger.add_sides_to_sideset(elem_ids, side_ids, dist_facts, ss_id)
 
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):

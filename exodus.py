@@ -1580,7 +1580,7 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
 
-    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact):
+    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact)
@@ -1590,7 +1590,7 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_sideset(ss_id)
 
-    def add_sides_to_sideset(self, elem_ids, side_ids, dist_facts, ss_id):
+    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_sides_to_sideset(elem_ids, side_ids, dist_facts, ss_id)

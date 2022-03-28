@@ -35,7 +35,7 @@ class SSLedger:
             self.ss_elem.append(None) # this is place holder to be filled with real values later
             self.ss_sides.append(None) # this is place holder to be filled with real values later
 
-    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact):
+    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None):
 
         if (ss_id in self.ss_prop1):
             # already sideset with the same id
@@ -54,6 +54,10 @@ class SSLedger:
         for id in elem_ids:
             internal_id = np.where(map == id)[0][0] + 1
             converted_elem_ids.append(internal_id)
+
+        # if no distribution factors specified, just use 1
+        if (dist_fact is None):
+            dist_fact = np.ones(len(elem_ids))
 
         # add sidesets to list
         self.ss_elem.append(converted_elem_ids)
@@ -81,7 +85,7 @@ class SSLedger:
         self.ss_dist_fact.pop(ndx)
         self.num_ss -= 1
 
-    def add_sides_to_sideset(self, elem_ids, side_ids, dist_facts, ss_id):
+    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None):
         ndx = self.find_sideset_num(ss_id)
 
         # if not loaded in yet, need to load in 
@@ -102,6 +106,9 @@ class SSLedger:
         
         self.ss_elem[ndx] = np.append(self.ss_elem[ndx], converted_elem_ids)
         self.ss_sides[ndx] = np.append(self.ss_sides[ndx], side_ids)
+        if (dist_facts is None):
+            dist_facts = np.ones(len(elem_ids))
+        
         self.ss_dist_fact[ndx] = np.append(self.ss_dist_fact[ndx], dist_facts)
         self.ss_sizes[ndx] += len(elem_ids)
         self.num_dist_fact[ndx] += len(dist_facts)
