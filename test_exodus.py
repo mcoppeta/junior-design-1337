@@ -419,7 +419,7 @@ def test_remove_duplicate_nodes(tmpdir):
         exofile.remove_nodes_from_nodeset([8, 8], 2)
 
 
-def test_basic_ns_append(tmpdir):
+def test_basic_ns_append_add(tmpdir):
     exofile = Exodus('sample-files/can.ex2', 'a', clobber=False)
     exofile.add_nodeset([1, 2, 3, 4, 5], 10)
 
@@ -436,6 +436,23 @@ def test_basic_ns_append(tmpdir):
 
     assert original.num_node_sets + 1 == exofile.num_node_sets
     assert np.array_equal(exofile.get_node_set(10), np.array([1, 2, 3, 4, 5]))
+
+
+def test_basic_ns_append_remove(tmpdir):
+    exofile = Exodus('sample-files/can.ex2', 'a', clobber=False)
+
+    assert exofile.num_node_sets == 2
+    exofile.remove_nodeset(1)
+    assert exofile.num_node_sets == 1
+    assert np.array_equal(exofile.get_node_set_id_map(), np.array([100]))
+
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'r')
+    original = Exodus('sample-files/can.ex2', 'r', clobber=False)
+
+    assert original.num_node_sets - 1 == exofile.num_node_sets
 
 
 def test_permissions():
