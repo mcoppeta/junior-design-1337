@@ -1,8 +1,12 @@
 import warnings
 import netCDF4 as nc
 import numpy
+from typing import List
+
 from ledger import Ledger
 import util
+from selector import ElementBlockSelector, NodeSetSelector, SideSetSelector
+from constants import *
 
 
 class Exodus:
@@ -535,21 +539,21 @@ class Exodus:
             raise KeyError("Element block id map is missing from this database!".format(type))
         return table
 
-    def _lookup_id(self, obj_type, num):
+    def _lookup_id(self, obj_type: ObjectType, num):
         """
         Returns the internal ID of a set or block of the given type and user-defined ID.
 
         FOR INTERNAL USE ONLY!
 
-        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_type: type of object this id refers to
         :param num: user-defined ID (aka number) of the set/block
         :return: internal ID
         """
-        if obj_type == 'nodeset':
+        if obj_type == NODESET:
             table = self.get_node_set_id_map()
-        elif obj_type == 'sideset':
+        elif obj_type == SIDESET:
             table = self.get_side_set_id_map()
-        elif obj_type == 'elblock':
+        elif obj_type == ELEMBLOCK:
             table = self.get_elem_block_id_map()
         else:
             raise ValueError("{} is not a valid set/block type!".format(obj_type))
@@ -705,14 +709,14 @@ class Exodus:
             raise KeyError("Could not find global variables in this database!")
         return result
 
-    def _int_get_partial_object_var_across_times(self, obj_type, internal_id, start_time_step, end_time_step, var_index,
+    def _int_get_partial_object_var_across_times(self, obj_type: ObjectType, internal_id, start_time_step, end_time_step, var_index,
                                                  start_index, count):
         """
         Returns partial values of an element block variable between specified time steps (inclusive).
 
         FOR INTERNAL USE ONLY!
 
-        :param obj_type: 'elem', 'nodeset', or 'sideset'
+        :param obj_type: type of object this id refers to
         :param internal_id: INTERNAL (1-based) id
         :param start_time_step: start time (inclusive)
         :param end_time_step:  end time (inclusive)
@@ -730,13 +734,13 @@ class Exodus:
         if end_time_step <= 0 or end_time_step < start_time_step or end_time_step > num_steps:
             raise ValueError("End time step out of range. Got {}".format(end_time_step))
 
-        if obj_type == 'elem':
+        if obj_type == ELEMBLOCK:
             varname = 'vals_elem_var%deb%d'
             numvar = self.num_elem_block_var
-        elif obj_type == 'nodeset':
+        elif obj_type == NODESET:
             varname = 'vals_nset_var%dns%d'
             numvar = self.num_node_set_var
-        elif obj_type == 'sideset':
+        elif obj_type == SIDESET:
             varname = 'vals_sset_var%dss%d'
             numvar = self.num_side_set_var
         else:
@@ -771,9 +775,9 @@ class Exodus:
         """
         # This method cannot simply call its partial version because we cannot know the number of elements to read
         #  without looking up the id first. This extra id lookup call is slow, so we get around it with a helper method.
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         size = self._int_get_elem_block_params(obj_id, internal_id)[0]
-        return self._int_get_partial_object_var_across_times('elem', internal_id, start_time_step, end_time_step,
+        return self._int_get_partial_object_var_across_times(ELEMBLOCK, internal_id, start_time_step, end_time_step,
                                                              var_index, 1, size)
 
     def get_partial_elem_block_var_across_times(self, obj_id, start_time_step, end_time_step, var_index, start_index,
@@ -784,8 +788,8 @@ class Exodus:
         Time steps, variable index, ID and start index are all 1-based. First time step is at 1, last at num_time_steps.
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
-        return self._int_get_partial_object_var_across_times('elem', internal_id, start_time_step, end_time_step,
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
+        return self._int_get_partial_object_var_across_times(ELEMBLOCK, internal_id, start_time_step, end_time_step,
                                                              var_index, start_index, count)
 
     def get_node_set_var_at_time(self, obj_id, time_step, var_index):
@@ -802,9 +806,9 @@ class Exodus:
 
         Time steps, variable index, and ID are all 1-based. First time step is at 1, last at num_time_steps.
         """
-        internal_id = self._lookup_id('nodeset', obj_id)
+        internal_id = self._lookup_id(NODESET, obj_id)
         size = self._int_get_node_set_params(obj_id, internal_id)[0]
-        return self._int_get_partial_object_var_across_times('nodeset', internal_id, start_time_step, end_time_step,
+        return self._int_get_partial_object_var_across_times(NODESET, internal_id, start_time_step, end_time_step,
                                                              var_index, 1, size)
 
     def get_partial_node_set_var_across_times(self, obj_id, start_time_step, end_time_step, var_index, start_index,
@@ -815,8 +819,8 @@ class Exodus:
         Time steps, variable index, ID and start index are all 1-based. First time step is at 1, last at num_time_steps.
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('nodeset', obj_id)
-        return self._int_get_partial_object_var_across_times('nodeset', internal_id, start_time_step, end_time_step,
+        internal_id = self._lookup_id(NODESET, obj_id)
+        return self._int_get_partial_object_var_across_times(NODESET, internal_id, start_time_step, end_time_step,
                                                              var_index, start_index, count)
 
     def get_side_set_var_at_time(self, obj_id, time_step, var_index):
@@ -833,9 +837,9 @@ class Exodus:
 
         Time steps, variable index, and ID are all 1-based. First time step is at 1, last at num_time_steps.
         """
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         size = self._int_get_side_set_params(obj_id, internal_id)[0]
-        return self._int_get_partial_object_var_across_times('sideset', internal_id, start_time_step, end_time_step,
+        return self._int_get_partial_object_var_across_times(SIDESET, internal_id, start_time_step, end_time_step,
                                                              var_index, 1, size)
 
     def get_partial_side_set_var_across_times(self, obj_id, start_time_step, end_time_step, var_index, start_index,
@@ -846,33 +850,33 @@ class Exodus:
         Time steps, variable index, ID and start index are all 1-based. First time step is at 1, last at num_time_steps.
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('sideset', obj_id)
-        return self._int_get_partial_object_var_across_times('sideset', internal_id, start_time_step, end_time_step,
+        internal_id = self._lookup_id(SIDESET, obj_id)
+        return self._int_get_partial_object_var_across_times(SIDESET, internal_id, start_time_step, end_time_step,
                                                              var_index, start_index, count)
 
-    def _get_var_names(self, obj_type):
+    def _get_var_names(self, var_type: VariableType):
         """
         Returns a list of variable names for objects of a given type.
 
-        :param obj_type: 'global', 'nodal', 'elem', 'nodeset', or 'sideset'
+        :param var_type: the type of variable
         :return: a list of variable names
         """
-        if obj_type == 'global':
+        if var_type == GLOBAL_VAR:
             varname = 'name_glo_var'
-        elif obj_type == 'nodal':
+        elif var_type == NODAL_VAR:
             varname = 'name_nod_var'
-        elif obj_type == 'elem':
+        elif var_type == ELEMENTAL_VAR:
             varname = 'name_elem_var'
-        elif obj_type == 'nodeset':
+        elif var_type == NODESET_VAR:
             varname = 'name_nset_var'
-        elif obj_type == 'sideset':
+        elif var_type == SIDESET_VAR:
             varname = 'name_sset_var'
         else:
-            raise ValueError("Invalid variable type {}!".format(obj_type))
+            raise ValueError("Invalid variable type {}!".format(var_type))
         try:
             names = self.data.variables[varname][:]
         except KeyError:
-            raise KeyError("No {} variable names stored in database!".format(obj_type))
+            raise KeyError("No {} variable names stored in database!".format(var_type))
         result = numpy.empty([len(names)], self._MAX_NAME_LENGTH_T)
         for i in range(len(names)):
             result[i] = util.lineparse(names[i])
@@ -880,27 +884,27 @@ class Exodus:
 
     def get_global_var_names(self):
         """Returns a list of all global variable names. Index of the variable is the index of the name + 1."""
-        return self._get_var_names('global')
+        return self._get_var_names(GLOBAL_VAR)
 
     def get_nodal_var_names(self):
         """Returns a list of all nodal variable names. Index of the variable is the index of the name + 1."""
-        return self._get_var_names('nodal')
+        return self._get_var_names(NODAL_VAR)
 
     def get_elem_var_names(self):
         """Returns a list of all element variable names. Index of the variable is the index of the name + 1."""
-        return self._get_var_names('elem')
+        return self._get_var_names(ELEMENTAL_VAR)
 
     def get_node_set_var_names(self):
         """Returns a list of all node set variable names. Index of the variable is the index of the name + 1."""
-        return self._get_var_names('nodeset')
+        return self._get_var_names(NODESET_VAR)
 
     def get_side_set_var_names(self):
         """Returns a list of all node set variable names. Index of the variable is the index of the name + 1."""
-        return self._get_var_names('sideset')
+        return self._get_var_names(SIDESET_VAR)
 
-    def _get_var_name(self, obj_type, index):
+    def _get_var_name(self, var_type, index):
         """Returns variable name of variable with given index of given object type."""
-        names = self._get_var_names(obj_type)
+        names = self._get_var_names(var_type)
         try:
             name = names[index - 1]
         except IndexError:
@@ -909,23 +913,23 @@ class Exodus:
 
     def get_global_var_name(self, index):
         """Returns the name of the global variable with the given index."""
-        return self._get_var_name('global', index)
+        return self._get_var_name(GLOBAL_VAR, index)
 
     def get_nodal_var_name(self, index):
         """Returns the name of the nodal variable with the given index."""
-        return self._get_var_name('nodal', index)
+        return self._get_var_name(NODAL_VAR, index)
 
     def get_elem_var_name(self, index):
         """Returns the name of the element variable with the given index."""
-        return self._get_var_name('elem', index)
+        return self._get_var_name(ELEMENTAL_VAR, index)
 
     def get_node_set_var_name(self, index):
         """Returns the name of the node set variable with the given index."""
-        return self._get_var_name('nodeset', index)
+        return self._get_var_name(NODESET_VAR, index)
 
     def get_side_set_var_name(self, index):
         """Returns the name of the side set variable with the given index."""
-        return self._get_var_name('sideset', index)
+        return self._get_var_name(SIDESET_VAR, index)
 
     ######################
     # Node and side sets #
@@ -1011,7 +1015,7 @@ class Exodus:
         if self.mode == 'w' or self.mode == 'a':
             return self.ledger.get_node_set(obj_id)
 
-        internal_id = self._lookup_id('nodeset', obj_id)
+        internal_id = self._lookup_id(NODESET, obj_id)
         size = self._int_get_node_set_params(obj_id, internal_id)[0]
         return self._int_get_partial_node_set(obj_id, internal_id, 1, size)
 
@@ -1024,12 +1028,12 @@ class Exodus:
         if self.mode == 'w' or self.mode == 'a':
             return self.ledger.get_partial_node_set(id, start, count)
 
-        internal_id = self._lookup_id('nodeset', obj_id)
+        internal_id = self._lookup_id(NODESET, obj_id)
         return self._int_get_partial_node_set(obj_id, internal_id, start, count)
 
     def get_node_set_df(self, obj_id):
         """Returns an array containing the distribution factors in the node set with given ID."""
-        internal_id = self._lookup_id('nodeset', obj_id)
+        internal_id = self._lookup_id(NODESET, obj_id)
         size = self._int_get_node_set_params(obj_id, internal_id)[1]
         return self._int_get_partial_node_set_df(obj_id, internal_id, 1, size)
 
@@ -1039,7 +1043,7 @@ class Exodus:
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('nodeset', obj_id)
+        internal_id = self._lookup_id(NODESET, obj_id)
         return self._int_get_partial_node_set_df(obj_id, internal_id, start, count)
 
     def get_node_set_params(self, obj_id):
@@ -1048,7 +1052,7 @@ class Exodus:
 
         Returned tuple is of format (number of nodes, number of distribution factors).
         """
-        internal_id = self._lookup_id('nodeset', obj_id)
+        internal_id = self._lookup_id(NODESET, obj_id)
         return self._int_get_node_set_params(obj_id, internal_id)
 
     def _int_get_partial_side_set(self, obj_id, internal_id, start, count):
@@ -1138,7 +1142,7 @@ class Exodus:
 
         Returned tuple is of format (elements in side set, sides in side set).
         """
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         size = self._int_get_side_set_params(obj_id, internal_id)[0]
         return self._int_get_partial_side_set(obj_id, internal_id, 1, size)
 
@@ -1149,12 +1153,12 @@ class Exodus:
         Arrays start at element number ``start`` (1-based) and contains ``count`` elements.
         Returned tuple is of format (elements in side set, sides in side set).
         """
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         return self._int_get_partial_side_set(obj_id, internal_id, start, count)
 
     def get_side_set_df(self, obj_id):
         """Returns an array containing the distribution factors in the side set with given ID."""
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         size = self._int_get_side_set_params(obj_id, internal_id)[1]
         return self._int_get_partial_side_set_df(obj_id, internal_id, 1, size)
 
@@ -1164,7 +1168,7 @@ class Exodus:
 
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         return self._int_get_partial_side_set_df(obj_id, internal_id, start, count)
 
     def get_side_set_params(self, obj_id):
@@ -1173,7 +1177,7 @@ class Exodus:
 
         Returned tuple is of format (number of elements, number of distribution factors).
         """
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         return self._int_get_side_set_params(obj_id, internal_id)
 
     ##################
@@ -1247,7 +1251,7 @@ class Exodus:
 
     def get_elem_block_connectivity(self, obj_id):
         """Returns the connectivity list for the element block with given ID."""
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         size = self._int_get_elem_block_params(obj_id, internal_id)[0]
         return self._int_get_partial_elem_block_connectivity(obj_id, internal_id, 1, size)
 
@@ -1257,7 +1261,7 @@ class Exodus:
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_partial_elem_block_connectivity(obj_id, internal_id, start, count)
 
     def get_elem_block_params(self, obj_id):
@@ -1266,31 +1270,31 @@ class Exodus:
 
         Returned tuple is of format (number of elements, nodes per element, topology, number of attributes).
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_elem_block_params(obj_id, internal_id)
 
     #########
     # Names #
     #########
 
-    def _get_set_block_names(self, obj_type):
+    def _get_set_block_names(self, obj_type: ObjectType):
         """
         Returns a list of names for objects of a given type.
-        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_type: type of object
         :return: a list of names
         """
         names = []
-        if obj_type == 'nodeset':
+        if obj_type == NODESET:
             try:
                 names = self.data.variables['ns_names']
             except KeyError:
                 warnings.warn("This database does not contain node set names.")
-        elif obj_type == 'sideset':
+        elif obj_type == SIDESET:
             try:
                 names = self.data.variables['ss_names']
             except KeyError:
                 warnings.warn("This database does not contain side set names.")
-        elif obj_type == 'elblock':
+        elif obj_type == ELEMBLOCK:
             try:
                 names = self.data.variables['eb_names']
             except KeyError:
@@ -1304,12 +1308,12 @@ class Exodus:
 
     def get_elem_block_names(self):
         """Returns an array containing the names of element blocks in this database."""
-        return self._get_set_block_names('elblock')
+        return self._get_set_block_names(ELEMBLOCK)
 
     def get_elem_block_name(self, obj_id):
         """Returns the name of the given element block."""
-        internal_id = self._lookup_id('elblock', obj_id)
-        names = self._get_set_block_names('elblock')
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
+        names = self._get_set_block_names(ELEMBLOCK)
         if len(names) > 0:
             return names[internal_id - 1]
         else:
@@ -1319,15 +1323,15 @@ class Exodus:
         """Returns an array containing the names of node sets in this database."""
         if self.mode == 'a' or self.mode == 'w':
             return self.ledger.get_node_set_names()
-        return self._get_set_block_names('nodeset')
+        return self._get_set_block_names(NODESET)
 
     def get_node_set_name(self, obj_id):
         """Returns the name of the given node set."""
         if self.mode == 'a' or self.mode == 'w':
             return self.ledger.get_node_set_name(obj_id)
 
-        internal_id = self._lookup_id('nodeset', obj_id)
-        names = self._get_set_block_names('nodeset')
+        internal_id = self._lookup_id(NODESET, obj_id)
+        names = self._get_set_block_names(NODESET)
         if len(names) > 0:
             return names[internal_id - 1]
         else:
@@ -1335,12 +1339,12 @@ class Exodus:
 
     def get_side_set_names(self):
         """Returns an array containing the names of side sets in this database."""
-        return self._get_set_block_names('sideset')
+        return self._get_set_block_names(SIDESET)
 
     def get_side_set_name(self, obj_id):
         """Returns the name of the given side set."""
-        internal_id = self._lookup_id('sideset', obj_id)
-        names = self._get_set_block_names('sideset')
+        internal_id = self._lookup_id(SIDESET, obj_id)
+        names = self._get_set_block_names(SIDESET)
         if len(names) > 0:
             return names[internal_id - 1]
         else:
@@ -1426,7 +1430,7 @@ class Exodus:
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         Returns an empty array if the element block doesn't have attributes.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_partial_one_elem_attrib(obj_id, internal_id, attrib_index, start, count)
 
     def get_one_elem_attrib(self, obj_id, attrib_index):
@@ -1435,7 +1439,7 @@ class Exodus:
 
         Returns an empty array if the element block doesn't have attributes.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         size = self._int_get_elem_block_params(obj_id, internal_id)[0]
         return self._int_get_partial_one_elem_attrib(obj_id, internal_id, attrib_index, 1, size)
 
@@ -1445,7 +1449,7 @@ class Exodus:
 
         Returns an empty array if the element block doesn't have attributes.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         size = self._int_get_elem_block_params(obj_id, internal_id)[0]
         return self._int_get_partial_elem_attrib(obj_id, internal_id, 1, size)
 
@@ -1456,7 +1460,7 @@ class Exodus:
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         Returns an empty array if the element block doesn't have attributes.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_partial_elem_attrib(obj_id, internal_id, start, count)
 
     def get_elem_attrib_names(self, obj_id):
@@ -1465,7 +1469,7 @@ class Exodus:
 
         Returns an empty array if the element block doesn't have attributes or attribute names.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         num_attrib = self._int_get_num_elem_attrib(internal_id)
         result = []
         if num_attrib == 0:
@@ -1482,7 +1486,7 @@ class Exodus:
 
     def get_num_elem_attrib(self, obj_id):
         """Returns the number of attributes in the element block with given ID."""
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_num_elem_attrib(internal_id)
 
     #####################
@@ -1507,11 +1511,11 @@ class Exodus:
                 break
         return n
 
-    def _get_object_property(self, obj_type, obj_id, name):
+    def _get_object_property(self, obj_type: ObjectType, obj_id, name):
         """
         Returns the value of a specific object's property.
 
-        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_type: type of object this id refers to
         :param obj_id: EXTERNAL (user-defined) id
         :param name: name of the property
         :return: value of the property for the specified object
@@ -1526,29 +1530,29 @@ class Exodus:
 
     def get_node_set_property(self, obj_id, name):
         """Returns the value of the specified property for the node set with the given ID."""
-        return self._get_object_property('nodeset', obj_id, name)
+        return self._get_object_property(NODESET, obj_id, name)
 
     def get_side_set_property(self, obj_id, name):
         """Returns the value of the specified property for the side set with the given ID."""
-        return self._get_object_property('sideset', obj_id, name)
+        return self._get_object_property(SIDESET, obj_id, name)
 
     def get_elem_block_property(self, obj_id, name):
         """Returns the value of the specified property for the element block with the given ID."""
-        return self._get_object_property('elblock', obj_id, name)
+        return self._get_object_property(ELEMBLOCK, obj_id, name)
 
-    def _get_object_property_array(self, obj_type, name):
+    def _get_object_property_array(self, obj_type: ObjectType, name):
         """
         Returns a list containing all the values of a particular property for objects of a given type.
 
-        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_type: type of object this id refers to
         :param name: name of the property
         :return: array containing values of the property for objects of the given type
         """
-        if obj_type == 'nodeset':
+        if obj_type == NODESET:
             varname = 'ns_prop%d'
-        elif obj_type == 'sideset':
+        elif obj_type == SIDESET:
             varname = 'ss_prop%d'
-        elif obj_type == 'elblock':
+        elif obj_type == ELEMBLOCK:
             varname = 'eb_prop%d'
         else:
             raise ValueError("Invalid variable type {}!".format(obj_type))
@@ -1575,28 +1579,28 @@ class Exodus:
 
     def get_node_set_property_array(self, name):
         """Returns a list containing the values of the specified property for all node sets."""
-        return self._get_object_property_array('nodeset', name)
+        return self._get_object_property_array(NODESET, name)
 
     def get_side_set_property_array(self, name):
         """Returns a list containing the values of the specified property for all side sets."""
-        return self._get_object_property_array('sideset', name)
+        return self._get_object_property_array(SIDESET, name)
 
     def get_elem_block_property_array(self, name):
         """Returns a list containing the values of the specified property for all element blocks."""
-        return self._get_object_property_array('elblock', name)
+        return self._get_object_property_array(ELEMBLOCK, name)
 
-    def _get_object_property_names(self, obj_type):
+    def _get_object_property_names(self, obj_type: ObjectType):
         """
         Returns a list containing the names of properties defined for objects of a given type.
 
-        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_type: type of object
         :return: array of property names
         """
-        if obj_type == 'nodeset':
+        if obj_type == NODESET:
             varname = 'ns_prop%d'
-        elif obj_type == 'sideset':
+        elif obj_type == SIDESET:
             varname = 'ss_prop%d'
-        elif obj_type == 'elblock':
+        elif obj_type == ELEMBLOCK:
             varname = 'eb_prop%d'
         else:
             raise ValueError("Invalid variable type {}!".format(obj_type))
@@ -1608,15 +1612,15 @@ class Exodus:
 
     def get_node_set_property_names(self):
         """Returns a list of node set property names."""
-        return self._get_object_property_names('nodeset')
+        return self._get_object_property_names(NODESET)
 
     def get_side_set_property_names(self):
         """Returns a list of side set property names."""
-        return self._get_object_property_names('sideset')
+        return self._get_object_property_names(SIDESET)
 
     def get_elem_block_property_names(self):
         """Returns a list of element block property names."""
-        return self._get_object_property_names('elblock')
+        return self._get_object_property_names(ELEMBLOCK)
 
     ###############
     # Coordinates #
@@ -1999,7 +2003,27 @@ class Exodus:
         self.ledger.write(path)
 
 
+# Writing out a subset of a mesh
+def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
+                  ns_selectors: List[NodeSetSelector], ss_selectors: List[SideSetSelector],
+                  time_steps, path: str, name: str, keep_info=True, keep_qa=True):
+    """
+    Creates a new Exodus file containing a subset of the mesh stored in another Exodus file.
+
+    :param exodus: exodus object of the file to copy a subset of
+    :param eb_selectors: selectors for element blocks to keep
+    :param ns_selectors: selectors for node sets to keep
+    :param ss_selectors: selectors for side sets to keep
+    :param time_steps: range of time steps to keep
+    :param path: location of the new exodus file
+    :param name: name of the new exodus file
+    :param keep_info: should info records be retained?
+    :param keep_qa: should qa records be retained?
+    """
+    pass
+
+
 if __name__ == "__main__":
     ex = Exodus("sample-files/disk_out_ref.ex2", 'r')
-    print(ex.data)
+    #print(ex.data)
     ex.close()
