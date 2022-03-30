@@ -14,7 +14,7 @@ class ElemLedger:
         eb_status = []
         if 'eb_status' in self.ex.data.variables.keys():
             eb_status = self.ex.data.variables['eb_status'][:]
-        else:
+        elif 'num_elem' in self.ex.data.dimensions.keys():
             eb_status = [1 for i in range(self.ex.data.dimensions['num_elem'].size)]
 
         # TODO: if removing blocks, will need to accomodate here
@@ -32,16 +32,16 @@ class ElemLedger:
         if 'elem_var_tab' in self.ex.data.variables.keys():
             self.elem_var_tab = self.ex.data.variables['elem_var_tab'][:]  # # elem blocks x num_elem_var -- 1's only
 
-        # Assumes all elements must exist in some block
-        if 'num_el_blk' not in self.ex.data.dimensions.keys():
-            return
-
         # ID map of individual elements
         self.elem_num_map = []
         if 'elem_num_map' in self.ex.data.variables.keys():
             self.elem_num_map = self.ex.data.variables['elem_num_map'][:].tolist()
-        else:
+        elif 'num_elem' in self.ex.data.dimensions.keys():
             self.elem_num_map = [i for i in range(self.ex.data.dimensions['num_elem'].size)]
+
+        # Assumes all elements must exist in some block
+        if 'num_el_blk' not in self.ex.data.dimensions.keys():
+            return
 
         for i in range(1, self.ex.data.dimensions['num_el_blk'].size + 1):
             blk_num = i # does this in ascending connectX order. Use eb_prop1 to find the block later
