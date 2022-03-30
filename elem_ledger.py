@@ -17,6 +17,7 @@ class ElemLedger:
         else:
             eb_status = [1 for i in range(self.ex.data.dimensions['num_elem'].size)]
 
+        # TODO: if removing blocks, will need to accomodate here
         self.eb_prop1 = []
         if 'eb_prop1' in self.ex.data.variables.keys():
             self.eb_prop1 = self.ex.data.variables['eb_prop1'][:]  # each block from here gets entry in self.blocks
@@ -42,8 +43,8 @@ class ElemLedger:
         else:
             self.elem_num_map = [i for i in range(self.ex.data.dimensions['num_elem'].size)]
 
-        for i in range(self.ex.data.dimensions['num_el_blk'].size):
-            blk_num = self.eb_prop1[i]
+        for i in range(1, self.ex.data.dimensions['num_el_blk'].size + 1):
+            blk_num = i # does this in ascending connectX order. Use eb_prop1 to find the block later
             connect_title = "connect{}".format(blk_num)
             status = eb_status[blk_num - 1]
             elements = np.array(self.ex.data.variables[connect_title][:].tolist())
@@ -52,7 +53,7 @@ class ElemLedger:
             num_el_in_blk = self.ex.data.dimensions['num_el_in_blk' + str(blk_num)].size
 
             if 'eb_names' in self.ex.data.variables.keys():
-                blk_name = util.lineparse(self.ex.data.variables['eb_names'][i])
+                blk_name = util.lineparse(self.ex.data.variables['eb_names'][i - 1])
             else:
                 blk_name = "Block {}".format(blk_num)
 
@@ -91,6 +92,7 @@ class ElemLedger:
         block, ndx = self.find_element_location(self.find_element_num(id))
         return block.get_element(ndx)
 
+    # Given the ID of the element, remove it from its corresponding block
     def remove_element(self, id):
         internal_id = self.find_element_num(id)
         e_block, e_id = self.find_element_location(internal_id)
@@ -106,7 +108,7 @@ class ElemLedger:
         self.elem_num_map.pop(index)  # removes element reference from the number map
 
         elements = e_block.elements.tolist()
-        elements.pop(e_id)  # removes element from connectX
+        removed_element = elements.pop(e_id)  # removes element from connectX
         e_block.elements = np.array(elements)
 
         for variable in e_block.variables:
@@ -114,6 +116,45 @@ class ElemLedger:
             for i in range(len(var_data)):
                 var_data[i].pop(e_id)  # Removes associated data from each elemental variable
             e_block.variables[variable] = np.array(var_data)
+
+        return removed_element
+
+    # Given an element block ID, return the block
+    def find_element_block(self, block_id):
+        blk_num = None
+        for i in range(len(self.eb_prop1)):
+            if self.eb_prop1[i] == block_id:
+                blk_num = i + 1
+
+        for i in self.blocks:
+            if i.blk_num == blk_num:
+                return i
+
+        raise KeyError("Cannot find block with ID {}".format(block_id))
+
+    # Adds new element formed from nodes in nodelist to block with given ID
+    # Returns the element's ID
+    def add_element(self, block_id, nodelist):
+        block = self.find_element_block(block_id)
+
+        # Add it to the block
+        block.add_element(nodelist, self.ex)
+        
+        # Insert into element number map
+        newID = 1 # Find new element id
+        for i in range(1, len(self.elem_num_map) + 3):
+            if i not in self.elem_num_map:
+                newID = i
+                break
+
+        blk_num = block.get_blk_num()
+        ndx = 0
+        for i in range(1, blk_num):
+            ndx += self.blocks[i].get_num_elements()
+        ndx += block.get_num_elements() - 1 # -1 because it includes new element
+        self.elem_num_map.insert(ndx, newID)
+
+        return newID
 
     # Writes out element data to the new dataset
     def write(self, data):

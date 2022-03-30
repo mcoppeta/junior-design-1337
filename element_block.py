@@ -12,6 +12,7 @@ class ElementBlock:
 		self.num_el_in_blk = num_el_in_blk
 		self.elements = elements
 		self.variables = variables
+		self.valid = True # will be useful for functionality to remove element blocks (helps retain position in self.blocks)
 
 	def get_num_elements(self):
 		return self.num_el_in_blk
@@ -34,3 +35,29 @@ class ElementBlock:
 	def get_elem_type(self):
 		return self.elem_type
 
+	def invalidate(self):
+		self.valid = False
+		self.num_el_in_blk = 0
+
+	# Add element to this block
+	def add_element(self, nodelist, ex):
+		if len(nodelist) != self.num_nod_per_el:
+			raise ValueError("The given nodelist contains {} nodes when element of type {} requires {}".format(len(nodelist), self.elem_type, self.num_nod_per_el))
+
+		if nodelist in self.elements.tolist():
+			raise ValueError("The given nodelist already exists in this block")
+
+		if len(nodelist) != len(set(nodelist)):
+			raise ValueError("The same node is used more than once in the provided nodelist")
+
+		el = self.elements.tolist()
+		el.append(nodelist)
+		self.elements = np.array(el)
+
+		self.num_el_in_blk += 1
+
+		for variable in self.variables:
+			data = self.variables[variable].tolist()
+			for row in range(len(data)):
+				data[row].append(0)
+			self.variables[variable] = np.array(data)
