@@ -2,7 +2,6 @@ import warnings
 import netCDF4 as nc
 import numpy
 from typing import List
-
 from ledger import Ledger
 import util
 from selector import ElementBlockSelector, NodeSetSelector, SideSetSelector
@@ -159,7 +158,7 @@ class Exodus:
     def title(self):
         """The database title."""
         try:
-            return self.data.getncattr('title')
+            return self.data.getncattr(ATTR_TITLE)
         except AttributeError:
             AttributeError("Database title could not be found")
 
@@ -167,9 +166,9 @@ class Exodus:
     def max_allowed_name_length(self):
         """The maximum allowed length for variable/dimension/attribute names in this database."""
         max_name_len = Exodus._MAX_NAME_LENGTH
-        if 'len_name' in self.data.dimensions:
+        if DIM_NAME_LENGTH in self.data.dimensions:
             # Subtract 1 because in C an extra null character is added for C reasons
-            max_name_len = self.data.dimensions['len_name'].size - 1
+            max_name_len = self.data.dimensions[DIM_NAME_LENGTH].size - 1
         return max_name_len
 
     @property
@@ -177,20 +176,40 @@ class Exodus:
         """The maximum used length for variable/dimension/attribute names in this database."""
         # 32 is the default size consistent with other databases
         max_used_name_len = 32
-        if 'maximum_name_length' in self.data.ncattrs():
+        if ATTR_MAX_NAME_LENGTH in self.data.ncattrs():
             # The length does not include the added null character from C
-            max_used_name_len = self.data.getncattr('maximum_name_length')
+            max_used_name_len = self.data.getncattr(ATTR_MAX_NAME_LENGTH)
         return max_used_name_len
+
+    @property
+    def max_string_length(self):
+        """Maximum QA record string length."""
+        # See ex_put_qa.c @ line 119. This record is created and used when adding QA records
+        max_str_len = Exodus._MAX_STR_LENGTH
+        if DIM_STRING_LENGTH in self.data.dimensions:
+            # Subtract 1 because in C an extra character is added for C reasons
+            max_str_len = self.data.dimensions[DIM_STRING_LENGTH].size - 1
+        return max_str_len
+
+    @property
+    def max_line_length(self):
+        """Maximum info record line length."""
+        # See ex_put_info.c @ line 121. This record is created and used when adding info records
+        max_line_len = Exodus._MAX_LINE_LENGTH
+        if DIM_LINE_LENGTH in self.data.dimensions:
+            # Subtract 1 because in C an extra character is added for C reasons
+            max_line_len = self.data.dimensions[DIM_LINE_LENGTH].size - 1
+        return max_line_len
 
     @property
     def api_version(self):
         """The Exodus API version this database was built with."""
         try:
-            result = self.data.getncattr('api_version')
+            result = self.data.getncattr(ATTR_API_VER)
         except AttributeError:
             # Try the old way of spelling it
             try:
-                result = self.data.getncattr('api version')
+                result = self.data.getncattr(ATTR_API_VER_OLD)
             except AttributeError:
                 raise AttributeError("Exodus API version could not be found")
         return result
@@ -199,15 +218,70 @@ class Exodus:
     def version(self):
         """The Exodus version this database uses."""
         try:
-            return self.data.getncattr('version')
+            return self.data.getncattr(ATTR_VERSION)
         except AttributeError:
             raise AttributeError("Exodus database version could not be found")
+
+    @property
+    def large_model(self):
+        """
+        Describes how coordinates are stored in this database.
+
+        If true: nodal coordinates and variables are stored in separate x, y, z variables.
+        If false: nodal coordinates and variables are stored in a single variable.
+
+        :return: 1 if stored separately (large), 0 if stored in a blob
+        """
+        # According to a comment in ex_utils.c @ line 1614
+        # "Basically, the difference is whether the coordinates and nodal variables are stored in a blob (xyz components
+        # together) or as a variable per component per nodal_variable."
+        # This is important for coordinate getter functions
+        if ATTR_FILE_SIZE in self.data.ncattrs():
+            return self.data.getncattr(ATTR_FILE_SIZE)
+        else:
+            return 0
+            # No warning is raised because older files just don't have this
+
+    @property
+    def int64_status(self):
+        """
+        64-bit integer support for this database.
+
+        Use ``int()`` to get the integer type used by this database.
+
+        :return: 1 if 64-bit integers are supported, 0 otherwise
+        """
+        # Determines whether the file uses int64s
+        if ATTR_64BIT_INT in self.data.ncattrs():
+            return self.data.getncattr(ATTR_64BIT_INT)
+        else:
+            return 1 if self.data.data_model == 'NETCDF3_64BIT_DATA' else 0
+            # No warning is raised because older files just don't have this
+
+    @property
+    def word_size(self):
+        """
+        Word size of floating point variables in this database.
+
+        Use ``float()`` to get the float type used by this database.
+
+        :return: floating point word size
+        """
+        try:
+            result = self.data.getncattr(ATTR_WORD_SIZE)
+        except AttributeError:
+            try:
+                result = self.data.getncattr(ATTR_WORD_SIZE_OLD)
+            except AttributeError:
+                # This should NEVER happen, but here to be safe
+                raise AttributeError("Exodus database floating point word size could not be found")
+        return result
 
     @property
     def num_qa(self):
         """Number of QA records."""
         try:
-            result = self.data.dimensions['num_qa_rec'].size
+            result = self.data.dimensions[DIM_NUM_QA].size
         except KeyError:
             result = 0
         return result
@@ -348,86 +422,6 @@ class Exodus:
             return self.data.dimensions['num_sset_var'].size
         except KeyError:
             raise KeyError("Number of side set variables could not be found")
-
-    @property
-    def large_model(self):
-        """
-        Describes how coordinates are stored in this database.
-
-        If true: nodal coordinates and variables are stored in separate x, y, z variables.
-        If false: nodal coordinates and variables are stored in a single variable.
-
-        :return: 1 if stored separately (large), 0 if stored in a blob
-        """
-        # According to a comment in ex_utils.c @ line 1614
-        # "Basically, the difference is whether the coordinates and nodal variables are stored in a blob (xyz components
-        # together) or as a variable per component per nodal_variable."
-        # This is important for coordinate getter functions
-        if 'file_size' in self.data.ncattrs():
-            return self.data.getncattr('file_size')
-        else:
-            # return 1 if self.data.data_model == 'NETCDF3_64BIT_OFFSET' else 0
-            return 0
-            # No warning is raised because older files just don't have this
-
-    @property
-    def int64_status(self):
-        """
-        64-bit integer support for this database.
-
-        Use ``int()`` to get the integer type used by this database.
-
-        :return: 1 if 64-bit integers are supported, 0 otherwise
-        """
-        # Determines whether the file uses int64s
-        if 'int64_status' in self.data.ncattrs():
-            return self.data.getncattr('int64_status')
-        else:
-            return 1 if self.data.data_model == 'NETCDF3_64BIT_DATA' else 0
-            # No warning is raised because older files just don't have this
-
-    @property
-    def word_size(self):
-        """
-        Word size of floating point variables in this database.
-
-        Use ``float()`` to get the float type used by this database.
-
-        :return: floating point word size
-        """
-        try:
-            result = self.data.getncattr('floating_point_word_size')
-        except AttributeError:
-            try:
-                result = self.data.getncattr('floating point word size')
-            except AttributeError:
-                # This should NEVER happen, but here to be safe
-                raise AttributeError("Exodus database floating point word size could not be found")
-        return result
-
-    # Below are accessors for some data records that the C library doesn't seem to have
-    # max_string/max_line_length are probably only useful on writing qa/info records. We can keep these for now but
-    # delete them later once we determine they're actually useless
-
-    # NOT IN C
-    @property
-    def max_string_length(self):
-        # See ex_put_qa.c @ line 119. This record is created and used when adding QA records
-        max_str_len = Exodus._MAX_STR_LENGTH
-        if 'len_string' in self.data.dimensions:
-            # Subtract 1 because in C an extra character is added for C reasons
-            max_str_len = self.data.dimensions['len_string'].size - 1
-        return max_str_len
-
-    # NOT IN C
-    @property
-    def max_line_length(self):
-        # See ex_put_info.c @ line 121. This record is created and used when adding info records
-        max_line_len = Exodus._MAX_LINE_LENGTH
-        if 'len_line' in self.data.dimensions:
-            # Subtract 1 because in C an extra character is added for C reasons
-            max_line_len = self.data.dimensions['len_line'].size - 1
-        return max_line_len
 
     # endregion
 
@@ -1798,7 +1792,7 @@ class Exodus:
         result = numpy.empty([num, 4], Exodus._MAX_STR_LENGTH_T)
         if num > 0:
             try:
-                qas = self.data.variables['qa_records']
+                qas = self.data.variables[VAR_QA]
             except KeyError:
                 raise KeyError("Failed to retrieve qa records from database!")
             for i in range(num):
@@ -2006,7 +2000,7 @@ class Exodus:
 # Writing out a subset of a mesh
 def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
                   ns_selectors: List[NodeSetSelector], ss_selectors: List[SideSetSelector],
-                  time_steps, path: str, name: str, keep_info=True, keep_qa=True):
+                  time_steps: List[int], path: str, title: str, keep_info=True, keep_qa=True):
     """
     Creates a new Exodus file containing a subset of the mesh stored in another Exodus file.
 
@@ -2016,14 +2010,46 @@ def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
     :param ss_selectors: selectors for side sets to keep
     :param time_steps: range of time steps to keep
     :param path: location of the new exodus file
-    :param name: name of the new exodus file
+    :param title: name of the new exodus file
     :param keep_info: should info records be retained?
     :param keep_qa: should qa records be retained?
     """
-    pass
+    output = nc.Dataset(path, 'w')
+    output.set_fill_off()
+
+    # Metadata
+    output.setncattr_string(ATTR_TITLE, nc.stringtoarr(title, exodus.max_string_length + 1))
+    output.createDimension(DIM_NAME_LENGTH, exodus.max_allowed_name_length + 1)
+    output.setncattr(ATTR_MAX_NAME_LENGTH, exodus.max_used_name_length + 1)
+    output.setncattr(ATTR_API_VER, exodus.api_version)
+    output.setncattr(ATTR_VERSION, exodus.version)
+    output.setncattr(ATTR_FILE_SIZE, exodus.large_model)
+    output.setncattr(ATTR_64BIT_INT, exodus.int64_status)
+    output.setncattr(ATTR_WORD_SIZE, exodus.word_size)
+
+    # QA records
+    output.createDimension(DIM_FOUR, 4)
+    output.createDimension(DIM_STRING_LENGTH, exodus.max_string_length + 1)
+    output.createDimension(DIM_LINE_LENGTH, exodus.max_line_length + 1)
+    num_qa_rec = 1
+    if keep_qa:
+        num_qa_rec = exodus.num_qa + 1
+    output.createDimension(DIM_NUM_QA, num_qa_rec)
+    var = output.createVariable(VAR_QA, '|S1', (DIM_NUM_QA, DIM_FOUR, DIM_STRING_LENGTH))
+    qa = numpy.empty((num_qa_rec, 4, exodus.max_string_length + 1), '|S1')  # add 1 for null terminator
+    for i in range(exodus.num_qa):
+        qa[i] = exodus.data.variables[VAR_QA][i]
+    qa[0:exodus.num_qa] = exodus.data.variables[VAR_QA][:]
+    qa[-1] = util.generate_qa_rec(exodus.max_string_length)
+    var[:] = qa
+    # actually does it even make sense to select variables per nodeset? should we change that?
+    output.close()
 
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/disk_out_ref.ex2", 'r')
-    #print(ex.data)
+    output_subset(ex, [], [], [], [], "sample-files/outputtest.ex2", "output test")
+    print(ex.data)
+    ds = nc.Dataset("sample-files/outputtest.ex2")
+    print(ds)
     ex.close()
