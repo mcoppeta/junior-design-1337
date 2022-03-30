@@ -68,7 +68,7 @@ class NSLedger:
             raise KeyError("Nodeset name already in use")
 
         self.nodesets.append(str(self.new_nodeset_name))
-        self.nodeset_map[str(self.new_nodeset_name)] = np.unique(np.array(node_ids))
+        self.nodeset_map[str(self.new_nodeset_name)] = np.unique(node_ids)
         self.nodeset_ids.append(nodeset_id)
         self.nodeset_id_set.add(nodeset_id)
 
@@ -222,21 +222,41 @@ class NSLedger:
 
         return nodeset_num
 
+    #############################################
+    #                                           #
+    #          Read Shadow Methods              #
+    #                                           #
+    #############################################
+
     def num_node_sets(self):
         return len(self.nodesets)
 
-    def get_node_set(self, id):
-        num = self.find_nodeset_num(id)
+    def get_node_set(self, nodeset_id):
+        num = self.find_nodeset_num(nodeset_id)
         name = self.nodesets[num]
         if name not in self.nodeset_map.keys():
-            raise KeyError(f"NodeSet {id} does not exist")
+            raise KeyError(f"NodeSet {nodeset_id} does not exist")
 
         if self.nodeset_map[name] is None:
             return np.array(self.ex.data[name])
         return np.array(self.nodeset_map[name])
 
-    def get_node_set_name(self, id):
+    def get_partial_node_set(self, nodeset_id, start, count):
         num = self.find_nodeset_num(id)
+        name = self.nodesets[num]
+        if name not in self.nodeset_map.keys():
+            raise KeyError(f"NodeSet {nodeset_id} does not exist")
+
+        if self.nodeset_map[name] is None:
+            return np.unique(self.ex.data[name])[start - 1:start + count - 1]
+        return np.unique(self.nodeset_map[name])[start - 1:start + count - 1]
+
+    def get_node_set_id_map(self):
+        """ Returns the id map for node sets (ns_prop1). """
+        return np.array(self.nodeset_ids)
+
+    def get_node_set_name(self, nodeset_id):
+        num = self.find_nodeset_num(nodeset_id)
         return self.nodeset_names[num]
 
     def get_node_set_names(self):
