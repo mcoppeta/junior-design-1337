@@ -155,7 +155,7 @@ class Ledger:
         self.sideset_ledger.write(self.ex.data)
 
     def a_write(self, path):
-        out = nc.Dataset(path, "w", True, format="NETCDF3_CLASSIC")
+        out = nc.Dataset(path, "w", True, format="NETCDF4")
         old = self.ex.data
 
         out.setncatts(old.__dict__)

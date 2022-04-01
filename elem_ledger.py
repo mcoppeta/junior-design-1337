@@ -28,6 +28,7 @@ class ElemLedger:
             self.name_elem_var = self.ex.data.variables['name_elem_var'][:]
 
         # Variables as table?
+        # TODO: if adding blocks in future, need to accomodate this
         self.elem_var_tab = []
         if 'elem_var_tab' in self.ex.data.variables.keys():
             self.elem_var_tab = self.ex.data.variables['elem_var_tab'][:]  # # elem blocks x num_elem_var -- 1's only
@@ -38,6 +39,10 @@ class ElemLedger:
             self.elem_num_map = self.ex.data.variables['elem_num_map'][:].tolist()
         elif 'num_elem' in self.ex.data.dimensions.keys():
             self.elem_num_map = [i for i in range(self.ex.data.dimensions['num_elem'].size)]
+
+        self.num_elem_var = 0
+        if 'num_elem_var' in self.ex.data.dimensions.keys():
+            self.num_elem_var = self.ex.data.dimensions['num_elem_var'].size
 
         # Assumes all elements must exist in some block
         if 'num_el_blk' not in self.ex.data.dimensions.keys():
@@ -57,8 +62,9 @@ class ElemLedger:
             else:
                 blk_name = "Block {}".format(blk_num)
 
+            # TODO -> OPENING WHEN NO VARIABLES GIVES ERROR
             variables = {}  # self.blocks['connect1']['variables']['vals_elem_var1eb1']
-            for j in range(self.ex.data.dimensions['num_elem_var'].size):
+            for j in range(self.num_elem_var):
                 current_var_name = "vals_elem_var{}eb{}".format(j + 1, blk_num)
                 variables[current_var_name] = self.ex.data.variables[current_var_name][:]
 
@@ -184,7 +190,7 @@ class ElemLedger:
             data.createDimension(nod_per_el_title, i.get_num_nodes_per_element())
 
         # Creates dimension for the number of elemental variables
-        data.createDimension("num_elem_var", self.ex.data.dimensions['num_elem_var'].size)
+        data.createDimension("num_elem_var", self.num_elem_var)
 
         data.createVariable("eb_status", "int32", dimensions=("num_el_blk"))
         data['eb_status'][:] = np.array(eb_status)
@@ -222,8 +228,9 @@ class ElemLedger:
                 data.createVariable(variable, "float64", dimensions=("time_step", "num_el_in_blk{}".format(num)))
                 data[variable][:] = np.array(var_data)
 
-        #TODO: maintain with new functions
-        data.createVariable("elem_var_tab", "int32", dimensions=("num_el_blk", "num_elem_var"))
-        data["elem_var_tab"][:] = np.array(self.elem_var_tab)
+        # IF no blocks are variables, don't write out elem_var_tab (can't fit size (x, 0)) 
+        if data.dimensions['num_el_blk'].size > 0 and data.dimensions['num_elem_var'].size > 0:
+            data.createVariable("elem_var_tab", "int32", dimensions=("num_el_blk", "num_elem_var"))
+            data["elem_var_tab"][:] = np.array(self.elem_var_tab)
 
         #TODO: Add write functionality for element attributes
