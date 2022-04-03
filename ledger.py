@@ -223,12 +223,8 @@ class Ledger:
             datatype = var_data.dtype
             dimensions = var_data.dimensions
             out.createVariable(varname, datatype, dimensions)
+            out[varname].setncatts(old[varname].__dict__)
             out[varname][:] = old[var][:]
-            #TODO: REMOVE THIS TEMP FIX
-            try:
-                out[varname].setncatts(old[varname].__dict__)
-            except Exception as e:
-                print("Caught Error:\t{}".format(e))
 
         self.nodeset_ledger.write(out)
         self.sideset_ledger.write(out)
