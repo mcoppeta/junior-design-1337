@@ -2,7 +2,7 @@ from exodus import Exodus
 
 
 # This method skins the element block
-def remove_elements_demo(path, path_out):
+def skin_block(path, path_out):
     ex = Exodus(path, 'a')
 
     # Skin cube
@@ -17,8 +17,8 @@ def remove_elements_demo(path, path_out):
 def review_changes(path):
     ex = Exodus(path, 'r')
     ss = ex.get_side_set(4)
-    print(ss) # Gives element IDs in skin, and the corresponding mask is the corresponding face number
-
+    print(ss[:][0]) # Gives element IDs in skin
+    print("\n", ss[:][1]) # Gives corresponding face numbers (1-6)
     print("\n\nNum sides:\t{}".format(len(ss[:][0]))) # 384 = length^3 which is expected
     
     ex.close()
