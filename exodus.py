@@ -2001,6 +2001,10 @@ class Exodus:
     def write(self, path=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to write")
+        elif self.mode == 'a' and path is None:
+            raise AttributeError("Must specify a new path when in append mode")
+        elif self.mode == 'w' and path is not None:
+            raise AttributeError("Do not specify a new path in write mode. Initialization path will be used")
         self.ledger.write(path)
 
 
