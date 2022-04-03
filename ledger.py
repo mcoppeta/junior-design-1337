@@ -133,7 +133,10 @@ class Ledger:
 
     # element methods
     def remove_element(self, elem_id):
-        self.element_ledger.remove_element(elem_id)
+        return self.element_ledger.remove_element(elem_id)
+
+    def add_element(self, block_id, nodelist):
+        return self.element_ledger.add_element(block_id, nodelist)
 
     def write(self, path):
         """
@@ -152,7 +155,7 @@ class Ledger:
         self.sideset_ledger.write(self.ex.data)
 
     def a_write(self, path):
-        out = nc.Dataset(path, "w", True, format="NETCDF3_CLASSIC")
+        out = nc.Dataset(path, "w", True, format="NETCDF4")
         old = self.ex.data
 
         out.setncatts(old.__dict__)
