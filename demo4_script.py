@@ -19,7 +19,7 @@ def review_changes(path):
     ss = ex.get_side_set(4)
     print(ss[:][0]) # Gives element IDs in skin
     print("\n", ss[:][1]) # Gives corresponding face numbers (1-6)
-    print("\n\nNum sides:\t{}".format(len(ss[:][0]))) # 384 = length^3 which is expected
+    print("\n\nNum sides:\t{}".format(len(ss[:][0]))) # 384 = width*height*faces = 8*8*6 which is expected
     
     ex.close()
 
