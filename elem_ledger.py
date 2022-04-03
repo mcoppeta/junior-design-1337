@@ -174,7 +174,6 @@ class ElemLedger:
 
         unique_faces = block.skin_block(shift)
 
-        print(self.elem_num_map)
         # we have the intern id's, need the elem_num_map id's instead
         converted_unique_faces = []
         for i in unique_faces:
