@@ -61,3 +61,47 @@ class ElementBlock:
 			for row in range(len(data)):
 				data[row].append(0)
 			self.variables[variable] = np.array(data)
+
+	# Returns an array(num elements, num faces in element) containing the nodes of the faces of the element
+	def elem_iterate_faces(self, ndx):
+		# Get element 
+		elem = list(self.elements[ndx]) # list of node IDs
+
+		faces = []
+		if self.elem_type.upper() == "HEX" or self.elem_type.upper() == "HEX8":
+			faces.append([elem[0], elem[1], elem[5], elem[4]]) # face 1
+			faces.append([elem[1], elem[2], elem[6], elem[5]])
+			faces.append([elem[2], elem[3], elem[7], elem[6]])
+			faces.append([elem[0], elem[4], elem[7], elem[3]])
+			faces.append([elem[0], elem[3], elem[2], elem[1]])
+			faces.append([elem[4], elem[5], elem[6], elem[7]])
+
+		return faces
+
+	# Returns a list of the unique faces of the form [(ndx, face_number)]
+	def skin_block(self, shift):
+		all_faces = [] # size (num elements, faces in element)
+		for i in range(len(self.elements)):
+			all_faces.append(self.elem_iterate_faces(i))
+
+		face_count_sorted = {} # str(face): count
+		for elem in all_faces:
+			for face in elem:
+				sort_face_str = str(sorted(face))
+				if sort_face_str in face_count_sorted:
+					face_count_sorted[str(sort_face_str)] += 1
+				else:
+					face_count_sorted[str(sort_face_str)] = 1
+		
+		unique_faces = [] # (rel_eid, face_no)
+		rel_eid = 0
+		while rel_eid < len(all_faces):
+			face_no = 1
+			while face_no <= len(all_faces[0]):
+				sorted_face_str = str(sorted(all_faces[rel_eid][face_no - 1]))
+				if face_count_sorted[sorted_face_str] == 1:
+					unique_faces.append((rel_eid + shift, face_no))
+				face_no += 1
+			rel_eid += 1
+
+		return unique_faces
