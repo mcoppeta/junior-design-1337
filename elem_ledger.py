@@ -162,6 +162,29 @@ class ElemLedger:
 
         return newID
 
+    # Returns faces of skinned mesh of form [(intern id, face number)]
+    def skin_block(self, block_id):
+        block = self.find_element_block(block_id)
+
+        i = 1
+        shift = 0
+        while i < block.blk_num:
+            shift += self.blocks[i - 1].num_el_in_blk
+            i += 1
+
+        unique_faces = block.skin_block(shift)
+
+        print(self.elem_num_map)
+        # we have the intern id's, need the elem_num_map id's instead
+        converted_unique_faces = []
+        for i in unique_faces:
+            e, f = i
+            e = self.elem_num_map[e]
+            converted_unique_faces.append((e, f))
+        
+        return converted_unique_faces
+
+
     # Writes out element data to the new dataset
     def write(self, data):
 

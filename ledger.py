@@ -138,6 +138,17 @@ class Ledger:
     def add_element(self, block_id, nodelist):
         return self.element_ledger.add_element(block_id, nodelist)
 
+    def skin_element_block(self, block_id, skin_id, skin_name):
+        unique_faces = self.element_ledger.skin_block(block_id)
+        el_list = []
+        face_list = []
+        df = []
+        for i in unique_faces:
+            e, f = i
+            el_list.append(e)
+            face_list.append(f)
+        self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name, df)
+
     def write(self, path):
         """
         Write from the ledger
@@ -153,6 +164,7 @@ class Ledger:
     def w_write(self):
         self.nodeset_ledger.write(self.ex.data)
         self.sideset_ledger.write(self.ex.data)
+        self.element_ledger.write(self.ex.data)
 
     def a_write(self, path):
         out = nc.Dataset(path, "w", True, format="NETCDF4")
@@ -212,7 +224,11 @@ class Ledger:
             dimensions = var_data.dimensions
             out.createVariable(varname, datatype, dimensions)
             out[varname][:] = old[var][:]
-            out[varname].setncatts(old[varname].__dict__)
+            #TODO: REMOVE THIS TEMP FIX
+            try:
+                out[varname].setncatts(old[varname].__dict__)
+            except Exception as e:
+                print("Caught Error:\t{}".format(e))
 
         self.nodeset_ledger.write(out)
         self.sideset_ledger.write(out)

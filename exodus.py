@@ -1997,6 +1997,11 @@ class Exodus:
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         return self.ledger.remove_element(elem_id)
+
+    def skin_element_block(self, block_id, skin_id, skin_name):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to skin element into new sideset")
+        self.ledger.skin_element_block(block_id, skin_id, skin_name)
         
     def write(self, path=None):
         if self.mode != 'w' and self.mode != 'a':
