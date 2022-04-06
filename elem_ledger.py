@@ -35,10 +35,14 @@ class ElemLedger:
 
         # ID map of individual elements
         self.elem_num_map = []
+        if 'elem_num_map' in self.ex.data.variables.keys() and 'elem_map' in self.ex.data.variables.keys():
+            raise NotImplementedError("Both elem_num_map and elem_map variables present. Ambiguous meaning")
         if 'elem_num_map' in self.ex.data.variables.keys():
             self.elem_num_map = self.ex.data.variables['elem_num_map'][:].tolist()
+        elif 'elem_map' in self.ex.data.variables.keys():
+            self.elem_num_map = self.ex.data.variables['elem_map'][:].tolist()
         elif 'num_elem' in self.ex.data.dimensions.keys():
-            self.elem_num_map = [i for i in range(self.ex.data.dimensions['num_elem'].size)]
+            self.elem_num_map = [i + 1 for i in range(self.ex.data.dimensions['num_elem'].size)]
 
         self.num_elem_var = 0
         if 'num_elem_var' in self.ex.data.dimensions.keys():
