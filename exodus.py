@@ -1978,7 +1978,7 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
 
-    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact):
+    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact)
@@ -1988,10 +1988,28 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_sideset(ss_id)
 
+
+    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.add_sides_to_sideset(elem_ids, side_ids, dist_facts, ss_id)
+
+    def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.remove_sides_from_sideset(elem_ids, side_ids, ss_id)
+
+    def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to split sideset")
+        self.ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+    
+
     def add_element(self, block_id, nodelist):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         return self.ledger.add_element(block_id, nodelist)
+
 
     def remove_element(self, elem_id):
         if self.mode != 'w' and self.mode != 'a':

@@ -125,11 +125,20 @@ class Ledger:
         self.nodeset_ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
 
     # sideset methods
-    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact):
+    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None):
         self.sideset_ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact)
 
     def remove_sideset(self, ss_id):
         self.sideset_ledger.remove_sideset(ss_id)
+
+    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None):
+        self.sideset_ledger.add_sides_to_sideset(elem_ids, side_ids, dist_facts, ss_id)
+
+    def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
+        self.sideset_ledger.remove_sides_from_sideset(elem_ids, side_ids, ss_id)
+
+    def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2):
+        self.sideset_ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
 
     # element methods
     def remove_element(self, elem_id):
@@ -148,6 +157,7 @@ class Ledger:
             el_list.append(e)
             face_list.append(f)
         self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name, df)
+
 
     def write(self, path):
         """
