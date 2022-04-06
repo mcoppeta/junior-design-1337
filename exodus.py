@@ -4,7 +4,7 @@ import numpy
 from typing import List
 from ledger import Ledger
 import util
-from selector import ElementBlockSelector, NodeSetSelector, SideSetSelector
+from selector import ElementBlockSelector, NodeSetSelector, SideSetSelector, PropertySelector
 from constants import *
 
 
@@ -389,7 +389,7 @@ class Exodus:
         try:
             return self.data.dimensions['num_glo_var'].size
         except KeyError:
-            raise KeyError("Number of global variables could not be found")
+            return 0
 
     @property
     def num_node_var(self):
@@ -397,7 +397,7 @@ class Exodus:
         try:
             return self.data.dimensions['num_nod_var'].size
         except KeyError:
-            raise KeyError("Number of nodal variables could not be found")
+            return 0
 
     @property
     def num_elem_block_var(self):
@@ -405,7 +405,7 @@ class Exodus:
         try:
             return self.data.dimensions['num_elem_var'].size
         except KeyError:
-            raise KeyError("Number of element block variables could not be found")
+            return 0
 
     @property
     def num_node_set_var(self):
@@ -413,7 +413,7 @@ class Exodus:
         try:
             return self.data.dimensions['num_nset_var'].size
         except KeyError:
-            raise KeyError("Number of node set variables could not be found")
+            return 0
 
     @property
     def num_side_set_var(self):
@@ -421,7 +421,7 @@ class Exodus:
         try:
             return self.data.dimensions['num_sset_var'].size
         except KeyError:
-            raise KeyError("Number of side set variables could not be found")
+            return 0
 
     # endregion
 
@@ -729,13 +729,13 @@ class Exodus:
             raise ValueError("End time step out of range. Got {}".format(end_time_step))
 
         if obj_type == ELEMBLOCK:
-            varname = 'vals_elem_var%deb%d'
+            varname = VAR_VALS_ELEM_VAR
             numvar = self.num_elem_block_var
         elif obj_type == NODESET:
-            varname = 'vals_nset_var%dns%d'
+            varname = VAR_VALS_NS_VAR
             numvar = self.num_node_set_var
         elif obj_type == SIDESET:
-            varname = 'vals_sset_var%dss%d'
+            varname = VAR_VALS_SS_VAR
             numvar = self.num_side_set_var
         else:
             raise ValueError("Invalid variable type {}!".format(obj_type))
@@ -847,6 +847,52 @@ class Exodus:
         internal_id = self._lookup_id(SIDESET, obj_id)
         return self._int_get_partial_object_var_across_times(SIDESET, internal_id, start_time_step, end_time_step,
                                                              var_index, start_index, count)
+
+    def _get_truth_table(self, obj_type: ObjectType):
+        """
+        Returns the truth table for variables of a given object type.
+
+        FOR INTERNAL USE ONLY!
+
+        :param obj_type: type of object
+        :return: truth table
+        """
+        if obj_type == ELEMBLOCK:
+            tabname = VAR_ELEM_TAB
+            valname = VAR_VALS_ELEM_VAR
+            num_entity = self.num_elem_blk
+            num_var = self.num_elem_block_var
+        elif obj_type == NODESET:
+            tabname = VAR_NSET_TAB
+            valname = VAR_VALS_NS_VAR
+            num_entity = self.num_node_sets
+            num_var = self.num_node_set_var
+        elif obj_type == SIDESET:
+            tabname = VAR_SSET_TAB
+            valname = VAR_VALS_SS_VAR
+            num_entity = self.num_side_sets
+            num_var = self.num_side_set_var
+        else:
+            raise ValueError("Invalid object type {}!".format(obj_type))
+        if tabname in self.data.variables:
+            result = self.data.variables[tabname][:]
+        else:
+            # we have to figure it out for ourselves
+            result = numpy.zeros((num_entity, num_var), dtype=self.int)
+            for e in range(num_entity):
+                for v in range(num_var):
+                    if valname % (v + 1, e + 1) in self.data.variables:
+                        result[e, v] = 1
+        return result
+
+    def get_elem_block_truth_table(self):
+        return self._get_truth_table(ELEMBLOCK)
+
+    def get_node_set_truth_table(self):
+        return self._get_truth_table(NODESET)
+
+    def get_side_set_truth_table(self):
+        return self._get_truth_table(SIDESET)
 
     def _get_var_names(self, var_type: VariableType):
         """
@@ -2000,7 +2046,7 @@ class Exodus:
 # Writing out a subset of a mesh
 def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
                   ns_selectors: List[NodeSetSelector], ss_selectors: List[SideSetSelector],
-                  time_steps: List[int], path: str, title: str, keep_info=True, keep_qa=True):
+                  prop_selector: PropertySelector, time_steps: List[int], path: str, title: str):
     """
     Creates a new Exodus file containing a subset of the mesh stored in another Exodus file.
 
@@ -2008,11 +2054,10 @@ def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
     :param eb_selectors: selectors for element blocks to keep
     :param ns_selectors: selectors for node sets to keep
     :param ss_selectors: selectors for side sets to keep
+    :param prop_selector: selector for object properties
     :param time_steps: range of time steps to keep
     :param path: location of the new exodus file
     :param title: name of the new exodus file
-    :param keep_info: should info records be retained?
-    :param keep_qa: should qa records be retained?
     """
     output = nc.Dataset(path, 'w')
     output.set_fill_off()
@@ -2031,25 +2076,27 @@ def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
     output.createDimension(DIM_FOUR, 4)
     output.createDimension(DIM_STRING_LENGTH, exodus.max_string_length + 1)
     output.createDimension(DIM_LINE_LENGTH, exodus.max_line_length + 1)
-    num_qa_rec = 1
-    if keep_qa:
-        num_qa_rec = exodus.num_qa + 1
+    num_qa_rec = exodus.num_qa + 1
     output.createDimension(DIM_NUM_QA, num_qa_rec)
     var = output.createVariable(VAR_QA, '|S1', (DIM_NUM_QA, DIM_FOUR, DIM_STRING_LENGTH))
     qa = numpy.empty((num_qa_rec, 4, exodus.max_string_length + 1), '|S1')  # add 1 for null terminator
-    for i in range(exodus.num_qa):
-        qa[i] = exodus.data.variables[VAR_QA][i]
-    qa[0:exodus.num_qa] = exodus.data.variables[VAR_QA][:]
+    # for i in range(exodus.num_qa):
+    #     qa[i] = exodus.data.variables[VAR_QA][i]
+    qa[0:exodus.num_qa] = exodus.data.variables[VAR_QA][:] # does this work?
     qa[-1] = util.generate_qa_rec(exodus.max_string_length)
     var[:] = qa
-    # actually does it even make sense to select variables per nodeset? should we change that?
+
+    # Every block/set can have its own variables
+    # The truth table shows which block has which variables
+    # All blocks/set have to have the same properties
     output.close()
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/disk_out_ref.ex2", 'r')
-    output_subset(ex, [], [], [], [], "sample-files/outputtest.ex2", "output test")
-    print(ex.data)
-    ds = nc.Dataset("sample-files/outputtest.ex2")
-    print(ds)
+    ex = Exodus("sample-files/cube_with_data.exo", 'r')
+    # output_subset(ex, [], [], [], [], "sample-files/outputtest.ex2", "output test")
+    # print(ex.data)
+    # ds = nc.Dataset("sample-files/outputtest.ex2")
+    # print(ds)
+    print(ex.get_side_set_truth_table())
     ex.close()

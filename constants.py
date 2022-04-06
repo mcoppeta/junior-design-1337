@@ -35,5 +35,12 @@ ATTR_FILE_SIZE = "file_size"
 ATTR_64BIT_INT = "int64_status"
 ATTR_WORD_SIZE = "floating_point_word_size"
 ATTR_WORD_SIZE_OLD = "floating point word size"
+VAR_ELEM_TAB = "elem_var_tab"
+VAR_NSET_TAB = "nset_var_tab"
+VAR_SSET_TAB = "sset_var_tab"
+VAR_VALS_ELEM_VAR = "vals_elem_var%deb%d"
+VAR_VALS_NS_VAR = "vals_nset_var%dns%d"
+VAR_VALS_SS_VAR = "vals_sset_var%dss%d"
+
 
 # TODO put all the variable strings in here instead of hard coding them

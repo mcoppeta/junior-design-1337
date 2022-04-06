@@ -23,7 +23,7 @@ class ObjectSelector(ABC):
 class ElementBlockSelector(ObjectSelector):
     """Selects a subset of an element block's components."""
     # input a range
-    def __init__(self, exodus: Exodus, obj_id: int, elements=..., variables=..., attributes=..., properties=...):
+    def __init__(self, exodus: Exodus, obj_id: int, elements=..., variables=..., attributes=...):
         """
         Create a new selector object for an element block.
 
@@ -32,20 +32,18 @@ class ElementBlockSelector(ObjectSelector):
         :param elements: the range of elements to select (1-indexed)
         :param variables: the range of variables to select (1-indexed)
         :param attributes: the range of attributes to select (1-indexed)
-        :param properties: list of properties to select by name
         """
         ObjectSelector.__init__(self, exodus, obj_id, ELEMBLOCK)
         self.elements = elements
         self.variables = variables
         self.attributes = attributes
-        self.properties = properties
         # We ought to bounds check the inputs and also update the bounds if the exodus object changes
 
 
 class NodeSetSelector(ObjectSelector):
     """Selects a subset of a node set's components."""
     # input a range
-    def __init__(self, exodus: Exodus, obj_id: int, nodes=..., variables=..., properties=...):
+    def __init__(self, exodus: Exodus, obj_id: int, nodes=..., variables=...):
         """
         Create a new selector object for a node set.
 
@@ -53,18 +51,16 @@ class NodeSetSelector(ObjectSelector):
         :param obj_id: the id of the node set this represents
         :param nodes: the range of nodes to select (1-indexed)
         :param variables: the range of variables to select (1-indexed)
-        :param properties: list of properties to select by name
         """
         ObjectSelector.__init__(self, exodus, obj_id, NODESET)
         self.elements = nodes
         self.variables = variables
-        self.properties = properties
 
 
 class SideSetSelector(ObjectSelector):
     """Selects a subset of a side set's components."""
     # input a range
-    def __init__(self, exodus: Exodus, obj_id: int, elements=..., variables=..., properties=...):
+    def __init__(self, exodus: Exodus, obj_id: int, elements=..., variables=...):
         """
         Create a new selector object for a side set.
 
@@ -72,9 +68,24 @@ class SideSetSelector(ObjectSelector):
         :param obj_id: the id of the side set this represents
         :param elements: the range of elements to select (1-indexed)
         :param variables: the range of variables to select (1-indexed)
-        :param properties: list of properties to select by name
         """
         ObjectSelector.__init__(self, exodus, obj_id, SIDESET)
         self.elements = elements
         self.variables = variables
-        self.properties = properties
+
+
+class PropertySelector:
+    """Select a subset of object properties."""
+    def __init__(self, exodus: Exodus, eb_prop=..., ns_prop=..., ss_prop=...):
+        """
+        Create a new object property selector
+
+        :param exodus: the exodus object whose properties this refers to
+        :param eb_prop: list of all element block properties to keep by name
+        :param ns_prop: list of all node set properties to keep by name
+        :param ss_prop: list of all side set properties to keep by name
+        """
+        self.exodus = exodus
+        self.eb_prop = eb_prop
+        self.ns_prop = ns_prop
+        self.ss_prop = ss_prop
