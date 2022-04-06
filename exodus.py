@@ -1988,6 +1988,7 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_sideset(ss_id)
 
+
     def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
@@ -2003,14 +2004,30 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to split sideset")
         self.ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
     
+
+    def add_element(self, block_id, nodelist):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        return self.ledger.add_element(block_id, nodelist)
+
+
     def remove_element(self, elem_id):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.remove_element(elem_id)
+        return self.ledger.remove_element(elem_id)
+
+    def skin_element_block(self, block_id, skin_id, skin_name):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to skin element into new sideset")
+        self.ledger.skin_element_block(block_id, skin_id, skin_name)
         
     def write(self, path=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to write")
+        elif self.mode == 'a' and path is None:
+            raise AttributeError("Must specify a new path when in append mode")
+        elif self.mode == 'w' and path is not None:
+            raise AttributeError("Do not specify a new path in write mode. Initialization path will be used")
         self.ledger.write(path)
 
 
