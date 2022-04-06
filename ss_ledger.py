@@ -6,10 +6,18 @@ class SSLedger:
     def __init__(self, ex):
         self.ex = ex
 
-        # Create lists for sideset data
+        # Get number of sidesets in exodus file
+        # If the dimension does not exist, number of sidesets is 0
         self.num_ss = 0
         if ("num_side_sets" in ex.data.dimensions.keys()):
             self.num_ss = ex.data.dimensions["num_side_sets"].size
+
+        # Get number of sideset variables per sideset in exodus file
+        # If dimensions does not exist, the number of sideset variables is 0
+        self.num_ss_var = 0
+        if ("num_sset_var" in ex.data.dimensions.keys()):
+            self.num_ss_var = ex.data.dimensions["num_sset_var"].size
+
         self.ss_prop1 = [] # this is id for sideset
         self.ss_status = [] # status for each sideset
         self.ss_sizes = [] # number of sides in each sideset
@@ -18,24 +26,60 @@ class SSLedger:
         self.ss_dist_fact = [] # distribution factors in each sideset
         self.ss_elem = [] # internal elem ids of each sideset, each index in this is an array of elem ids
         self.ss_sides = [] # side ids of each sideset, each index in this is an array of side ids
+        self.ss_var_names = [] # names for each of the sideset variables
+        self.ss_vars = [] # variables for each sideset, each sideset can have multiple variables (will be 4d array)
+        self.ss_var_tab = None # this is 2d array that holds the "status" of all sideset variables and is num_ss by num_ss_var
 
 
         # Fill in lists with sideset data
         for i in range(self.num_ss):
-            self.ss_prop1.append(ex.data["ss_prop1"][i]) 
-            self.ss_status.append(ex.data["ss_status"][i])
-            self.ss_sizes.append(ex.data.dimensions["num_side_ss" + str(i + 1)].size)
-            if ("ss_names" in ex.data.variables):
+            print(i)
+            # load in ids for each sideset
+            if ("ss_prop1" in ex.data.variables):
+                self.ss_prop1.append(ex.data["ss_prop1"][i])
+            else:
+                self.ss_prop1.append(i + 1) # if id does not exist, just make one up and add it
+            
+            # load in status for each sideset
+            if ("ss_status" in ex.data.variables):
+                self.ss_status.append(ex.data["ss_status"][i])
+            else: 
+                self.ss_status.append(1) # if no status exists just set it to 1
+            
+            # load in size of each sideset
+            if ("num_side_ss" + str(i + 1) in ex.data.dimensions.keys()):
+                self.ss_sizes.append(ex.data.dimensions["num_side_ss" + str(i + 1)].size)
+            else:
+                self.ss_sizes.append(0) # if size variable does not exist, just set it to 0
+
+            # load in names of each sideset
+            if ("ss_names" in ex.data.variables): 
                 self.ss_names.append(util.lineparse(ex.data["ss_names"][i]))
             else:
-                self.ss_names.append("")
-            # if df do not exist, add size 0 arrays for them
-            self.num_dist_fact.append(ex.get_side_set_params(self.ss_prop1[i])[1])
-            self.ss_dist_fact.append(None)
+                self.ss_names.append("") # if name does not exist, just add empty string
+            
+            # load number of df for each sideset
+            if ("num_df" + str(i + 1) in ex.data.dimensions.keys()):
+                self.num_dist_fact.append(ex.get_side_set_params(self.ss_prop1[i])[1])
+            else:
+                self.num_dist_fact.append(0) # if num_df does not exist, just set to 0
+
+            # load in sideset variable names
+            if ("name_sset_var" in ex.data.variables):
+                self.ss_var_names.append(util.lineparse(ex.data["name_sset_var"][i]))
+            else:
+                self.ss_var_names.append("") # if variable names do not exist, just append empty string
+
+            # load in sideset variable statuses (tab), if they do not exist, just keep None value that was set at start
+            if ("sset_var_tab" in ex.data.variables):
+                self.ss_var_tab = ex.data["sset_var_tab"]
+
+            self.ss_vars.append(None) # this is placeholder for actually loading in data later
+            self.ss_dist_fact.append(None)  # this is place holder to be filled with real values later
             self.ss_elem.append(None) # this is place holder to be filled with real values later
             self.ss_sides.append(None) # this is place holder to be filled with real values later
 
-    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None):
+    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
 
         if (ss_id in self.ss_prop1):
             # already sideset with the same id
@@ -52,12 +96,19 @@ class SSLedger:
         map = self.ex.get_elem_id_map()
         converted_elem_ids = []
         for id in elem_ids:
-            internal_id = np.where(map == id)[0][0] + 1
+            internal_id = np.where(map == id)[0][0] + 1 # conversion, add 1 to the index to get internal id
             converted_elem_ids.append(internal_id)
 
         # if no distribution factors specified, just use 1
         if (dist_fact is None):
             dist_fact = np.ones(len(elem_ids))
+
+        # if no variables specified, just use 0
+        # this is a 3-d array of num_var by time_step by num_sides
+        if (variables is None and self.num_ss_var > 0):
+            # make array of all 0s
+            if ("time_step" in self.ex.data.dimensions.keys()):
+                variables = np.zeros([self.num_ss_var, self.ex.data.dimensions["time_step"].size,  len(side_ids)])
 
         # add sidesets to list
         self.ss_elem.append(converted_elem_ids)
@@ -68,6 +119,13 @@ class SSLedger:
         self.ss_names.append(ss_name)
         self.num_dist_fact.append(len(dist_fact))
         self.ss_dist_fact.append(dist_fact)
+        if (self.num_ss_var > 0):
+            self.ss_vars.append(variables)
+        # need to update ss_var_tab which is status of each variable
+        # append row of num_ss_var 1s to bottom of ss_var_tab array
+        if (self.num_ss_var > 0):
+            # If there are no sideset variables, no need to update the truth table
+            self.ss_var_tab = np.vstack([self.ss_var_tab, np.ones(self.num_ss_var)])
         self.num_ss += 1 
 
     #TODO Replaced start of this with find_sideset_num, we should check that this still works
@@ -83,9 +141,14 @@ class SSLedger:
         self.ss_sides.pop(ndx)
         self.num_dist_fact.pop(ndx)
         self.ss_dist_fact.pop(ndx)
+        self.ss_vars.pop(ndx)
+        # need to update sideset vars status in ss_var_tab
+        # remove row that corresponds to sideset
+        self.ss_var_tab = np.delete(self.ss_var_tab, ndx)
+        
         self.num_ss -= 1
 
-    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None):
+    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
         ndx = self.find_sideset_num(ss_id)
 
         # if not loaded in yet, need to load in 
@@ -96,6 +159,8 @@ class SSLedger:
             self.ss_elem[ndx] = np.array(elems)
             self.ss_sides[ndx] = np.array(sides)
             self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(ss_id))
+            for i in range(self.num_ss_var):
+                self.ss_vars[ndx].append(self.ex["vals_sset_var" + str(i + 1) + "ss" + str(ndx)])
 
         # need to convert elem_ids to internal ids
         map = self.ex.get_elem_id_map()
@@ -108,11 +173,19 @@ class SSLedger:
         self.ss_sides[ndx] = np.append(self.ss_sides[ndx], side_ids)
         if (dist_facts is None):
             dist_facts = np.ones(len(elem_ids))
-        
+
+        # need to update sideset variables
+        curr_ss_vars = self.ss_vars[ndx]
+        # add column of 0s to each 2d array corresponding to each variable
+        for i in range(self.num_ss_var):
+            var = curr_ss_vars[i]
+            var = np.hstack(var, np.zeros([1, self.ex.data.dimensions["time_step"].size]))
+
         self.ss_dist_fact[ndx] = np.append(self.ss_dist_fact[ndx], dist_facts)
         self.ss_sizes[ndx] += len(elem_ids)
         self.num_dist_fact[ndx] += len(dist_facts)
     
+    # NEED TO DEAL WITH SIDESET VARS
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
         ndx = self.find_sideset_num(ss_id)
 
@@ -124,6 +197,8 @@ class SSLedger:
             self.ss_elem[ndx] = np.array(elems)
             self.ss_sides[ndx] = np.array(sides)
             self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(ss_id))
+            for i in range(self.num_ss_var):
+                self.ss_vars[ndx].append(self.ex["vals_sset_var" + str(i + 1) + "ss" + str(ndx)])
 
         num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
 
@@ -144,7 +219,6 @@ class SSLedger:
         # if it matches one of the passed in sides, mark for removal
         elem_side_remove_ndx = []
         df_remove_ndx = []
-        print(num_df_per_side)
         for i in range(self.ss_sizes[ndx]):
             side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
             if (side_tuple in tuple_set):
@@ -152,9 +226,13 @@ class SSLedger:
                 adjusted_i = i * num_df_per_side # adjust i to account for multiple df
                 if (num_df_per_side != 0):
                     df_remove_ndx.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
-        
-        print(elem_side_remove_ndx)
-        print(df_remove_ndx)
+
+        # need to update sideset variables
+        curr_ss_vars = self.ss_vars[ndx]
+        # remove column of 1s from each 2d variable array of timestep x num_sides
+        for i in range(self.num_ss_var):
+            var = curr_ss_vars[i]
+            var = np.delete(var, elem_side_remove_ndx, axis=1)
 
 
         # remove all marked indices from arrays
@@ -301,6 +379,7 @@ class SSLedger:
         # if delete:
         #    self.remove_sideset(old_ss)
 
+    # NEED TO DEAL WITH SIDESET VARS
     def write(self, data):
 
         if (self.num_ss == 0):
@@ -326,12 +405,27 @@ class SSLedger:
         data.createVariable("ss_names", "|S1", dimensions=("num_side_sets", "len_name"))
         for i in range(len(self.ss_names)):
             data['ss_names'][i] = util.convert_string(self.ss_names[i] + str('\0'), self.ex.max_allowed_name_length)
+        
+        # write out num_sset_var dimension
+        if (self.num_ss_var > 0):
+            data.createDimension("num_sset_var", self.num_ss_var)
 
+        # write out sidset variable status truth table
+        if (self.num_ss_var > 0):
+            data.createVariable("sset_var_tab", "int32", dimensions=("num_side_sets", "num_sset_var"))
+            data["sset_var_tab"] = self.ss_var_tab[:]
+
+        # write out sideset variable names
+        if (self.num_ss_var > 0):
+            data.createVariable("name_sset_var", "|S1", dimensions=("num_sset_var", "len_name"))
+            for i in range(len(self.ss_var_names)):
+                data["name_sset_var"][i] = util.convert_string(self.ss_var_names[i] + str('\0'), self.ex.max_allowed_name_length)
+        
         for i in range(self.num_ss):
             # create elem, sides, and dist facts
             data.createVariable("elem_ss" + str(i+1), "int32", dimensions=("num_side_ss" + str(i+1)))
             data.createVariable("dist_fact_ss" + str(i+1), "int32", dimensions=("num_df_ss" + str(i+1)))
-            data.createVariable("side_ss" + str(i+1), "float64", dimensions=("num_side_ss" + str(i+1)))
+            data.createVariable("side_ss" + str(i+1), "int32", dimensions=("num_side_ss" + str(i+1)))
             
             # if None, just copy over old data, otherwise copy over new stuff
             if (self.ss_elem[i] is None):
@@ -348,6 +442,11 @@ class SSLedger:
                 data["dist_fact_ss" + str(i+1)][:] = self.ex.get_side_set_df(self.ss_prop1[i])[:]
             else:
                 data["dist_fact_ss" + str(i+1)][:] = self.ss_dist_fact[i][:]
+
+            # write out sideset variables
+            for j in range(self.num_ss_var):
+                data.createVariable("vals_sset_var" + str(j + 1) + "ss" + str(i + 1), "float64", dimensions=("time_step", "num_side_ss" + str(i + 1)))
+                data["vals_sset_var" + str(j + 1) + "ss" + str(i + 1)] = self.ss_vars[i][j]
 
     # (Based on find_nodeset_num in ns_ledger)
     def find_sideset_num(self, ss_id):
