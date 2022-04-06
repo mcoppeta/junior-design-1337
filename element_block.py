@@ -1,4 +1,5 @@
 import numpy as np
+import element_types
 
 class ElementBlock:
 
@@ -62,27 +63,13 @@ class ElementBlock:
 				data[row].append(0)
 			self.variables[variable] = np.array(data)
 
-	# Returns an array(num elements, num faces in element) containing the nodes of the faces of the element
-	def elem_iterate_faces(self, ndx):
-		# Get element 
-		elem = list(self.elements[ndx]) # list of node IDs
-
-		faces = []
-		if self.elem_type.upper() == "HEX" or self.elem_type.upper() == "HEX8":
-			faces.append([elem[0], elem[1], elem[5], elem[4]]) # face 1
-			faces.append([elem[1], elem[2], elem[6], elem[5]])
-			faces.append([elem[2], elem[3], elem[7], elem[6]])
-			faces.append([elem[0], elem[4], elem[7], elem[3]])
-			faces.append([elem[0], elem[3], elem[2], elem[1]])
-			faces.append([elem[4], elem[5], elem[6], elem[7]])
-
-		return faces
 
 	# Returns a list of the unique faces of the form [(ndx, face_number)]
 	def skin_block(self, shift):
 		all_faces = [] # size (num elements, faces in element)
+		elem_iterator = element_types.get_element_type(self.elem_type)
 		for i in range(len(self.elements)):
-			all_faces.append(self.elem_iterate_faces(i))
+			all_faces.append(elem_iterator.iterate_element_faces(self.elements[i]))
 
 		face_count_sorted = {} # str(face): count
 		for elem in all_faces:
