@@ -21,7 +21,7 @@ class Ledger:
     def __init__(self, ex):
         self.nodeset_ledger = NSLedger(ex)
         self.sideset_ledger = SSLedger(ex)
-        # self.element_ledger = ElemLedger(ex)
+        self.element_ledger = ElemLedger(ex)
         self.ex = ex
 
     def num_node_sets(self):
@@ -223,5 +223,5 @@ class Ledger:
 
         self.nodeset_ledger.write(out)
         self.sideset_ledger.write(out)
-        # self.element_ledger.write(out)
+        self.element_ledger.write(out)
         out.close()
