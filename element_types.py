@@ -28,6 +28,30 @@ class ElementType(ABC):
 
 
 
+class CIRCLE(ElementType):
+	def __init__(self):
+		self.type = "CIRCLE"
+		self.num_nodes = 1
+		self.face_map = {
+			1: [1]
+		}
+
+class BAR2(ElementType):
+	def __init__(self):
+		self.type = "BAR2"
+		self.num_nodes = 2
+		self.face_map = {
+			1: [1, 2]
+		}
+
+class BAR3(ElementType):
+	def __init__(self):
+		self.type = "BAR3"
+		self.num_nodes = 3
+		self.face_map = {
+			1: [1, 2, 3]
+		}
+
 class QUAD4(ElementType):
 	def __init__(self):
 		self.type = "QUAD4"
@@ -258,19 +282,25 @@ class PYRA13(ElementType):
 # Takes in uppercase string of type
 # Returns (class, num faces)
 # NOTE -> This is only for the purposes of face iteration (hence why hex9->hex8)
+# TODO -> The TYPEA+1 doesn't work because of num_nodes check (hex9 for ex)
 elem_types = {
+	"CIRCLE": CIRCLE,
+	"SPHERE": CIRCLE, #both 1 node
+	"BEAM": BAR2,
+	"BAR2": BAR2,
+	"BAR3": BAR3,
 	"QUAD": QUAD4, #Assumption
 	"QUAD4": QUAD4,
-	"QUAD5": QUAD4,
+	#"QUAD5": QUAD4,
 	"QUAD8": QUAD8,
-	"QUAD9": QUAD8,
-	"SHELL": SHELL4, #Assumption
-	"SHELL4": SHELL4,
-	"SHELL8": SHELL8,
-	"SHELL9": SHELL9, 
-	"TRI": TRI3, #Assumption
-	"TRI3": TRI3,
-	"TRI6": TRI6,
+	#"QUAD9": QUAD8,
+	##"SHELL": SHELL4, #Assumption
+	##"SHELL4": SHELL4,
+	##"SHELL8": SHELL8,
+	##"SHELL9": SHELL9, 
+	##"TRI": TRI3, #Assumption
+	##"TRI3": TRI3,
+	##"TRI6": TRI6,
 	"TRISHELL": TRISHELL3, #Assumption
 	"TRISHELL3": TRISHELL3,
 	"TRISHELL6": TRISHELL6,
@@ -280,18 +310,18 @@ elem_types = {
 	"WEDGE": WEDGE6, #Assumption
 	"WEDGE6": WEDGE6,
 	"WEDGE15": WEDGE15,
-	"WEDGE16": WEDGE15,
+	#"WEDGE16": WEDGE15,
 	"WEDGE20": WEDGE20, # Assumption
-	"WEDGE21": WEDGE20,
+	#"WEDGE21": WEDGE20,
 	"HEX": HEX8, #Assumption
 	"HEX8": HEX8,
-	"HEX9": HEX8,
+	#"HEX9": HEX8,
 	"HEX20": HEX20,
 	"HEX27": HEX27,
 	"PYRA": PYRA5, #Assumption
 	"PYRA5": PYRA5,
 	"PYRA13": PYRA13,
-	"PYRA14": PYRA13
+	#"PYRA14": PYRA13
 }
 
 # Returns an object of type ElementType
