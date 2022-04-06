@@ -218,10 +218,6 @@ class Ledger:
         # copy variables
         for var in old.variables:
 
-            # TEMP
-            if var[:6] == 'attrib':
-                continue
-
             # ignore variables that will be written by ns ledger
             if var[:3] == "ns_" or var[:7] == "node_ns" \
                     or var[:12] == "dist_fact_ns":
