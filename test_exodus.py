@@ -12,7 +12,7 @@ pytestmark = pytest.mark.filterwarnings('ignore')
 
 def test_open():
     # Test that we can open a file without any errors
-    exofile = Exodus('sample-files/disk_out_ref.ex2', 'r')
+    exofile = Exodus('sample-files/can.ex2', 'r')
     assert exofile.data
     exofile.close()
 
@@ -212,6 +212,28 @@ def test_get_coord_z():
     # Node ID 563 z coord: .25
     assert zcoords[562] == .25
     exofile.close()
+
+
+def test_write_exceptions(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.exo', 'w')
+    exofile.add_nodeset([1,2,3], 30, "This is a ns")
+
+    with pytest.raises(AttributeError):
+        exofile.write(str(tmpdir) + '\\newfile.exo')
+
+    exofile.write()
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + '\\test.exo', 'a')
+    exofile.remove_nodeset(30)
+
+    with pytest.raises(AttributeError):
+        exofile.write()
+
+    # Uncomment when Element Ledger bug fixes are pushed
+    # exofile.write(str(tmpdir) + '\\newfile.exo')
+    exofile.close()
+
 
 
 #############################################################################
@@ -423,7 +445,7 @@ def test_basic_ns_append(tmpdir):
     exofile = Exodus('sample-files/can.ex2', 'a', clobber=False)
     exofile.add_nodeset([1, 2, 3, 4, 5], 10)
 
-    with pytest.raises(OSError):
+    with pytest.raises(AttributeError):
         exofile.write()
 
     exofile.write(str(tmpdir) + '\\test.ex2')
