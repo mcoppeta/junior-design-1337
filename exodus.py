@@ -290,7 +290,7 @@ class Exodus:
     def num_info(self):
         """Number of info records."""
         try:
-            result = self.data.dimensions['num_info'].size
+            result = self.data.dimensions[DIM_NUM_INFO].size
         except KeyError:
             result = 0
         return result
@@ -299,7 +299,7 @@ class Exodus:
     def num_dim(self):
         """Number of dimensions (coordinate axes) used in the model."""
         try:
-            return self.data.dimensions['num_dim'].size
+            return self.data.dimensions[DIM_NUM_DIM].size
         except KeyError:
             raise KeyError("Database dimensionality could not be found")
 
@@ -307,7 +307,7 @@ class Exodus:
     def num_nodes(self):
         """Number of nodes stored in this database."""
         try:
-            result = self.data.dimensions['num_nodes'].size
+            result = self.data.dimensions[DIM_NUM_NODES].size
         except KeyError:
             # This and following functions don't actually error in C, they return 0. I assume there's a good reason.
             result = 0
@@ -317,7 +317,7 @@ class Exodus:
     def num_elem(self):
         """Number of elements stored in this database."""
         try:
-            result = self.data.dimensions['num_elem'].size
+            result = self.data.dimensions[DIM_NUM_ELEM].size
         except KeyError:
             result = 0
         return result
@@ -326,7 +326,7 @@ class Exodus:
     def num_elem_blk(self):
         """Number of element blocks stored in this database."""
         try:
-            result = self.data.dimensions['num_el_blk'].size
+            result = self.data.dimensions[DIM_NUM_ELBLOCK].size
         except KeyError:
             result = 0
         return result
@@ -338,7 +338,7 @@ class Exodus:
             return self.ledger.num_node_sets()
 
         try:
-            result = self.data.dimensions['num_node_sets'].size
+            result = self.data.dimensions[DIM_NUM_NS].size
         except KeyError:
             result = 0
         return result
@@ -347,7 +347,7 @@ class Exodus:
     def num_side_sets(self):
         """Number of side sets stored in this database."""
         try:
-            result = self.data.dimensions['num_side_sets'].size
+            result = self.data.dimensions[DIM_NUM_SS].size
         except KeyError:
             result = 0
         return result
@@ -356,20 +356,33 @@ class Exodus:
     def num_time_steps(self):
         """Number of time steps stored in this database."""
         try:
-            return self.data.dimensions['time_step'].size
+            return self.data.dimensions[DIM_NUM_TIME_STEP].size
         except KeyError:
             raise KeyError("Number of database time steps could not be found")
 
-    # TODO Similar to above, all of the _PROP functions (ctrl+f ex_get_num_props)
+    @property
+    def num_elem_block_prop(self):
+        """Number of element block properties in this database."""
+        return self._get_num_object_properties(VAR_EB_PROP)
 
-    # Are these two functions below for order maps?
-    # These may not be supported by our library anyway.
+    @property
+    def num_node_set_prop(self):
+        """Number of node set properties in this database."""
+        return self._get_num_object_properties(VAR_NS_PROP)
+
+    @property
+    def num_side_set_prop(self):
+        """Number of side set properties in this database."""
+        return self._get_num_object_properties(VAR_SS_PROP)
+
+    # TODO Are these two functions below for order maps?
+    #  These may not be supported by our library anyway.
 
     # Same as C
     @property
     def num_elem_map(self):
         try:
-            result = self.data.dimensions['num_elem_maps'].size
+            result = self.data.dimensions[DIM_NUM_ELEM_MAP].size
         except KeyError:
             result = 0
         return result
@@ -378,7 +391,7 @@ class Exodus:
     @property
     def num_node_map(self):
         try:
-            result = self.data.dimensions['num_node_maps'].size
+            result = self.data.dimensions[DIM_NUM_NODE_MAPS].size
         except KeyError:
             result = 0
         return result
@@ -387,7 +400,7 @@ class Exodus:
     def num_global_var(self):
         """Number of global variables."""
         try:
-            return self.data.dimensions['num_glo_var'].size
+            return self.data.dimensions[DIM_NUM_GLO_VAR].size
         except KeyError:
             return 0
 
@@ -395,7 +408,7 @@ class Exodus:
     def num_node_var(self):
         """Number of nodal variables."""
         try:
-            return self.data.dimensions['num_nod_var'].size
+            return self.data.dimensions[DIM_NUM_NOD_VAR].size
         except KeyError:
             return 0
 
@@ -403,7 +416,7 @@ class Exodus:
     def num_elem_block_var(self):
         """Number of elemental variables."""
         try:
-            return self.data.dimensions['num_elem_var'].size
+            return self.data.dimensions[DIM_NUM_ELEM_VAR].size
         except KeyError:
             return 0
 
@@ -411,7 +424,7 @@ class Exodus:
     def num_node_set_var(self):
         """Number of node set variables."""
         try:
-            return self.data.dimensions['num_nset_var'].size
+            return self.data.dimensions[DIM_NUM_NS_VAR].size
         except KeyError:
             return 0
 
@@ -419,7 +432,7 @@ class Exodus:
     def num_side_set_var(self):
         """Number of side set variables."""
         try:
-            return self.data.dimensions['num_sset_var'].size
+            return self.data.dimensions[DIM_NUM_SS_VAR].size
         except KeyError:
             return 0
 
@@ -439,11 +452,11 @@ class Exodus:
         if num_elem == 0:
             warnings.warn("Cannot retrieve an element order map if there are no elements!")
             return
-        if 'elem_map' not in self.data.variables:
+        if VAR_ELEM_MAP not in self.data.variables:
             # Return a default array from 1 to the number of elements
             warnings.warn("There is no element order map in this database!")
             return numpy.arange(1, num_elem + 1, dtype=self.int)
-        return self.data.variables['elem_map'][:]
+        return self.data.variables[VAR_ELEM_MAP][:]
 
     ###########
     # ID maps #
@@ -475,11 +488,11 @@ class Exodus:
             raise ValueError("start index must be greater than 0")
         if start + count - 1 > num_nodes:
             raise ValueError("start index + node count is larger than the total number of nodes")
-        if 'node_num_map' not in self.data.variables:
+        if VAR_NODE_NUM_MAP not in self.data.variables:
             # Return a default array from start to start + count exclusive
             warnings.warn("There is no node id map in this database!")
             return numpy.arange(start, start + count, dtype=self.int)
-        return self.data.variables['node_num_map'][start - 1:start + count - 1]
+        return self.data.variables[VAR_NODE_NUM_MAP][start - 1:start + count - 1]
 
     def get_elem_id_map(self):
         """Return the element ID map for this database."""
@@ -500,11 +513,11 @@ class Exodus:
             raise ValueError("start index must be greater than 0")
         if start + count - 1 > num_elem:
             raise ValueError("start index + element count is larger than the total number of elements")
-        if 'elem_num_map' not in self.data.variables:
+        if VAR_ELEM_NUM_MAP not in self.data.variables:
             # Return a default array from start to start + count exclusive
             warnings.warn("There is no element id map in this database!")
             return numpy.arange(start, start + count, dtype=self.int)
-        return self.data.variables['elem_num_map'][start - 1:start + count - 1]
+        return self.data.variables[VAR_ELEM_NUM_MAP][start - 1:start + count - 1]
 
     def get_node_set_id_map(self):
         """Returns the id map for node sets (ns_prop1)."""
@@ -512,7 +525,7 @@ class Exodus:
             return self.ledger.get_node_set_id_map()
 
         try:
-            table = self.data.variables['ns_prop1'][:]
+            table = self.data.variables[VAR_NS_ID_MAP][:]
         except KeyError:
             raise KeyError("Node set id map is missing from this database!".format(type))
         return table
@@ -520,7 +533,7 @@ class Exodus:
     def get_side_set_id_map(self):
         """Returns the id map for side sets (ss_prop1)."""
         try:
-            table = self.data.variables['ss_prop1'][:]
+            table = self.data.variables[VAR_SS_ID_MAP][:]
         except KeyError:
             raise KeyError("Side set id map is missing from this database!".format(type))
         return table
@@ -528,7 +541,7 @@ class Exodus:
     def get_elem_block_id_map(self):
         """Returns the id map for element blocks (eb_prop1)."""
         try:
-            table = self.data.variables['eb_prop1'][:]
+            table = self.data.variables[VAR_ELBLOCK_ID_MAP][:]
         except KeyError:
             raise KeyError("Element block id map is missing from this database!".format(type))
         return table
@@ -569,7 +582,7 @@ class Exodus:
     def get_all_times(self):
         """Returns an array of all time values from all time steps from this database."""
         try:
-            result = self.data.variables['time_whole'][:]
+            result = self.data.variables[VAR_TIME_WHOLE][:]
         except KeyError:
             raise KeyError("Could not retrieve time steps from database!")
         return result
@@ -584,13 +597,8 @@ class Exodus:
         if num_steps <= 0:
             raise ValueError("There are no time steps in this database!")
         if time_step <= 0 or time_step > num_steps:
-            raise ValueError("Time step out of range. Got {}"
-                             .format(time_step))
-        try:
-            result = self.data.variables['time_whole'][time_step - 1]
-        except KeyError:
-            raise KeyError("Could not retrieve time steps from database!")
-        return result
+            raise ValueError("Time step out of range. Got {}".format(time_step))
+        return self.get_all_times()[time_step - 1]
 
     def get_nodal_var_at_time(self, time_step, var_index):
         """
@@ -634,14 +642,14 @@ class Exodus:
             # All vars stored in one variable
             try:
                 # Do not subtract 1 from end (inclusive)
-                result = self.data.variables['vals_nod_var'][
+                result = self.data.variables[VAR_VALS_NOD_VAR_SMALL][
                          start_time_step - 1:end_time_step, var_index - 1, start_index - 1:start_index + count - 1]
             except KeyError:
                 raise KeyError("Could not find the nodal variables in this database!")
         else:
             # Each var to its own variable
             try:
-                result = self.data.variables['vals_nod_var%d' % var_index][start_time_step - 1:end_time_step, :]
+                result = self.data.variables[VAR_VALS_NOD_VAR_LARGE % var_index][start_time_step - 1:end_time_step, :]
             except KeyError:
                 raise KeyError("Could not find nodal variable {} in this database!".format(var_index))
         return result
@@ -669,7 +677,7 @@ class Exodus:
             raise ValueError("End time step out of range. Got {}".format(end_time_step))
         try:
             # Do not subtract 1 from end (inclusive)
-            result = self.data.variables['vals_glo_var'][start_time_step - 1:end_time_step, :]
+            result = self.data.variables[VAR_VALS_GLO_VAR][start_time_step - 1:end_time_step, :]
         except KeyError:
             raise KeyError("Could not find global variables in this database!")
         return result
@@ -698,7 +706,7 @@ class Exodus:
         if var_index <= 0 or var_index > self.num_global_var:
             raise ValueError("Variable index out of range. Got {}".format(var_index))
         try:
-            result = self.data.variables['vals_glo_var'][start_time_step - 1:end_time_step, var_index - 1]
+            result = self.data.variables[VAR_VALS_GLO_VAR][start_time_step - 1:end_time_step, var_index - 1]
         except KeyError:
             raise KeyError("Could not find global variables in this database!")
         return result
@@ -902,15 +910,15 @@ class Exodus:
         :return: a list of variable names
         """
         if var_type == GLOBAL_VAR:
-            varname = 'name_glo_var'
+            varname = VAR_NAME_GLO_VAR
         elif var_type == NODAL_VAR:
-            varname = 'name_nod_var'
+            varname = VAR_NAME_NOD_VAR
         elif var_type == ELEMENTAL_VAR:
-            varname = 'name_elem_var'
+            varname = VAR_NAME_ELEM_VAR
         elif var_type == NODESET_VAR:
-            varname = 'name_nset_var'
+            varname = VAR_NAME_NS_VAR
         elif var_type == SIDESET_VAR:
-            varname = 'name_sset_var'
+            varname = VAR_NAME_SS_VAR
         else:
             raise ValueError("Invalid variable type {}!".format(var_type))
         try:
@@ -995,9 +1003,9 @@ class Exodus:
         if count < 0:
             raise ValueError("Count must be a positive integer")
         try:
-            set = self.data.variables['node_ns%d' % internal_id][start - 1:start + count - 1]
+            set = self.data.variables[VAR_NODE_NS % internal_id][start - 1:start + count - 1]
         except KeyError:
-            raise KeyError("Failed to retrieve node set with id {} ('{}')".format(obj_id, 'node_ns%d' % internal_id))
+            raise KeyError("Failed to retrieve node set with id {} ('{}')".format(obj_id, VAR_NODE_NS % internal_id))
         return set
 
     def _int_get_partial_node_set_df(self, obj_id, internal_id, start, count):
@@ -1020,7 +1028,7 @@ class Exodus:
         if count < 0:
             raise ValueError("Count must be a positive integer")
         if ('dist_fact_ns%d' % internal_id) in self.data.variables:
-            set = self.data.variables['dist_fact_ns%d' % internal_id][start - 1:start + count - 1]
+            set = self.data.variables[VAR_DF_NS % internal_id][start - 1:start + count - 1]
         else:
             warnings.warn("This database does not contain dist factors for node set {}".format(obj_id))
             set = []
@@ -1040,11 +1048,11 @@ class Exodus:
         if num_sets == 0:
             raise KeyError("No node sets are stored in this database!")
         try:
-            num_entries = self.data.dimensions['num_nod_ns%d' % internal_id].size
+            num_entries = self.data.dimensions[DIM_NUM_NODE_NS % internal_id].size
         except KeyError:
             raise KeyError("Failed to retrieve number of entries in node set with id {} ('{}')"
-                           .format(obj_id, 'num_nod_ns%d' % internal_id))
-        if ('dist_fact_ns%d' % internal_id) in self.data.variables:
+                           .format(obj_id, DIM_NUM_NODE_NS % internal_id))
+        if (VAR_DF_NS % internal_id) in self.data.variables:
             num_df = num_entries
         else:
             num_df = 0
@@ -1115,15 +1123,15 @@ class Exodus:
         if count < 0:
             raise ValueError("Count must be a positive integer")
         try:
-            elmset = self.data.variables['elem_ss%d' % internal_id][start - 1:start + count - 1]
+            elmset = self.data.variables[VAR_ELEM_SS % internal_id][start - 1:start + count - 1]
         except KeyError:
             raise KeyError(
-                "Failed to retrieve elements of side set with id {} ('{}')".format(obj_id, 'elem_ss%d' % internal_id))
+                "Failed to retrieve elements of side set with id {} ('{}')".format(obj_id, VAR_ELEM_SS % internal_id))
         try:
-            sset = self.data.variables['side_ss%d' % internal_id][start - 1:start + count - 1]
+            sset = self.data.variables[VAR_SIDE_SS % internal_id][start - 1:start + count - 1]
         except KeyError:
             raise KeyError(
-                "Failed to retrieve sides of side set with id {} ('{}')".format(obj_id, 'side_ss%d' % internal_id))
+                "Failed to retrieve sides of side set with id {} ('{}')".format(obj_id, VAR_SIDE_SS % internal_id))
         return elmset, sset
 
     def _int_get_partial_side_set_df(self, obj_id, internal_id, start, count):
@@ -1145,8 +1153,8 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        if ('dist_fact_ss%d' % internal_id) in self.data.variables:
-            set = self.data.variables['dist_fact_ss%d' % internal_id][start - 1:start + count - 1]
+        if (VAR_DF_SS % internal_id) in self.data.variables:
+            set = self.data.variables[VAR_DF_SS % internal_id][start - 1:start + count - 1]
         else:
             warnings.warn("This database does not contain dist factors for side set {}".format(obj_id))
             set = []
@@ -1166,12 +1174,12 @@ class Exodus:
         if num_sets == 0:
             raise KeyError("No side sets are stored in this database!")
         try:
-            num_entries = self.data.dimensions['num_side_ss%d' % internal_id].size
+            num_entries = self.data.dimensions[DIM_NUM_SIDE_SS % internal_id].size
         except KeyError:
             raise KeyError("Failed to retrieve number of entries in side set with id {} ('{}')"
-                           .format(obj_id, 'num_side_ss%d' % internal_id))
-        if 'num_df_ss%d' % internal_id in self.data.dimensions:
-            num_df = self.data.dimensions['num_df_ss%d' % internal_id].size
+                           .format(obj_id, DIM_NUM_SIDE_SS % internal_id))
+        if DIM_NUM_DF_SS % internal_id in self.data.dimensions:
+            num_df = self.data.dimensions[DIM_NUM_DF_SS % internal_id].size
         else:
             num_df = 0
         return num_entries, num_df
@@ -1240,16 +1248,16 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
-            num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
+        if (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
+            num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
             num_node_entry = 0
         if num_node_entry > 0:
             try:
-                result = self.data.variables['connect%d' % internal_id][start - 1:start + count - 1]
+                result = self.data.variables[VAR_CONNECT % internal_id][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
-                               .format(obj_id, 'connect%d' % internal_id))
+                               .format(obj_id, VAR_CONNECT % internal_id))
         else:
             result = []
         return result
@@ -1266,25 +1274,25 @@ class Exodus:
         """
         # TODO this will be way faster with caching
         try:
-            num_entries = self.data.dimensions['num_el_in_blk%d' % internal_id].size
+            num_entries = self.data.dimensions[DIM_NUM_EL_IN_BLK % internal_id].size
         except KeyError:
             raise KeyError("Failed to retrieve number of elements in element block with id {} ('{}')"
-                           .format(obj_id, 'num_el_in_blk%d' % internal_id))
-        if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
-            num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
+                           .format(obj_id, DIM_NUM_EL_IN_BLK % internal_id))
+        if (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
+            num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
             num_node_entry = 0
         try:
             if num_node_entry > 0:
-                connect = self.data.variables['connect%d' % internal_id]
-                topology = connect.getncattr('elem_type')
+                connect = self.data.variables[VAR_CONNECT % internal_id]
+                topology = connect.getncattr(ATTR_ELEM_TYPE)
             else:
                 topology = None
         except KeyError:
             raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
-                           .format(obj_id, 'connect%d' % internal_id))
-        if ('num_att_in_blk%d' % internal_id) in self.data.dimensions:
-            num_att_blk = self.data.dimensions['num_att_in_blk%d' % internal_id].size
+                           .format(obj_id, VAR_CONNECT % internal_id))
+        if (DIM_NUM_ATT_IN_BLK % internal_id) in self.data.dimensions:
+            num_att_blk = self.data.dimensions[DIM_NUM_ATT_IN_BLK % internal_id].size
         else:
             num_att_blk = 0
         return num_entries, num_node_entry, topology, num_att_blk
@@ -1326,17 +1334,17 @@ class Exodus:
         names = []
         if obj_type == NODESET:
             try:
-                names = self.data.variables['ns_names']
+                names = self.data.variables[VAR_NS_NAMES]
             except KeyError:
                 warnings.warn("This database does not contain node set names.")
         elif obj_type == SIDESET:
             try:
-                names = self.data.variables['ss_names']
+                names = self.data.variables[VAR_SS_NAMES]
             except KeyError:
                 warnings.warn("This database does not contain side set names.")
         elif obj_type == ELEMBLOCK:
             try:
-                names = self.data.variables['eb_names']
+                names = self.data.variables[VAR_EB_NAMES]
             except KeyError:
                 warnings.warn("This database does not contain element block names.")
         else:
@@ -1401,8 +1409,8 @@ class Exodus:
         FOR INTERNAL USE ONLY!
         """
         # Some databases don't have attributes
-        if ('num_att_in_blk%d' % internal_id) in self.data.dimensions:
-            num = self.data.dimensions['num_att_in_blk%d' % internal_id].size
+        if (DIM_NUM_ATT_IN_BLK % internal_id) in self.data.dimensions:
+            num = self.data.dimensions[DIM_NUM_ATT_IN_BLK % internal_id].size
         else:
             # No need to warn. If there are no attributes, the number is 0...
             num = 0
@@ -1426,7 +1434,7 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        varname = 'attrib%d' % internal_id
+        varname = VAR_ELEM_ATTRIB % internal_id
         if varname in self.data.variables:
             result = self.data.variables[varname][start - 1:start + count - 1, :]
         else:
@@ -1457,7 +1465,7 @@ class Exodus:
         if num_attrib > 0:  # faster to check this than if the variable exists like in the function above this one
             if attrib_index < 1 or attrib_index > num_attrib:
                 raise ValueError("Attribute index out of range. Got {}".format(attrib_index))
-            result = self.data.variables['attrib%d' % internal_id][start - 1:start + count - 1, attrib_index - 1]
+            result = self.data.variables[VAR_ELEM_ATTRIB % internal_id][start - 1:start + count - 1, attrib_index - 1]
         else:
             result = []
             warnings.warn("Element block {} has no attributes.".format(obj_id))
@@ -1515,7 +1523,7 @@ class Exodus:
         if num_attrib == 0:
             warnings.warn("Element block {} has no attributes.".format(obj_id))
         else:
-            varname = 'attrib_name%d' % internal_id
+            varname = VAR_ELEM_ATTRIB_NAME % internal_id
             # Older datasets don't have attribute names
             if varname in self.data.variables:
                 names = self.data.variables[varname][:]
@@ -1533,8 +1541,8 @@ class Exodus:
     # Object properties #
     #####################
 
-    # We need to know the number of properties in advance for _get_object_property_names.
-    # Since this function is here, we might as well use it elsewhere too.
+    # This method contains a general algorithm for counting the number of properties an object has.
+    # This is used by the num_*_prop properties which are in turn used by _get_object_property_names
     def _get_num_object_properties(self, varname):
         """
         Returns the number of properties an object has.
@@ -1589,11 +1597,11 @@ class Exodus:
         :return: array containing values of the property for objects of the given type
         """
         if obj_type == NODESET:
-            varname = 'ns_prop%d'
+            varname = VAR_NS_PROP
         elif obj_type == SIDESET:
-            varname = 'ss_prop%d'
+            varname = VAR_SS_PROP
         elif obj_type == ELEMBLOCK:
-            varname = 'eb_prop%d'
+            varname = VAR_EB_PROP
         else:
             raise ValueError("Invalid variable type {}!".format(obj_type))
         prop = []
@@ -1602,7 +1610,7 @@ class Exodus:
         n = 1
         while True:
             if varname % n in self.data.variables:
-                propname = self.data.variables[varname % n].getncattr('name')
+                propname = self.data.variables[varname % n].getncattr(ATTR_NAME)
                 if propname == name:
                     # we've found our property
                     prop = self.data.variables[varname % n][:]
@@ -1637,17 +1645,20 @@ class Exodus:
         :return: array of property names
         """
         if obj_type == NODESET:
-            varname = 'ns_prop%d'
+            varname = VAR_NS_PROP
+            num_props = self.num_node_set_prop
         elif obj_type == SIDESET:
-            varname = 'ss_prop%d'
+            varname = VAR_SS_PROP
+            num_props = self.num_side_set_prop
         elif obj_type == ELEMBLOCK:
-            varname = 'eb_prop%d'
+            varname = VAR_EB_PROP
+            num_props = self.num_elem_block_prop
         else:
             raise ValueError("Invalid variable type {}!".format(obj_type))
-        num_props = self._get_num_object_properties(varname)
+        # num_props = self._get_num_object_properties(varname)
         result = numpy.empty([num_props], self._MAX_NAME_LENGTH_T)
         for n in range(num_props):
-            result[n] = self.data.variables[varname % (n + 1)].getncattr('name')
+            result[n] = self.data.variables[varname % (n + 1)].getncattr(ATTR_NAME)
         return result
 
     def get_node_set_property_names(self):
@@ -1688,22 +1699,22 @@ class Exodus:
         large = self.large_model
         if not large:
             try:
-                coord = self.data.variables['coord'][:, start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD][:, start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve nodal coordinate array!")
         else:
             try:
-                coordx = self.data.variables['coordx'][start - 1:start + count - 1]
+                coordx = self.data.variables[VAR_COORD_X][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve x axis nodal coordinate array!")
             if dim_cnt > 1:
                 try:
-                    coordy = self.data.variables['coordy'][start - 1:start + count - 1]
+                    coordy = self.data.variables[VAR_COORD_Y][start - 1:start + count - 1]
                 except KeyError:
                     raise KeyError("Failed to retrieve y axis nodal coordinate array!")
                 if dim_cnt > 2:
                     try:
-                        coordz = self.data.variables['coordz'][start - 1:start + count - 1]
+                        coordz = self.data.variables[VAR_COORD_Z][start - 1:start + count - 1]
                     except KeyError:
                         raise KeyError("Failed to retrieve z axis nodal coordinate array!")
                     coord = numpy.array([coordx, coordy, coordz])
@@ -1733,12 +1744,12 @@ class Exodus:
         large = self.large_model
         if not large:
             try:
-                coord = self.data.variables['coord'][0][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD][0][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve nodal coordinate array!")
         else:
             try:
-                coord = self.data.variables['coordx'][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD_X][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve x axis nodal coordinate array!")
         return coord
@@ -1764,12 +1775,12 @@ class Exodus:
         large = self.large_model
         if not large:
             try:
-                coord = self.data.variables['coord'][1][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD][1][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve nodal coordinate array!")
         else:
             try:
-                coord = self.data.variables['coordy'][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD_Y][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve y axis nodal coordinate array!")
         return coord
@@ -1795,12 +1806,12 @@ class Exodus:
         large = self.large_model
         if not large:
             try:
-                coord = self.data.variables['coord'][2][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD][2][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve nodal coordinate array!")
         else:
             try:
-                coord = self.data.variables['coordz'][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD_Z][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve z axis nodal coordinate array!")
         return coord
@@ -1809,7 +1820,7 @@ class Exodus:
         """Returns an array containing the names of the coordinate axes in this database."""
         dim_cnt = self.num_dim
         try:
-            names = self.data.variables['coor_names']
+            names = self.data.variables[VAR_COORD_NAMES]
         except KeyError:
             raise KeyError("Failed to retrieve coordinate name array!")
         result = util.arrparse(names, dim_cnt, self._MAX_NAME_LENGTH_T)
@@ -1825,7 +1836,7 @@ class Exodus:
         result = numpy.empty([num], Exodus._MAX_LINE_LENGTH_T)
         if num > 0:
             try:
-                infos = self.data.variables['info_records']
+                infos = self.data.variables[VAR_INFO]
             except KeyError:
                 raise KeyError("Failed to retrieve info records from database!")
             for i in range(num):
@@ -2062,29 +2073,42 @@ def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
     output = nc.Dataset(path, 'w')
     output.set_fill_off()
 
-    # Metadata
-    output.setncattr_string(ATTR_TITLE, nc.stringtoarr(title, exodus.max_string_length + 1))
+    output.setncattr_string(ATTR_TITLE, title[0:exodus.max_line_length])
     output.createDimension(DIM_NAME_LENGTH, exodus.max_allowed_name_length + 1)
     output.setncattr(ATTR_MAX_NAME_LENGTH, exodus.max_used_name_length + 1)
+    output.createDimension(DIM_STRING_LENGTH, exodus.max_string_length + 1)
+    output.createDimension(DIM_LINE_LENGTH, exodus.max_line_length + 1)
     output.setncattr(ATTR_API_VER, exodus.api_version)
     output.setncattr(ATTR_VERSION, exodus.version)
     output.setncattr(ATTR_FILE_SIZE, exodus.large_model)
     output.setncattr(ATTR_64BIT_INT, exodus.int64_status)
     output.setncattr(ATTR_WORD_SIZE, exodus.word_size)
+    output.createDimension(DIM_NUM_DIM, exodus.num_dim)
+    # This function will not carry over order maps because this library doesn't officially support them
+    #  and it might make sense to remake those maps for a new model anyway.
 
     # QA records
     output.createDimension(DIM_FOUR, 4)
-    output.createDimension(DIM_STRING_LENGTH, exodus.max_string_length + 1)
-    output.createDimension(DIM_LINE_LENGTH, exodus.max_line_length + 1)
     num_qa_rec = exodus.num_qa + 1
     output.createDimension(DIM_NUM_QA, num_qa_rec)
     var = output.createVariable(VAR_QA, '|S1', (DIM_NUM_QA, DIM_FOUR, DIM_STRING_LENGTH))
     qa = numpy.empty((num_qa_rec, 4, exodus.max_string_length + 1), '|S1')  # add 1 for null terminator
-    # for i in range(exodus.num_qa):
-    #     qa[i] = exodus.data.variables[VAR_QA][i]
-    qa[0:exodus.num_qa] = exodus.data.variables[VAR_QA][:] # does this work?
+    if VAR_QA in exodus.data.variables:
+        qa[0:exodus.num_qa] = exodus.data.variables[VAR_QA][:]
     qa[-1] = util.generate_qa_rec(exodus.max_string_length)
     var[:] = qa
+
+    # Info records
+    output.createDimension(DIM_NUM_INFO, exodus.num_info)
+    # Don't create a variable if there are no info recs
+    if exodus.num_info > 0:
+        var = output.createVariable(VAR_INFO, '|S1', (DIM_NUM_INFO, DIM_LINE_LENGTH))
+        # Handle this potential error
+        if VAR_INFO in exodus.data.variables:
+            var[:] = exodus.data.variables[VAR_INFO][:]
+
+    # Easy stuff done. now its selector time
+
 
     # Every block/set can have its own variables
     # The truth table shows which block has which variables
@@ -2094,9 +2118,8 @@ def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/cube_with_data.exo", 'r')
-    # output_subset(ex, [], [], [], [], "sample-files/outputtest.ex2", "output test")
-    # print(ex.data)
-    # ds = nc.Dataset("sample-files/outputtest.ex2")
-    # print(ds)
-    print(ex.get_side_set_truth_table())
+    output_subset(ex, [], [], [], PropertySelector(ex), [], "sample-files/outputtest.ex2", "output test")
+    print(ex.data.variables[VAR_INFO])
+    ds = nc.Dataset("sample-files/outputtest.ex2")
+    print(ds.variables[VAR_INFO])
     ex.close()
