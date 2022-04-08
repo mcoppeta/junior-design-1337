@@ -183,9 +183,8 @@ class ElemLedger:
         
         return converted_unique_faces
 
-
-    # Writes out element data to the new dataset
-    def write(self, data):
+    # Writes out element dimension data to the new dataset
+    def write_dimensions(self, data):
 
         # Creates dimension for number of elements
         elem_count = 0
@@ -196,12 +195,8 @@ class ElemLedger:
         # Create dimension for number of element blocks
         data.createDimension("num_el_blk", len(self.blocks))
 
-        names = []
-        eb_status = []
         for i in self.blocks:
             blk_num = i.blk_num
-            eb_status.append(i.get_status())
-            names.append(util.convert_string(i.blk_name + str('\0'), self.ex.max_allowed_name_length))
 
             # Creates dimension for how many elements are in this element block
             el_in_blk_title = "num_el_in_blk{}".format(blk_num)
@@ -213,6 +208,16 @@ class ElemLedger:
 
         # Creates dimension for the number of elemental variables
         data.createDimension("num_elem_var", self.num_elem_var)
+
+
+    # Writes out element variable data to the new dataset
+    def write_variables(self, data):
+        names = []
+        eb_status = []
+        for i in self.blocks:
+            blk_num = i.blk_num
+            eb_status.append(i.get_status())
+            names.append(util.convert_string(i.blk_name + str('\0'), self.ex.max_allowed_name_length))  
 
         data.createVariable("eb_status", "int32", dimensions=("num_el_blk"))
         data['eb_status'][:] = np.array(eb_status)

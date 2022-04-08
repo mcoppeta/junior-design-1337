@@ -176,7 +176,8 @@ class Ledger:
         self.nodeset_ledger.write_variables(self.ex.data)
         self.sideset_ledger.write_dimensions(self.ex.data)
         self.sideset_ledger.write_variables(self.ex.data)
-        self.element_ledger.write(self.ex.data)
+        self.element_ledger.write_dimensions(self.ex.data)
+        self.element_ledger.write_variables(self.ex.data)
 
     def a_write(self, path):
         out = nc.Dataset(path, "w", True, format="NETCDF4")
@@ -212,6 +213,7 @@ class Ledger:
 
         self.nodeset_ledger.write_dimensions(out)
         self.sideset_ledger.write_dimensions(out)
+        self.element_ledger.write_dimensions(out)
 
         # copy variables
         for var in old.variables:
@@ -243,5 +245,5 @@ class Ledger:
 
         self.nodeset_ledger.write_variables(out)
         self.sideset_ledger.write_variables(out)
-        self.element_ledger.write(out)
+        self.element_ledger.write_variables(out)
         out.close()
