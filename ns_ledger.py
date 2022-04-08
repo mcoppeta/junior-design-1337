@@ -154,8 +154,7 @@ class NSLedger:
             raise IndexError("One or more nodes could not be found in NodeSet " + str(nodeset_id))
         self.nodeset_map[program_name] = new_nodeset
 
-    def write(self, data):
-
+    def write_dimensions(self, data):
         # if no nodesets exist, no writing needs to be performed
         if len(self.nodesets) == 0:
             return
@@ -163,8 +162,27 @@ class NSLedger:
         # create num_node_sets dimension
         data.createDimension("num_node_sets", len(self.nodesets))
 
+        for i in range(len(self.nodesets)):
+            # if nodeset exists in old file, copy directly
+            nodeset_name = self.nodesets[i]
+            if self.nodeset_map[nodeset_name] is None:
+                dimension = self.ex.data.variables[nodeset_name].dimensions[0]
+                data.createDimension("num_nod_ns" + str(i + 1),
+                                     self.ex.data.dimensions[dimension].size)
+
+            # else, create according to np array
+            else:
+                data.createDimension("num_nod_ns" + str(i + 1),
+                                     len(self.nodeset_map[nodeset_name]))
+
+    def write_variables(self, data):
+
+        # if no nodesets exist, no writing needs to be performed
+        if len(self.nodesets) == 0:
+            return
+
         # add ns_prop1 data
-        data.createVariable("ns_prop1", "int32", dimensions=("num_node_sets"))
+        data.createVariable("ns_prop1", "int32", dimensions="num_node_sets")
         data['ns_prop1'].setncattr('name', 'ID')
         data['ns_prop1'][:] = np.array(self.nodeset_ids)
 
@@ -178,9 +196,7 @@ class NSLedger:
             nodeset_name = self.nodesets[i]
             # if nodeset exists in old file, copy directly
             if self.nodeset_map[nodeset_name] is None:
-                dimension = self.ex.data.variables[nodeset_name].dimensions[0]
-                data.createDimension("num_nod_ns" + str(i+1),
-                                     self.ex.data.dimensions[dimension].size)
+
                 data.createVariable("node_ns" + str(i+1), "int32",
                                     dimensions=("num_nod_ns" + str(i+1)))
 
@@ -197,8 +213,6 @@ class NSLedger:
 
             # else, create according to np array
             else:
-                data.createDimension("num_nod_ns" + str(i+1),
-                                     len(self.nodeset_map[nodeset_name]))
                 data.createVariable("node_ns" + str(i+1), "int32",
                                     dimensions=("num_nod_ns" + str(i+1)))
                 data["node_ns"+str(i+1)][:] = self.nodeset_map[nodeset_name][:]

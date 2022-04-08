@@ -172,7 +172,8 @@ class Ledger:
             self.a_write(path)
 
     def w_write(self):
-        self.nodeset_ledger.write(self.ex.data)
+        self.nodeset_ledger.write_dimensions(self.ex.data)
+        self.nodeset_ledger.write_variables(self.ex.data)
         self.sideset_ledger.write(self.ex.data)
         self.element_ledger.write(self.ex.data)
 
@@ -208,6 +209,8 @@ class Ledger:
         if 'len_line' not in out.dimensions:
             out.createDimension('len_line', self._MAX_LINE_LENGTH + 1)
 
+        self.nodeset_ledger.write_dimensions(out)
+
         # copy variables
         for var in old.variables:
 
@@ -236,7 +239,7 @@ class Ledger:
             out[varname].setncatts(old[varname].__dict__)
             out[varname][:] = old[var][:]
 
-        self.nodeset_ledger.write(out)
+        self.nodeset_ledger.write_variables(out)
         self.sideset_ledger.write(out)
         self.element_ledger.write(out)
         out.close()
