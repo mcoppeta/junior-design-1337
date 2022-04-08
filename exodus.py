@@ -326,7 +326,7 @@ class Exodus:
     def num_elem_blk(self):
         """Number of element blocks stored in this database."""
         try:
-            result = self.data.dimensions[DIM_NUM_ELBLOCK].size
+            result = self.data.dimensions[DIM_NUM_EB].size
         except KeyError:
             result = 0
         return result
@@ -462,13 +462,19 @@ class Exodus:
     # ID maps #
     ###########
 
-    # Nodes and elements have IDs and internal values
-    # As a programmer, when I call methods I pass in the internal value, which
-    # is some contiguous number. Usually I identify stuff with their IDs though.
-    # Internally, the method I call understands the internal value.
-    # Say I have 1 element in my file with ID 100. The ID is 100, the internal
-    # value is 1. In the connectivity array, '1' refers to this element. As a
-    # backend person, I need to subtract 1 to index on this internal value.
+    # Below is an explanation of entity IDs in lieu of a proper one in any official documentation.
+    # Nodes and elements have two IDs: an internal ID used by Exodus and all Exodus libraries, and a user-defined ID
+    # used by analysts interacting with the database. To translate user-defined IDs to internal IDs, Exodus files store
+    # an optional node ID map and element ID map. If they are not defined, user-defined IDs = internal IDs. This map
+    # stores the user-defined ID for an entity at the index internal ID-1. We subtract 1 from the internal ID because
+    # internal IDs are 1-based, meaning they start counting up from 1, not 0!
+    # When working with element connectivity lists, we have to manually calculate the internal ID of each element since
+    # connectivity lists do not store element IDs, only their constituent nodes.
+    # The general formula to get the internal ID of the element at index i of element block n is as follows:
+    # offset = sum(num_elem_in_block(1), num_elem_in_block(2), ..., num_elem_in_block(n - 1);
+    # internal_id = offset + i + 1;
+    # Example: EB1 has 7 elements, EB2 has 10 elements. The internal ID of the 4th element in EB2 is 7 + 3 + 1
+
     def get_node_id_map(self):
         """Return the node ID map for this database."""
         num_nodes = self.num_nodes
@@ -519,6 +525,19 @@ class Exodus:
             return numpy.arange(start, start + count, dtype=self.int)
         return self.data.variables[VAR_ELEM_NUM_MAP][start - 1:start + count - 1]
 
+    def get_elem_id_map_for_block(self, obj_id):
+        """Reads the element ID map for the element block with specified ID."""
+        if self.num_elem_blk == 0:
+            raise KeyError("There are no element blocks in this database!")
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
+        num_elem, _, _, _ = self._int_get_elem_block_params(obj_id, internal_id)
+        offset = 0
+        emap = self.get_elem_id_map()
+        for i in range(1, internal_id):
+            n, _, _, _ = self._int_get_elem_block_params(emap[i - 1], i)
+            offset += n
+        return self.get_partial_elem_id_map(offset + 1, num_elem)
+
     def get_node_set_id_map(self):
         """Returns the id map for node sets (ns_prop1)."""
         if self.mode == 'w' or self.mode == 'a':
@@ -541,7 +560,7 @@ class Exodus:
     def get_elem_block_id_map(self):
         """Returns the id map for element blocks (eb_prop1)."""
         try:
-            table = self.data.variables[VAR_ELBLOCK_ID_MAP][:]
+            table = self.data.variables[VAR_EB_ID_MAP][:]
         except KeyError:
             raise KeyError("Element block id map is missing from this database!".format(type))
         return table
@@ -871,12 +890,12 @@ class Exodus:
             num_entity = self.num_elem_blk
             num_var = self.num_elem_block_var
         elif obj_type == NODESET:
-            tabname = VAR_NSET_TAB
+            tabname = VAR_NS_TAB
             valname = VAR_VALS_NS_VAR
             num_entity = self.num_node_sets
             num_var = self.num_node_set_var
         elif obj_type == SIDESET:
-            tabname = VAR_SSET_TAB
+            tabname = VAR_SS_TAB
             valname = VAR_VALS_SS_VAR
             num_entity = self.num_side_sets
             num_var = self.num_side_set_var
@@ -2057,7 +2076,8 @@ class Exodus:
 # Writing out a subset of a mesh
 def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
                   ns_selectors: List[NodeSetSelector], ss_selectors: List[SideSetSelector],
-                  prop_selector: PropertySelector, time_steps: List[int], path: str, title: str):
+                  prop_selector: PropertySelector, nod_vars: List[int], glo_vars: List[int], time_steps: List[int],
+                  path: str, title: str):
     """
     Creates a new Exodus file containing a subset of the mesh stored in another Exodus file.
 
@@ -2066,10 +2086,15 @@ def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
     :param ns_selectors: selectors for node sets to keep
     :param ss_selectors: selectors for side sets to keep
     :param prop_selector: selector for object properties
+    :param nod_vars: list of nodal variable ids to keep
+    :param glo_vars: list of global variable ids to keep
     :param time_steps: range of time steps to keep
     :param path: location of the new exodus file
     :param title: name of the new exodus file
     """
+    # TODO you should be able to select variables by name as well as id!
+    #  that's what Sandia told us to do originally!
+    #  Same goes for other data types!
     output = nc.Dataset(path, 'w')
     output.set_fill_off()
 
@@ -2107,8 +2132,58 @@ def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
         if VAR_INFO in exodus.data.variables:
             var[:] = exodus.data.variables[VAR_INFO][:]
 
-    # Easy stuff done. now its selector time
+    has_time_steps = False
+    # Time steps
+    if len(time_steps) > 0:
+        has_time_steps = True
+        output.createDimension(DIM_NUM_TIME_STEP, None)  # unlimited
+        var = output.createVariable(VAR_TIME_WHOLE, exodus.float, DIM_NUM_TIME_STEP)
+        try:
+            var[:] = exodus.data.variables[VAR_TIME_WHOLE][time_steps]
+        except IndexError:
+            raise IndexError("Time step range provided contains invalid indices")
 
+    # Easy stuff done. now its selector time
+    if len(eb_selectors) > 0:
+        # error check that each of these selectors is unique
+        ids = []  # We could preallocate memory, but this should be good enough
+        for ebs in eb_selectors:
+            if ebs.obj_id in ids:
+                raise ValueError("Multiple selectors for the same entity were provided!")
+            if ebs.exodus != exodus:
+                raise ValueError("Provided selector is for a different exodus object!")
+            ids.append(ebs.obj_id)
+        output.createDimension(DIM_NUM_EB, len(eb_selectors))
+        # Well now we know how to get the ID of EB elements...
+        # If has_time_steps we do var stuff, otherwise don't
+        # TODO REQUIRED DIMENSIONS/VARIABLES
+        #  DIM_NUM_ELEM - count how many elements each block has, add it up
+        #  DIM_NUM_ELEM_VAR - number of unique variables the blocks have
+        #  VAR_ELEM_TAB - this can be done with the one above it
+        #  VAR_ELEM_NUM_MAP - keep track of which elements we add and keep their entry
+        #  VAR_VALS_ELEM_VAR
+        #  VAR_NAME_ELEM_VAR
+        #  DIM_NUM_NOD_PER_EL
+        #  VAR_CONNECT (and its attributes! (ATTR_ELEM_TYPE))
+        #  DIM_NUM_EL_IN_BLK
+        #  DIM_NUM_ATT_IN_BLK
+        #  VAR_EB_NAMES
+        #  VAR_ELEM_ATTRIB
+        #  VAR_ELEM_ATTRIB_NAME
+        #  VAR_EB_PROP (AND ITS ATTRIBUTES (ATTR_NAME))
+        #   since we need prop1, if its not included, regenerate it
+        # DONE
+        #  DIM_NUM_EB
+
+        for ebs in eb_selectors:
+            # Copy THIS EB ONLY
+            pass
+
+    # TODO OK so we have two types of maps on the database
+    #  ID maps & ORDER maps (also called NUMBER maps)
+    #  ID maps used to be called number maps and number maps used to be called order maps
+    #  The names of these variables are ridiculously confusing, but we need to make sure our library
+    #  uses the right ones! ID maps are ID maps, order maps are ORDER maps. Number map is way to arbitrary
 
     # Every block/set can have its own variables
     # The truth table shows which block has which variables
@@ -2117,9 +2192,17 @@ def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/cube_with_data.exo", 'r')
-    output_subset(ex, [], [], [], PropertySelector(ex), [], "sample-files/outputtest.ex2", "output test")
-    print(ex.data.variables[VAR_INFO])
-    ds = nc.Dataset("sample-files/outputtest.ex2")
-    print(ds.variables[VAR_INFO])
+    ex = Exodus("sample-files/can.ex2", 'r')
+    # output_subset(ex, [], [], [], PropertySelector(ex), [], [], [], "sample-files/outputtest.ex2", "output test")
+    # print(ex.get_elem_block_connectivity(1))
+    print(ex.num_elem_blk)
+    print(ex.num_elem)
+    print(ex.num_nodes)
+    print(ex.get_elem_id_map())
+    print(ex.get_elem_id_map_for_block(1))
+    print(ex.get_elem_id_map_for_block(2))
+    # ds = nc.Dataset("sample-files/outputtest.ex2")
+    # print(ds.variables[VAR_TIME_WHOLE])
+    # for i in range(1, 1):
+    #     print("n")
     ex.close()

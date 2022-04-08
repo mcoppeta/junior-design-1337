@@ -29,7 +29,7 @@ class ElementBlockSelector(ObjectSelector):
 
         :param exodus: the exodus object this element block is stored in
         :param obj_id: the id of the element block this represents
-        :param elements: the range of elements to select (1-indexed)
+        :param elements: the range of elements to select (1-indexed, internal)
         :param variables: the range of variables to select (1-indexed)
         :param attributes: the range of attributes to select (1-indexed)
         """
@@ -49,7 +49,7 @@ class NodeSetSelector(ObjectSelector):
 
         :param exodus: the exodus object this node set is stored in
         :param obj_id: the id of the node set this represents
-        :param nodes: the range of nodes to select (1-indexed)
+        :param nodes: the range of nodes to select (1-indexed, internal)
         :param variables: the range of variables to select (1-indexed)
         """
         ObjectSelector.__init__(self, exodus, obj_id, NODESET)
@@ -66,7 +66,7 @@ class SideSetSelector(ObjectSelector):
 
         :param exodus: the exodus object this side set is stored in
         :param obj_id: the id of the side set this represents
-        :param elements: the range of elements to select (1-indexed)
+        :param elements: the range of elements to select (1-indexed, internal)
         :param variables: the range of variables to select (1-indexed)
         """
         ObjectSelector.__init__(self, exodus, obj_id, SIDESET)
