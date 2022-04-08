@@ -380,17 +380,11 @@ class SSLedger:
         #    self.remove_sideset(old_ss)
 
     # NEED TO DEAL WITH SIDESET VARS
-    def write(self, data):
+    def write_variables(self, data):
 
         if (self.num_ss == 0):
             # nothing to write so done
             return
-
-        # write each dimension
-        data.createDimension("num_side_sets", self.num_ss)
-        for i in range(self.num_ss):
-            data.createDimension("num_df_ss" + str(i + 1), self.num_dist_fact[i])
-            data.createDimension("num_side_ss" + str(i+1), self.ss_sizes[i])
 
         # write each variable
         # copy over statuses
@@ -403,12 +397,8 @@ class SSLedger:
 
         # copy over names
         data.createVariable("ss_names", "|S1", dimensions=("num_side_sets", "len_name"))
-        for i in range(len(self.ss_names)):
+        for i in range(self.num_ss):
             data['ss_names'][i] = util.convert_string(self.ss_names[i] + str('\0'), self.ex.max_allowed_name_length)
-        
-        # write out num_sset_var dimension
-        if (self.num_ss_var > 0):
-            data.createDimension("num_sset_var", self.num_ss_var)
 
         # write out sidset variable status truth table
         if (self.num_ss_var > 0):
@@ -418,13 +408,14 @@ class SSLedger:
         # write out sideset variable names
         if (self.num_ss_var > 0):
             data.createVariable("name_sset_var", "|S1", dimensions=("num_sset_var", "len_name"))
-            for i in range(len(self.ss_var_names)):
+            for i in range(self.num_ss):
                 data["name_sset_var"][i] = util.convert_string(self.ss_var_names[i] + str('\0'), self.ex.max_allowed_name_length)
         
         for i in range(self.num_ss):
             # create elem, sides, and dist facts
             data.createVariable("elem_ss" + str(i+1), "int32", dimensions=("num_side_ss" + str(i+1)))
-            data.createVariable("dist_fact_ss" + str(i+1), "int32", dimensions=("num_df_ss" + str(i+1)))
+            if (self.num_dist_fact[i] > 0): # if there are no distribution factors, don't write out the variables
+                data.createVariable("dist_fact_ss" + str(i+1), "int32", dimensions=("num_df_ss" + str(i+1)))
             data.createVariable("side_ss" + str(i+1), "int32", dimensions=("num_side_ss" + str(i+1)))
             
             # if None, just copy over old data, otherwise copy over new stuff
@@ -439,7 +430,8 @@ class SSLedger:
                 data["side_ss" + str(i+1)][:] = self.ss_sides[i][:]
             
             if (self.ss_dist_fact[i] is None):
-                data["dist_fact_ss" + str(i+1)][:] = self.ex.get_side_set_df(self.ss_prop1[i])[:]
+                if("dist_fact_ss" + str(i+1) in data.variables):
+                    data["dist_fact_ss" + str(i+1)][:] = self.ex.get_side_set_df(self.ss_prop1[i])[:]
             else:
                 data["dist_fact_ss" + str(i+1)][:] = self.ss_dist_fact[i][:]
 
@@ -447,6 +439,24 @@ class SSLedger:
             for j in range(self.num_ss_var):
                 data.createVariable("vals_sset_var" + str(j + 1) + "ss" + str(i + 1), "float64", dimensions=("time_step", "num_side_ss" + str(i + 1)))
                 data["vals_sset_var" + str(j + 1) + "ss" + str(i + 1)] = self.ss_vars[i][j]
+
+    def write_dimensions(self, data):
+        if (self.num_ss == 0):
+            # nothing to write so done
+            return
+        data.createDimension("num_side_sets", self.num_ss)
+
+        # write each dimension
+        for i in range(self.num_ss):
+            if (self.num_dist_fact[i] > 0): # if there are no distribution factors, don't write out the variables
+                data.createDimension("num_df_ss" + str(i + 1), self.num_dist_fact[i])
+            data.createDimension("num_side_ss" + str(i+1), self.ss_sizes[i])
+
+        # write out num_sset_var dimension
+        if (self.num_ss_var > 0):
+            data.createDimension("num_sset_var", self.num_ss_var)
+
+            
 
     # (Based on find_nodeset_num in ns_ledger)
     def find_sideset_num(self, ss_id):
