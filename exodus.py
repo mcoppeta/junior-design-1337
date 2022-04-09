@@ -158,7 +158,7 @@ class Exodus:
     def title(self):
         """The database title."""
         try:
-            return self.data.getncattr(ATTR_TITLE)
+            return self.data.getncattr(ATT_TITLE)
         except AttributeError:
             AttributeError("Database title could not be found")
 
@@ -176,9 +176,9 @@ class Exodus:
         """The maximum used length for variable/dimension/attribute names in this database."""
         # 32 is the default size consistent with other databases
         max_used_name_len = 32
-        if ATTR_MAX_NAME_LENGTH in self.data.ncattrs():
+        if ATT_MAX_NAME_LENGTH in self.data.ncattrs():
             # The length does not include the added null character from C
-            max_used_name_len = self.data.getncattr(ATTR_MAX_NAME_LENGTH)
+            max_used_name_len = self.data.getncattr(ATT_MAX_NAME_LENGTH)
         return max_used_name_len
 
     @property
@@ -205,11 +205,11 @@ class Exodus:
     def api_version(self):
         """The Exodus API version this database was built with."""
         try:
-            result = self.data.getncattr(ATTR_API_VER)
+            result = self.data.getncattr(ATT_API_VER)
         except AttributeError:
             # Try the old way of spelling it
             try:
-                result = self.data.getncattr(ATTR_API_VER_OLD)
+                result = self.data.getncattr(ATT_API_VER_OLD)
             except AttributeError:
                 raise AttributeError("Exodus API version could not be found")
         return result
@@ -218,7 +218,7 @@ class Exodus:
     def version(self):
         """The Exodus version this database uses."""
         try:
-            return self.data.getncattr(ATTR_VERSION)
+            return self.data.getncattr(ATT_VERSION)
         except AttributeError:
             raise AttributeError("Exodus database version could not be found")
 
@@ -236,8 +236,8 @@ class Exodus:
         # "Basically, the difference is whether the coordinates and nodal variables are stored in a blob (xyz components
         # together) or as a variable per component per nodal_variable."
         # This is important for coordinate getter functions
-        if ATTR_FILE_SIZE in self.data.ncattrs():
-            return self.data.getncattr(ATTR_FILE_SIZE)
+        if ATT_FILE_SIZE in self.data.ncattrs():
+            return self.data.getncattr(ATT_FILE_SIZE)
         else:
             return 0
             # No warning is raised because older files just don't have this
@@ -252,8 +252,8 @@ class Exodus:
         :return: 1 if 64-bit integers are supported, 0 otherwise
         """
         # Determines whether the file uses int64s
-        if ATTR_64BIT_INT in self.data.ncattrs():
-            return self.data.getncattr(ATTR_64BIT_INT)
+        if ATT_64BIT_INT in self.data.ncattrs():
+            return self.data.getncattr(ATT_64BIT_INT)
         else:
             return 1 if self.data.data_model == 'NETCDF3_64BIT_DATA' else 0
             # No warning is raised because older files just don't have this
@@ -268,10 +268,10 @@ class Exodus:
         :return: floating point word size
         """
         try:
-            result = self.data.getncattr(ATTR_WORD_SIZE)
+            result = self.data.getncattr(ATT_WORD_SIZE)
         except AttributeError:
             try:
-                result = self.data.getncattr(ATTR_WORD_SIZE_OLD)
+                result = self.data.getncattr(ATT_WORD_SIZE_OLD)
             except AttributeError:
                 # This should NEVER happen, but here to be safe
                 raise AttributeError("Exodus database floating point word size could not be found")
@@ -375,27 +375,6 @@ class Exodus:
         """Number of side set properties in this database."""
         return self._get_num_object_properties(VAR_SS_PROP)
 
-    # TODO Are these two functions below for order maps?
-    #  These may not be supported by our library anyway.
-
-    # Same as C
-    @property
-    def num_elem_map(self):
-        try:
-            result = self.data.dimensions[DIM_NUM_ELEM_MAP].size
-        except KeyError:
-            result = 0
-        return result
-
-    # Same as C
-    @property
-    def num_node_map(self):
-        try:
-            result = self.data.dimensions[DIM_NUM_NODE_MAPS].size
-        except KeyError:
-            result = 0
-        return result
-
     @property
     def num_global_var(self):
         """Number of global variables."""
@@ -447,16 +426,21 @@ class Exodus:
     ##############
 
     def get_elem_order_map(self):
-        """Returns the element order map for this database."""
+        """Returns the optional element order map for this database."""
         num_elem = self.num_elem
         if num_elem == 0:
             warnings.warn("Cannot retrieve an element order map if there are no elements!")
             return
-        if VAR_ELEM_MAP not in self.data.variables:
+        if VAR_ELEM_ORDER_MAP not in self.data.variables:
             # Return a default array from 1 to the number of elements
             warnings.warn("There is no element order map in this database!")
             return numpy.arange(1, num_elem + 1, dtype=self.int)
-        return self.data.variables[VAR_ELEM_MAP][:]
+        return self.data.variables[VAR_ELEM_ORDER_MAP][:]
+
+    # OK so we have two types of maps on the database: ID maps & ORDER maps (also called NUMBER maps).
+    # ID maps used to be called number maps and number maps used to be called order maps, which is super confusing.
+    # This library supports the classic element order map (as defined in Exodus II API documentation), but does not
+    # support the new 'number maps' that the SEACAS C library has support for.
 
     ###########
     # ID maps #
@@ -494,11 +478,11 @@ class Exodus:
             raise ValueError("start index must be greater than 0")
         if start + count - 1 > num_nodes:
             raise ValueError("start index + node count is larger than the total number of nodes")
-        if VAR_NODE_NUM_MAP not in self.data.variables:
+        if VAR_NODE_ID_MAP not in self.data.variables:
             # Return a default array from start to start + count exclusive
             warnings.warn("There is no node id map in this database!")
             return numpy.arange(start, start + count, dtype=self.int)
-        return self.data.variables[VAR_NODE_NUM_MAP][start - 1:start + count - 1]
+        return self.data.variables[VAR_NODE_ID_MAP][start - 1:start + count - 1]
 
     def get_elem_id_map(self):
         """Return the element ID map for this database."""
@@ -519,11 +503,11 @@ class Exodus:
             raise ValueError("start index must be greater than 0")
         if start + count - 1 > num_elem:
             raise ValueError("start index + element count is larger than the total number of elements")
-        if VAR_ELEM_NUM_MAP not in self.data.variables:
+        if VAR_ELEM_ID_MAP not in self.data.variables:
             # Return a default array from start to start + count exclusive
             warnings.warn("There is no element id map in this database!")
             return numpy.arange(start, start + count, dtype=self.int)
-        return self.data.variables[VAR_ELEM_NUM_MAP][start - 1:start + count - 1]
+        return self.data.variables[VAR_ELEM_ID_MAP][start - 1:start + count - 1]
 
     def get_elem_id_map_for_block(self, obj_id):
         """Reads the element ID map for the element block with specified ID."""
@@ -2074,14 +2058,14 @@ class Exodus:
 
 
 # Writing out a subset of a mesh
-def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
+def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
                   ns_selectors: List[NodeSetSelector], ss_selectors: List[SideSetSelector],
                   prop_selector: PropertySelector, nod_vars: List[int], glo_vars: List[int], time_steps: List[int],
                   path: str, title: str):
     """
     Creates a new Exodus file containing a subset of the mesh stored in another Exodus file.
 
-    :param exodus: exodus object of the file to copy a subset of
+    :param input: exodus object of the file to copy a subset of
     :param eb_selectors: selectors for element blocks to keep
     :param ns_selectors: selectors for node sets to keep
     :param ss_selectors: selectors for side sets to keep
@@ -2098,92 +2082,217 @@ def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
     output = nc.Dataset(path, 'w')
     output.set_fill_off()
 
-    output.setncattr_string(ATTR_TITLE, title[0:exodus.max_line_length])
-    output.createDimension(DIM_NAME_LENGTH, exodus.max_allowed_name_length + 1)
-    output.setncattr(ATTR_MAX_NAME_LENGTH, exodus.max_used_name_length + 1)
-    output.createDimension(DIM_STRING_LENGTH, exodus.max_string_length + 1)
-    output.createDimension(DIM_LINE_LENGTH, exodus.max_line_length + 1)
-    output.setncattr(ATTR_API_VER, exodus.api_version)
-    output.setncattr(ATTR_VERSION, exodus.version)
-    output.setncattr(ATTR_FILE_SIZE, exodus.large_model)
-    output.setncattr(ATTR_64BIT_INT, exodus.int64_status)
-    output.setncattr(ATTR_WORD_SIZE, exodus.word_size)
-    output.createDimension(DIM_NUM_DIM, exodus.num_dim)
-    # This function will not carry over order maps because this library doesn't officially support them
-    #  and it might make sense to remake those maps for a new model anyway.
+    output.setncattr_string(ATT_TITLE, title[0:input.max_line_length])
+    output.createDimension(DIM_NAME_LENGTH, input.max_allowed_name_length + 1)
+    output.setncattr(ATT_MAX_NAME_LENGTH, input.max_used_name_length + 1)
+    output.createDimension(DIM_STRING_LENGTH, input.max_string_length + 1)
+    output.createDimension(DIM_LINE_LENGTH, input.max_line_length + 1)
+    output.setncattr(ATT_API_VER, input.api_version)
+    output.setncattr(ATT_VERSION, input.version)
+    output.setncattr(ATT_FILE_SIZE, input.large_model)
+    output.setncattr(ATT_64BIT_INT, input.int64_status)
+    output.setncattr(ATT_WORD_SIZE, input.word_size)
+    output.createDimension(DIM_NUM_DIM, input.num_dim)
 
     # QA records
     output.createDimension(DIM_FOUR, 4)
-    num_qa_rec = exodus.num_qa + 1
+    num_qa_rec = input.num_qa + 1
     output.createDimension(DIM_NUM_QA, num_qa_rec)
     var = output.createVariable(VAR_QA, '|S1', (DIM_NUM_QA, DIM_FOUR, DIM_STRING_LENGTH))
-    qa = numpy.empty((num_qa_rec, 4, exodus.max_string_length + 1), '|S1')  # add 1 for null terminator
-    if VAR_QA in exodus.data.variables:
-        qa[0:exodus.num_qa] = exodus.data.variables[VAR_QA][:]
-    qa[-1] = util.generate_qa_rec(exodus.max_string_length)
+    qa = numpy.empty((num_qa_rec, 4, input.max_string_length + 1), '|S1')  # add 1 for null terminator
+    if VAR_QA in input.data.variables:
+        qa[0:input.num_qa] = input.data.variables[VAR_QA][:]
+    qa[-1] = util.generate_qa_rec(input.max_string_length)
     var[:] = qa
 
     # Info records
-    output.createDimension(DIM_NUM_INFO, exodus.num_info)
+    output.createDimension(DIM_NUM_INFO, input.num_info)
     # Don't create a variable if there are no info recs
-    if exodus.num_info > 0:
+    if input.num_info > 0:
         var = output.createVariable(VAR_INFO, '|S1', (DIM_NUM_INFO, DIM_LINE_LENGTH))
         # Handle this potential error
-        if VAR_INFO in exodus.data.variables:
-            var[:] = exodus.data.variables[VAR_INFO][:]
+        if VAR_INFO in input.data.variables:
+            var[:] = input.data.variables[VAR_INFO][:]
 
     has_time_steps = False
     # Time steps
     if len(time_steps) > 0:
         has_time_steps = True
         output.createDimension(DIM_NUM_TIME_STEP, None)  # unlimited
-        var = output.createVariable(VAR_TIME_WHOLE, exodus.float, DIM_NUM_TIME_STEP)
+        var = output.createVariable(VAR_TIME_WHOLE, input.float, DIM_NUM_TIME_STEP)
         try:
-            var[:] = exodus.data.variables[VAR_TIME_WHOLE][time_steps]
+            var[:] = input.data.variables[VAR_TIME_WHOLE][time_steps]
         except IndexError:
             raise IndexError("Time step range provided contains invalid indices")
 
     # Easy stuff done. now its selector time
     if len(eb_selectors) > 0:
-        # error check that each of these selectors is unique
-        ids = []  # We could preallocate memory, but this should be good enough
+        if input.num_elem_blk == 0:
+            raise ValueError("Element blocks selectors were provided for a database with no element blocks!")
+        # Check for duplicate or misplaced selectors
+        ids = []  # list of obj ids
+        idmap = {}  # dict mapping internal ids to eb selectors
         for ebs in eb_selectors:
             if ebs.obj_id in ids:
                 raise ValueError("Multiple selectors for the same entity were provided!")
-            if ebs.exodus != exodus:
+            if ebs.exodus != input:
                 raise ValueError("Provided selector is for a different exodus object!")
             ids.append(ebs.obj_id)
+            internal_id = input._lookup_id(ELEMBLOCK, ebs.obj_id)
+            idmap[internal_id] = ebs
         output.createDimension(DIM_NUM_EB, len(eb_selectors))
-        # Well now we know how to get the ID of EB elements...
+
         # If has_time_steps we do var stuff, otherwise don't
-        # TODO REQUIRED DIMENSIONS/VARIABLES
-        #  DIM_NUM_ELEM - count how many elements each block has, add it up
-        #  DIM_NUM_ELEM_VAR - number of unique variables the blocks have
-        #  VAR_ELEM_TAB - this can be done with the one above it
-        #  VAR_ELEM_NUM_MAP - keep track of which elements we add and keep their entry
-        #  VAR_VALS_ELEM_VAR
-        #  VAR_NAME_ELEM_VAR
-        #  DIM_NUM_NOD_PER_EL
-        #  VAR_CONNECT (and its attributes! (ATTR_ELEM_TYPE))
-        #  DIM_NUM_EL_IN_BLK
+        #  REQUIRED DIMENSIONS/VARIABLES
+        #  DONE
+        #  DIM_NUM_EB
+        #  DIM_NUM_NOD_PER_EL - (trivial read)
+        #  DIM_NUM_EL_IN_BLK - (trivial read)
+        #  VAR_CONNECT (and its attributes! (ATTR_ELEM_TYPE)) (requires num el in block and num nod per el)
+        #  VAR_EB_NAMES - copy this if it exists (requires num el blk, which we have immediately)
         #  DIM_NUM_ATT_IN_BLK
-        #  VAR_EB_NAMES
         #  VAR_ELEM_ATTRIB
         #  VAR_ELEM_ATTRIB_NAME
         #  VAR_EB_PROP (AND ITS ATTRIBUTES (ATTR_NAME))
         #   since we need prop1, if its not included, regenerate it
-        # DONE
-        #  DIM_NUM_EB
+        #  DIM_NUM_ELEM - count how many elements each block has, add it up (DO LAST)
+        #  VAR_ELEM_NUM_MAP - keep track of which elements we add and keep their entry (DO LAST)
+        #  DIM_NUM_ELEM_VAR - number of unique variables the blocks have (VAR RELATED)
+        #  VAR_ELEM_TAB - this can be done with the one above it (VAR RELATED)
+        #  VAR_VALS_ELEM_VAR - (VAR RELATED)
+        #  VAR_NAME_ELEM_VAR - (VAR RELATED)
+        #  VAR_ELEM_ORDER_MAP
 
-        for ebs in eb_selectors:
-            # Copy THIS EB ONLY
-            pass
+        selected_blk_indices = [x - 1 for x in idmap.keys()]
 
-    # TODO OK so we have two types of maps on the database
-    #  ID maps & ORDER maps (also called NUMBER maps)
-    #  ID maps used to be called number maps and number maps used to be called order maps
-    #  The names of these variables are ridiculously confusing, but we need to make sure our library
-    #  uses the right ones! ID maps are ID maps, order maps are ORDER maps. Number map is way to arbitrary
+        # EB names
+        if VAR_EB_NAMES in input.data.variables:
+            var = output.createVariable(VAR_EB_NAMES, '|S1', (DIM_NUM_EB, DIM_NAME_LENGTH))
+            var[:] = input.data.variables[VAR_EB_NAMES][selected_blk_indices]
+
+        elblock_id_map = input.data.variables[VAR_EB_PROP % 1]
+        # EB ID map / prop1
+        var = output.createVariable(VAR_EB_PROP % 1, input.int, DIM_NUM_EB)
+        if 'ID' in prop_selector.eb_prop:
+            # Keep ID map
+            var[:] = elblock_id_map[selected_blk_indices]
+        else:
+            # Generate ID map
+            var[:] = numpy.arange(1, len(eb_selectors) + 1, dtype=input.int)
+
+        # Other EB properties
+        propids = {}  # dict mapping property ids to names
+        for propname in prop_selector.eb_prop:
+            # We've already handled ids so we can skip this
+            if propname == 'ID':
+                continue
+            n = 1
+            while True:
+                if VAR_EB_PROP % n in input.data.variables:
+                    name = input.data.variables[VAR_EB_PROP % n].getncattr(ATTR_NAME)
+                    if propname == name:
+                        # we've found our property
+                        propids[n] = propname
+                        break
+                    else:
+                        # check next property
+                        n += 1
+                        continue
+                else:
+                    # We looked at every property and didn't find this one. This should never happen.
+                    break
+
+        # EB properties
+        propid = 1  # we've already handled prop1
+        # Loop over all the properties and add them if they were selected
+        for i in range(2, input.num_elem_block_prop + 1):
+            if i in propids.keys():
+                propid += 1  # id of current property in output
+                var = output.createVariable(VAR_EB_PROP % propid, input.int, DIM_NUM_EB)
+                var[:] = input.data.variables[VAR_EB_PROP % i][selected_blk_indices]
+
+        # Figure out which variables we're keeping
+        vars_to_keep = []
+        for eb in eb_selectors:
+            for v in eb.variables:
+                if v not in vars_to_keep:
+                    vars_to_keep.append(v)
+        vars_to_keep.sort()  # sort to keep ordering
+        has_variables = False
+        if len(vars_to_keep) > 0:
+            has_variables = True
+            output.createDimension(DIM_NUM_ELEM_VAR, len(vars_to_keep))
+            # Only copy names if they were previously defined
+            if VAR_NAME_ELEM_VAR in input.data.variables:
+                var = output.createVariable(VAR_NAME_ELEM_VAR, '|S1', (DIM_NUM_ELEM_VAR, DIM_STRING_LENGTH))
+                var[:] = input.data.variables[VAR_NAME_ELEM_VAR][vars_to_keep]
+            # Create truth table. We'll set its values in a moment.
+            var_elem_tab = output.createVariable(VAR_ELEM_TAB, input.int, (DIM_NUM_EB, DIM_NUM_ELEM_VAR))
+
+        # EB connectivity list
+        output_id = 0
+        sum_elem = 0
+        output_elem_indices = []
+        # Loop over all the input element blocks and add them if they were selected
+        for n in range(input.num_elem_blk):
+            input_id = n + 1
+            # retrieve info for this element block
+            num_el, nod_per_el, topology, num_attr = input.get_elem_block_params(elblock_id_map[n])
+            if input_id in idmap.keys():
+                output_id += 1  # id of current block in output
+                eb = idmap[input_id]  # selector of current block in output
+
+                # Dimensions
+                dim_el_in_blk = DIM_NUM_EL_IN_BLK % output_id
+                output.createDimension(dim_el_in_blk, len(eb.elements))
+                dim_nod_per_el = DIM_NUM_NOD_PER_EL % output_id
+                output.createDimension(dim_nod_per_el, nod_per_el)
+
+                # Connectivity list
+                var = output.createVariable(VAR_CONNECT % output_id, input.int, (dim_el_in_blk, dim_nod_per_el))
+                var.setncattr(ATTR_ELEM_TYPE, topology)
+                var[:] = input.data.variables[VAR_CONNECT % input_id][eb.elements, :]
+                output_elem_indices.append([x + sum_elem for x in eb.elements])
+
+                # EB attributes
+                if len(eb.attributes) > 0:
+                    dim_att_in_blk = DIM_NUM_ATT_IN_BLK % output_id
+                    output.createDimension(dim_att_in_blk, len(eb.attributes))
+                    var = output.createVariable(VAR_ELEM_ATTRIB % output_id, input.float,
+                                                (dim_el_in_blk, dim_att_in_blk))
+                    var[:] = input.data.variables[VAR_ELEM_ATTRIB % input_id][eb.elements, eb.attributes]
+                    var = output.createVariable(VAR_ELEM_ATTRIB_NAME % output_id, '|S1',
+                                                (dim_att_in_blk, DIM_NAME_LENGTH))
+                    var[:] = input.data.variables[VAR_ELEM_ATTRIB_NAME % input_id][eb.attributes]
+
+                # Variable data and truth table filling
+                if has_variables:
+                    row = numpy.zeros(len(vars_to_keep), input.int)  # init row
+                    for j in eb.variables:
+                        out_var_idx = vars_to_keep.index(j)
+                        row[out_var_idx] = 1  # Set true in truth table row
+                        # We only want to copy over variable values if we're keeping time steps
+                        if has_time_steps:
+                            var = output.createVariable(VAR_VALS_ELEM_VAR % (out_var_idx + 1, output_id), input.float,
+                                                        (DIM_NUM_TIME_STEP, dim_el_in_blk))
+                            var[:] = input.data.variables[VAR_VALS_ELEM_VAR % (j + 1, input_id)][time_steps,
+                                                                                                 eb.elements]
+                    var_elem_tab[output_id - 1] = row  # put row in table
+            # Keep track of how many elements we've looked at
+            sum_elem += num_el
+
+        # Number of elements
+        output.createDimension(DIM_NUM_ELEM, len(output_elem_indices))
+
+        # Element ID map
+        var = output.createVariable(VAR_ELEM_ID_MAP, input.int, DIM_NUM_ELEM)
+        var[:] = input.get_elem_id_map()[output_elem_indices]
+
+        # Optional element order map
+        if VAR_ELEM_ORDER_MAP in input.data.variables:
+            var = output.createVariable(VAR_ELEM_ORDER_MAP, input.int, DIM_NUM_ELEM)
+            var[:] = input.data.variables[VAR_ELEM_ORDER_MAP][output_elem_indices]
+    # END OF ELEMENT BLOCK PROCESSING
 
     # Every block/set can have its own variables
     # The truth table shows which block has which variables
@@ -2193,16 +2302,8 @@ def output_subset(exodus: Exodus, eb_selectors: List[ElementBlockSelector],
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/can.ex2", 'r')
-    # output_subset(ex, [], [], [], PropertySelector(ex), [], [], [], "sample-files/outputtest.ex2", "output test")
-    # print(ex.get_elem_block_connectivity(1))
-    print(ex.num_elem_blk)
-    print(ex.num_elem)
-    print(ex.num_nodes)
-    print(ex.get_elem_id_map())
-    print(ex.get_elem_id_map_for_block(1))
-    print(ex.get_elem_id_map_for_block(2))
-    # ds = nc.Dataset("sample-files/outputtest.ex2")
-    # print(ds.variables[VAR_TIME_WHOLE])
-    # for i in range(1, 1):
-    #     print("n")
+    print(ex.data.variables[VAR_ELEM_ORDER_MAP])
+    output_subset(ex, [], [], [], PropertySelector(ex), [], [], [], "sample-files/outputtest.ex2", "output test")
+    ds = nc.Dataset("sample-files/outputtest.ex2")
+    print(ds)
     ex.close()
