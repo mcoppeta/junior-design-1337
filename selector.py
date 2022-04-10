@@ -53,7 +53,7 @@ class ElementBlockSelector(ObjectSelector):
             self.elements.sort()
             num_elem, _, _, _ = exodus.get_elem_block_params(obj_id)
             if self.elements[0] < 1 or self.elements[-1] > num_elem:
-                raise ValueError("elements out of range!")
+                raise IndexError("elements out of range!")
             self.elements = [x - 1 for x in self.elements]
             if len(self.elements) != len(elements):
                 warnings.warn("Duplicate elements were automatically removed.")
@@ -66,7 +66,7 @@ class ElementBlockSelector(ObjectSelector):
             self.variables = list(set(variables))
             self.variables.sort()
             if self.variables[0] < 1 or self.variables[-1] > exodus.num_elem_block_var:
-                raise ValueError("variable index out of range!")
+                raise IndexError("variable index out of range!")
             self.variables = [x - 1 for x in self.variables]
             if len(self.variables) != len(variables):
                 warnings.warn("Duplicate variables were automatically removed.")
@@ -80,7 +80,7 @@ class ElementBlockSelector(ObjectSelector):
                 self.attributes = list(set(attributes))
                 self.attributes.sort()
                 if self.attributes[0] < 1 or self.attributes[-1] > exodus.get_num_elem_attrib(obj_id):
-                    raise ValueError("attribute index out of range!")
+                    raise IndexError("attribute index out of range!")
                 if len(self.attributes) != len(attributes):
                     warnings.warn("Duplicate attributes were automatically removed.")
                 self.attributes = [x - 1 for x in self.attributes]
@@ -111,7 +111,7 @@ class NodeSetSelector(ObjectSelector):
 
         :param exodus: the exodus object this node set is stored in
         :param obj_id: the id of the node set this represents
-        :param nodes: the range of nodes to select (1-indexed, internal)
+        :param nodes: the range of nodes to select within this set (1-indexed). This is not the same as IDs.
         :param variables: the range of variables to select (1-indexed)
         """
         ObjectSelector.__init__(self, exodus, obj_id, NODESET)
@@ -126,7 +126,7 @@ class NodeSetSelector(ObjectSelector):
             self.nodes.sort()
             num_nod, _ = exodus.get_node_set_params(obj_id)
             if self.nodes[0] < 1 or self.nodes[-1] > num_nod:
-                raise ValueError("nodes out of range!")
+                raise IndexError("nodes out of range!")
             self.nodes = [x - 1 for x in self.nodes]
             if len(self.nodes) != len(nodes):
                 warnings.warn("Duplicate nodes were automatically removed.")
@@ -134,13 +134,27 @@ class NodeSetSelector(ObjectSelector):
         if variables is None:
             self.variables = []
         elif variables is ...:
-            self.variables = list(range(exodus.num_node_set_var))
+            # Get the truth table
+            internal_id = exodus.get_node_set_number(obj_id)
+            tab = exodus.get_node_set_truth_table()[internal_id - 1]
+            self.variables = []
+            # Go over every variable. If it's in the truth table, add its index to the variables list
+            for i in range(exodus.num_node_set_var):
+                if tab[i]:
+                    self.variables.append(i)
         else:
             self.variables = list(set(variables))
             self.variables.sort()
             if self.variables[0] < 1 or self.variables[-1] > exodus.num_node_set_var:
-                raise ValueError("variable index out of range!")
+                raise IndexError("variable index out of range!")
             self.variables = [x - 1 for x in self.variables]
+            # Get the truth table
+            internal_id = exodus.get_node_set_number(obj_id)
+            tab = exodus.get_node_set_truth_table()[internal_id - 1]
+            # Go over selected variables. If it's not in the truth table, throw an error
+            for idx in variables:
+                if not tab[idx]:
+                    raise ValueError("variable %d is not set for node set %d!" % (idx, obj_id))
             if len(self.variables) != len(variables):
                 warnings.warn("Duplicate variables were automatically removed.")
 
@@ -169,7 +183,7 @@ class SideSetSelector(ObjectSelector):
             self.sides.sort()
             num_el, _ = exodus.get_side_set_params(obj_id)
             if self.sides[0] < 1 or self.sides[-1] > num_el:
-                raise ValueError("sides out of range!")
+                raise IndexError("sides out of range!")
             self.sides = [x - 1 for x in self.sides]
             if len(self.sides) != len(sides):
                 warnings.warn("Duplicate sides were automatically removed.")
@@ -182,7 +196,7 @@ class SideSetSelector(ObjectSelector):
             self.variables = list(set(variables))
             self.variables.sort()
             if self.variables[0] < 1 or self.variables[-1] > exodus.num_side_set_var:
-                raise ValueError("variable index out of range!")
+                raise IndexError("variable index out of range!")
             self.variables = [x - 1 for x in self.variables]
             if len(self.variables) != len(variables):
                 warnings.warn("Duplicate variables were automatically removed.")
@@ -200,7 +214,7 @@ class PropertySelector:
         :param ss_prop: list of all side set properties to keep by name
         """
         self.exodus = exodus
-
+        # TODO make sure the properties exist
         if eb_prop is None:
             self.eb_prop = []
         elif eb_prop is ...:

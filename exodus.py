@@ -595,6 +595,33 @@ class Exodus:
         return internal_id
         # The C library also does some crazy stuff with what might be the ns_status array
 
+    def get_node_set_number(self, obj_id):
+        """
+        Returns the internal ID (1-based) of the node set with the user-defined ID.
+
+        Note that this function is O(n) complexity for n number of node sets. While useful for quick tests, you should
+        create an ID lookup table yourself if you plan to convert IDs often.
+        """
+        return self._lookup_id(NODESET, obj_id)
+
+    def get_side_set_number(self, obj_id):
+        """
+        Returns the internal ID (1-based) of the side set with the user-defined ID.
+
+        Note that this function is O(n) complexity for n number of node sets. While useful for quick tests, you should
+        create an ID lookup table yourself if you plan to convert IDs often.
+        """
+        return self._lookup_id(SIDESET, obj_id)
+
+    def get_elem_block_number(self, obj_id):
+        """
+        Returns the internal ID (1-based) of the elem block with the user-defined ID.
+
+        Note that this function is O(n) complexity for n number of node sets. While useful for quick tests, you should
+        create an ID lookup table yourself if you plan to convert IDs often.
+        """
+        return self._lookup_id(ELEMBLOCK, obj_id)
+
     ############################
     # Variables and time steps #
     ############################
@@ -2720,40 +2747,44 @@ class Exodus:
 
 
 # Writing out a subset of a mesh
-def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
-                  ns_selectors: List[NodeSetSelector], ss_selectors: List[SideSetSelector],
-                  prop_selector: PropertySelector, nod_vars: List[int], glo_vars: List[int], time_steps: List[int],
-                  path: str, title: str):
+def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[ElementBlockSelector],
+                  ss_selectors: List[SideSetSelector], ns_selectors: List[NodeSetSelector],
+                  prop_selector: PropertySelector, nod_vars: List[int], glo_vars: List[int], time_steps: List[int]):
     """
     Creates a new Exodus file containing a subset of the mesh stored in another Exodus file.
 
     :param input: exodus object of the file to copy a subset of
-    :param eb_selectors: selectors for element blocks to keep
-    :param ns_selectors: selectors for node sets to keep
-    :param ss_selectors: selectors for side sets to keep
-    :param prop_selector: selector for object properties
-    :param nod_vars: list of nodal variable ids to keep
-    :param glo_vars: list of global variable ids to keep
-    :param time_steps: range of time steps to keep
     :param path: location of the new exodus file
     :param title: name of the new exodus file
+    :param eb_selectors: selectors for element blocks to keep
+    :param ss_selectors: selectors for side sets to keep
+    :param ns_selectors: selectors for node sets to keep
+    :param prop_selector: selector for object properties
+    :param nod_vars: list of nodal variable ids to keep (1-indexed)
+    :param glo_vars: list of global variable ids to keep (1-indexed)
+    :param time_steps: range of time steps to keep
     """
     # TODO you should be able to select variables by name as well as id!
     #  that's what Sandia told us to do originally!
     #  Same goes for other data types!
+    # Sort lists to maintain input file order in output file
+    time_steps.sort()
+    nod_vars.sort()
+    glo_vars.sort()
     output = nc.Dataset(path, 'w')
     output.set_fill_off()
 
     output.setncattr_string(ATT_TITLE, title[0:input.max_line_length])
-    output.createDimension(DIM_NAME_LENGTH, input.max_allowed_name_length + 1)
-    output.setncattr(ATT_MAX_NAME_LENGTH, input.max_used_name_length + 1)
-    output.createDimension(DIM_STRING_LENGTH, input.max_string_length + 1)
-    output.createDimension(DIM_LINE_LENGTH, input.max_line_length + 1)
+    # This attribute does not include the extra C null character in its size
+    output.setncattr(ATT_MAX_NAME_LENGTH, input.max_used_name_length)
     output.setncattr(ATT_API_VER, input.api_version)
     output.setncattr(ATT_VERSION, input.version)
     output.setncattr(ATT_FILE_SIZE, input.large_model)
     output.setncattr(ATT_64BIT_INT, input.int64_status)
     output.setncattr(ATT_WORD_SIZE, input.word_size)
+    output.createDimension(DIM_NAME_LENGTH, input.max_allowed_name_length + 1)
+    output.createDimension(DIM_STRING_LENGTH, input.max_string_length + 1)
+    output.createDimension(DIM_LINE_LENGTH, input.max_line_length + 1)
     output.createDimension(DIM_NUM_DIM, input.num_dim)
 
     # QA records
@@ -2792,7 +2823,7 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
     # Element Blocks
     # We will keep track of which elements we add so that if the side set selectors select an unadded element we can
     # throw an exception
-    eb_added_elements = []
+    output_elem_indices = []
     if len(eb_selectors) > 0:
         if input.num_elem_blk == 0:
             raise ValueError("Element blocks selectors were provided for a database with no element blocks!")
@@ -2883,7 +2914,6 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
         # EB connectivity list
         output_id = 0
         sum_elem = 0
-        output_elem_indices = []
         # Loop over all the input element blocks and add them if they were selected
         for n in range(input.num_elem_blk):
             input_id = n + 1
@@ -2903,7 +2933,7 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
                 var = output.createVariable(VAR_CONNECT % output_id, input.int, (dim_num_el_in_blk, dim_nod_per_el))
                 var.setncattr(ATTR_ELEM_TYPE, topology)
                 var[:] = input.data.variables[VAR_CONNECT % input_id][eb.elements, :]
-                output_elem_indices.append([x + sum_elem for x in eb.elements])
+                output_elem_indices.extend([x + sum_elem for x in eb.elements])
                 added_nodes.update(input.data.variables[VAR_CONNECT % input_id][eb.elements, :])
 
                 # EB attributes
@@ -2933,21 +2963,21 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
                     var_truth_tab[output_id - 1] = row  # put row in table
             # Keep track of how many elements we've looked at
             sum_elem += num_el
-
-        eb_added_elements = [x + 1 for x in output_elem_indices]
-
-        # Number of elements
-        output.createDimension(DIM_NUM_ELEM, len(output_elem_indices))
-
-        # Element ID map
-        var = output.createVariable(VAR_ELEM_ID_MAP, input.int, DIM_NUM_ELEM)
-        var[:] = input.get_elem_id_map()[output_elem_indices]
-
-        # Optional element order map
-        if VAR_ELEM_ORDER_MAP in input.data.variables:
-            var = output.createVariable(VAR_ELEM_ORDER_MAP, input.int, DIM_NUM_ELEM)
-            var[:] = input.data.variables[VAR_ELEM_ORDER_MAP][output_elem_indices]
     # END OF ELEMENT BLOCK PROCESSING
+
+    eb_added_elements = [x + 1 for x in output_elem_indices]
+
+    # Number of elements
+    output.createDimension(DIM_NUM_ELEM, len(eb_added_elements))
+
+    # Element ID map
+    var = output.createVariable(VAR_ELEM_ID_MAP, input.int, DIM_NUM_ELEM)
+    var[:] = input.get_elem_id_map()[output_elem_indices]
+
+    # Optional element order map
+    if VAR_ELEM_ORDER_MAP in input.data.variables:
+        var = output.createVariable(VAR_ELEM_ORDER_MAP, input.int, DIM_NUM_ELEM)
+        var[:] = input.data.variables[VAR_ELEM_ORDER_MAP][output_elem_indices]
 
     old_new_elem_id_map = {}  # keyed on old, value is new
     newid = 1
@@ -3272,24 +3302,26 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
         newid += 1
 
     # Node set node lists
-    for i in range(1, output.dimensions[DIM_NUM_NS].size + 1):
-        var = output.variables[VAR_NODE_NS % i]
-        num_nodes = output.dimensions[DIM_NUM_NODE_NS % i].size
-        new_var = numpy.empty(num_nodes, input.int)
-        for j in range(num_nodes):
-            new_var[j] = old_new_node_id_map[var[j]]
-        var[:] = new_var
+    if DIM_NUM_NS in output.dimensions:  # only if we have node sets
+        for i in range(1, output.dimensions[DIM_NUM_NS].size + 1):
+            var = output.variables[VAR_NODE_NS % i]
+            num_nodes = output.dimensions[DIM_NUM_NODE_NS % i].size
+            new_var = numpy.empty(num_nodes, input.int)
+            for j in range(num_nodes):
+                new_var[j] = old_new_node_id_map[var[j]]
+            var[:] = new_var
 
     # Element block connectivity lists
-    for i in range(1, output.dimensions[DIM_NUM_EB].size + 1):
-        var = output.variable[VAR_CONNECT % i]
-        num_elem = output.dimensions[DIM_NUM_EL_IN_BLK % i]
-        num_node = output.dimensions[DIM_NUM_NOD_PER_EL % i]
-        new_var = numpy.empty(num_elem, num_node)
-        for j in range(num_elem):
-            for k in range(num_node):
-                new_var[j, k] = old_new_node_id_map[var[j, k]]
-        var[:] = new_var
+    if DIM_NUM_EB in output.dimensions:  # only if we have element blocks
+        for i in range(1, output.dimensions[DIM_NUM_EB].size + 1):
+            var = output.variable[VAR_CONNECT % i]
+            num_elem = output.dimensions[DIM_NUM_EL_IN_BLK % i]
+            num_node = output.dimensions[DIM_NUM_NOD_PER_EL % i]
+            new_var = numpy.empty(num_elem, num_node)
+            for j in range(num_elem):
+                for k in range(num_node):
+                    new_var[j, k] = old_new_node_id_map[var[j, k]]
+            var[:] = new_var
 
     # Dimension for number of nodes
     output.createDimension(DIM_NUM_NODES, len(added_nodes))
@@ -3303,13 +3335,13 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
         num_dim = input.num_dim
         if num_dim >= 1:
             var = output.createVariable(VAR_COORD_X, input.float, DIM_NUM_NODES)
-            var[:] = input.data.variables[VAR_COORD_X][added_nodes_indices]
+            var[:] = input.data.variables[VAR_COORD_X][:][added_nodes_indices]
             if num_dim >= 2:
                 var = output.createVariable(VAR_COORD_Y, input.float, DIM_NUM_NODES)
-                var[:] = input.data.variables[VAR_COORD_Y][added_nodes_indices]
+                var[:] = input.data.variables[VAR_COORD_Y][:][added_nodes_indices]
                 if num_dim >= 3:
                     var = output.createVariable(VAR_COORD_Z, input.float, DIM_NUM_NODES)
-                    var[:] = input.data.variables[VAR_COORD_Z][added_nodes_indices]
+                    var[:] = input.data.variables[VAR_COORD_Z][:][added_nodes_indices]
     else:
         var = output.createVariable(VAR_COORD, input.float, (DIM_NUM_DIM, DIM_NUM_NODES))
         var[:] = input.data.variables[VAR_COORD][:, added_nodes_indices]
@@ -3359,10 +3391,10 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
             var = output.createVariable(VAR_NAME_NOD_VAR, '|S1', (DIM_NUM_NOD_VAR, DIM_STRING_LENGTH))
             var[:] = input.data.variables[VAR_NAME_NOD_VAR][nod_var_idx]
 
-    # Every block/set can have its own variables
-    # The truth table shows which block has which variables
-    # TODO I don't think the code enforces this last one
-    # All blocks/set have to have the same properties
+    if output.dimensions[DIM_NUM_NODES].size == 0:
+        warnings.warn("Output file is likely corrupt since it has 0 nodes!")
+    if output.dimensions[DIM_NUM_ELEM].size == 0:
+        warnings.warn("Output file is likely corrupt since it has 0 elements!")
     output.close()
 
 
@@ -3375,18 +3407,111 @@ if __name__ == "__main__":
     #     f = os.path.join(directory, filename)
     #     # checking if it is a file
     #     if os.path.isfile(f):
+    #         if "test" in str(f):
+    #             continue
     #         ex = Exodus(str(f), 'r')
     #         print("%s -- Node sets: %d, Side sets: %d, Element Blocks: %d" % (
     #             ex.path, ex.num_node_sets, ex.num_side_sets, ex.num_elem_blk))
+    #         print("\\ NS props: %d, SS props: %d, EB props: %d" % (
+    #             ex.num_node_set_prop, ex.num_side_set_prop, ex.num_elem_block_prop))
+    #         print("\\ NS vars: %d, SS vars: %d, EB vars: %d" % (
+    #             ex.num_node_set_var, ex.num_side_set_var, ex.num_elem_block_var))
+    #         print("\\ Timesteps: %d, Nodal vars: %d, Global vars: %d" % (
+    #             ex.num_time_steps, ex.num_node_var, ex.num_global_var))
+    #         print("\\ Elems: %d, Nodes: %d, QA recs: %d" % (ex.num_elem, ex.num_nodes, ex.num_qa))
     #         ex.close()
-    ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
-    print(ex.data.variables[VAR_VALS_NOD_VAR_LARGE % 1])
-    # print(ex.data.variables['side_ss1'])
-    # print(ex.data.variables['dist_fact_ss1'])
-    # print(ex.get_side_set_df(ex.get_side_set_id_map()[0]))
+    # sample-files/bake.e -- Node sets: 0, Side sets: 29, Element Blocks: 121
+    # \ NS props: 0, SS props: 1, EB props: 1
+    # \ NS vars: 0, SS vars: 0, EB vars: 1
+    # \ Timesteps: 15, Nodal vars: 1, Global vars: 2
+    # sample-files/biplane.exo -- Node sets: 0, Side sets: 13, Element Blocks: 46
+    # \ NS props: 0, SS props: 1, EB props: 1
+    # \ NS vars: 0, SS vars: 0, EB vars: 0
+    # \ Timesteps: 0, Nodal vars: 0, Global vars: 0
+    # sample-files/can.ex2 -- Node sets: 2, Side sets: 1, Element Blocks: 2
+    # \ NS props: 1, SS props: 1, EB props: 1
+    # \ NS vars: 0, SS vars: 0, EB vars: 1
+    # \ Timesteps: 44, Nodal vars: 9, Global vars: 6
+    # sample-files/cube_1ts_mod.e -- Node sets: 7, Side sets: 1, Element Blocks: 1
+    # \ NS props: 1, SS props: 1, EB props: 1
+    # \ NS vars: 0, SS vars: 0, EB vars: 105
+    # \ Timesteps: 1, Nodal vars: 27, Global vars: 0
+    # sample-files/cube_with_data.exo -- Node sets: 2, Side sets: 2, Element Blocks: 1
+    # \ NS props: 1, SS props: 1, EB props: 1
+    # \ NS vars: 2, SS vars: 2, EB vars: 0
+    # \ Timesteps: 1, Nodal vars: 0, Global vars: 0
+    # sample-files/disk_out_ref - Copy.ex2 -- Node sets: 3, Side sets: 7, Element Blocks: 1
+    # \ NS props: 1, SS props: 1, EB props: 1
+    # \ NS vars: 0, SS vars: 0, EB vars: 0
+    # \ Timesteps: 1, Nodal vars: 9, Global vars: 0
+    # sample-files/disk_out_ref.ex2 -- Node sets: 3, Side sets: 7, Element Blocks: 1
+    # \ NS props: 1, SS props: 1, EB props: 1
+    # \ NS vars: 0, SS vars: 0, EB vars: 0
+    # \ Timesteps: 1, Nodal vars: 9, Global vars: 0
+    # sample-files/tube_rbar_conmass.exo -- Node sets: 1, Side sets: 1, Element Blocks: 6
+    # \ NS props: 1, SS props: 1, EB props: 1
+    # \ NS vars: 0, SS vars: 0, EB vars: 0
+    # \ Timesteps: 0, Nodal vars: 0, Global vars: 0
+    # sample-files/write.ex2 -- Node sets: 2, Side sets: 1, Element Blocks: 2
+    # \ NS props: 1, SS props: 1, EB props: 1
+    # \ NS vars: 0, SS vars: 0, EB vars: 1
+    # \ Timesteps: 44, Nodal vars: 9, Global vars: 6
 
-    # print(ex.data.variables[VAR_ELEM_ORDER_MAP])
-    # output_subset(ex, [], [], [], PropertySelector(ex), [], [], [], "sample-files/outputtest.ex2", "output test")
-    # ds = nc.Dataset("sample-files/outputtest.ex2")
+    # ex = Exodus("sample-files/tube_rbar_conmass.exo", 'r')
+    # print(ex.data.dimensions[DIM_NUM_GLO_VAR])
+
+    # ex = Exodus("sample-files/cube_with_data.exo", 'r')
+    # p = "sample-files/outputtest.ex2"
+    # t = ""
+    # eb_sels = []
+    # ss_sels = []
+    # ns_sels = []
+    # prop_sel = PropertySelector(ex, None, None, None)
+    # nodal_var = []
+    # global_var = []
+    # steps = []
+    #
+    # print(ex.get_node_set_id_map())
+    # print(ex.get_node_set_params(3))
+    # print(ex.get_node_set(3))
+    # print(ex.get_node_set_df(3))
+    #
+    # ns = NodeSetSelector(ex, 3)
+
+    # output_subset(ex, p, t, eb_sels, ss_sels, ns_sels, prop_sel, nodal_var, global_var, steps)
+    #
+    # ds = nc.Dataset(p)
+    # print(ex.data)
     # print(ds)
+    # ds.close()
+    #
+    # out = Exodus(p, 'r')
+    # out.close()
+
     # ex.close()
+
+
+    input_file = Exodus("sample-files/cube_with_data.exo", 'r')
+
+    ns_id = input_file.get_node_set_id_map()[0]
+    num_nod_ns, num_df_ns = input_file.get_node_set_params(ns_id)
+    ns_num = input_file.get_node_set_number(ns_id)
+    tab_ns = input_file.get_node_set_truth_table()[ns_num - 1]
+    num_var_ns = sum(tab_ns)
+    nod_ns = input_file.get_node_set(ns_id)
+    df_ns = input_file.get_node_set_df(ns_id)
+    ns = NodeSetSelector(input_file, ns_id)
+    print(nod_ns)
+    print(tab_ns)
+    ns = NodeSetSelector(input_file, ns_id, range(1, 4))
+    print(ns.nodes)
+    print(nod_ns[ns.nodes])
+    # assert len(ns.nodes) == num_nod_ns
+    # assert ns.nodes == list(range(num_nod_ns))
+    # assert len(ns.variables) == num_var_ns
+    # print(ns.variables)
+    # print(tab_ns)
+    # ns = NodeSetSelector(input_file, ns_id, [4])
+    # print(list(set([4]))[-1] > input_file.num_node_set_var)
+
+    input_file.close()
