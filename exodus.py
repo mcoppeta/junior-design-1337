@@ -1,11 +1,28 @@
+import builtins
 import warnings
 import netCDF4 as nc
 import numpy
-from typing import List
+from typing import List, Tuple
 from ledger import Ledger
 import util
 from selector import ElementBlockSelector, NodeSetSelector, SideSetSelector, PropertySelector
 from constants import *
+from dataclasses import dataclass
+
+
+@dataclass
+class ElemBlockParam:
+    # Used to get the side set node count list
+    # Adapted from exodusII_int.h
+    elem_type_str: str
+    elem_blk_id: numpy.int64
+    num_elem_in_blk: numpy.int64
+    num_nodes_per_elem: int
+    num_sides: int
+    num_nodes_per_side: numpy.ndarray
+    num_attr: int
+    elem_ctr: numpy.int64
+    elem_type_val: ElementTopography
 
 
 class Exodus:
@@ -714,7 +731,8 @@ class Exodus:
             raise KeyError("Could not find global variables in this database!")
         return result
 
-    def _int_get_partial_object_var_across_times(self, obj_type: ObjectType, internal_id, start_time_step, end_time_step, var_index,
+    def _int_get_partial_object_var_across_times(self, obj_type: ObjectType, internal_id, start_time_step,
+                                                 end_time_step, var_index,
                                                  start_index, count):
         """
         Returns partial values of an element block variable between specified time steps (inclusive).
@@ -1197,6 +1215,352 @@ class Exodus:
         size = self._int_get_side_set_params(obj_id, internal_id)[0]
         return self._int_get_partial_side_set(obj_id, internal_id, 1, size)
 
+    def get_side_set_node_count_list(self, obj_id):
+        """Returns array of number of nodes per side/face."""
+        # Adapted from ex_get_side_set_node_count.c
+        internal_id = self._lookup_id(SIDESET, obj_id)
+        num_eb = self.num_elem_blk
+        ndim = self.num_dim
+        num_ss_elem, _ = self._int_get_side_set_params(obj_id, internal_id)
+        elem_list, side_list = self.get_side_set(obj_id)
+        ss_elem_idx = numpy.argsort(elem_list)
+        eb_id_map = self.get_elem_block_id_map()
+        eb_params = []
+        elem_ctr = 0
+        for i in range(num_eb):
+            id = eb_id_map[i]
+            eb_params.append(self._int_get_elem_block_param_object(id, ndim))
+            elem_ctr += eb_params[i].num_elem_in_blk
+            eb_params[i].elem_ctr = elem_ctr
+        node_count_list = numpy.empty(num_ss_elem, self.int)
+        j = 0  # current elem block
+        for ii in range(num_ss_elem):
+            i = ss_elem_idx[ii]
+            elem = elem_list[i]
+            side = side_list[i] - 1  # 0 based side
+            while j < num_eb:
+                if elem <= eb_params[j].elem_ctr:
+                    break
+                else:
+                    j += 1
+            if j >= num_eb:
+                raise ValueError("Invalid element number %d in side set %d!" % (elem, obj_id))
+            if side >= eb_params[j].num_sides:
+                raise ValueError("Invalid side number %d for element type %s in side set %d!" %
+                                 (side, eb_params[j].elem_type_str, obj_id))
+            node_count_list[i] = eb_params[j].num_nodes_per_side[side]
+        return node_count_list
+
+    def get_side_set_node_list(self, obj_id):
+        """
+        Returns array of nodes for this side set and the node count list.
+
+        :return: (node list, node count list)
+        """
+        # Adapted from ex_get_side_set_node_list.c.
+        # I really really really hope this doesn't have errors in it
+        internal_id = self._lookup_id(SIDESET, obj_id)
+        num_eb = self.num_elem_blk
+        num_elem = self.num_elem
+        ndim = self.num_dim
+        num_ss_elem, num_ss_df = self._int_get_side_set_params(obj_id, internal_id)
+        elem_list, side_list = self.get_side_set(obj_id)
+        ss_elem_idx = numpy.argsort(elem_list)
+        eb_id_map = self.get_elem_block_id_map()
+        eb_params = []
+        elem_ctr = 0
+        for i in range(num_eb):
+            id = eb_id_map[i]
+            eb_params.append(self._int_get_elem_block_param_object(id, ndim))
+            elem_ctr += eb_params[i].num_elem_in_blk
+            eb_params[i].elem_ctr = elem_ctr
+        ss_param_idx = numpy.empty(num_ss_elem)  # ss element to eb param index
+        ss_elem_node_idx = numpy.empty(num_ss_elem)  # ss element to node list index
+        node_count_list = numpy.empty(num_ss_elem, self.int)
+        node_ctr = 0
+        j = 0  # current elem block
+        for ii in range(num_ss_elem):
+            i = ss_elem_idx[ii]
+            elem = elem_list[i]
+            side = side_list[i]
+            while j < num_eb:
+                if eb_params[j].elem_type_val != NULL:
+                    if elem <= eb_params[j].elem_ctr:
+                        break
+                    else:
+                        j += 1
+            if j >= num_eb:
+                raise ValueError("Invalid element number %d in side set %d!" % (elem, obj_id))
+            if side >= eb_params[j].num_sides:
+                raise ValueError("Invalid side number %d for element type %s in side set %d!" %
+                                 (side, eb_params[j].elem_type_str, obj_id))
+            ss_param_idx[i] = j
+            ss_elem_node_idx[i] = eb_params[j].num_nodes_per_side[side - 1]
+            node_ctr += eb_params[j].num_nodes_per_side[side - 1]
+
+        if num_ss_df > 0 and num_ss_df != num_ss_elem:
+            if node_ctr != num_ss_df:
+                warnings.warn("Side set %d dist fact count (%d) does not match node list length (%d)! This may indicate"
+                              " a corrupt database." % (obj_id, num_ss_df, node_ctr))
+
+        for i in range(num_ss_elem):
+            node_count_list[i] = ss_elem_node_idx[i]
+
+        sum = 0
+        for i in range(num_ss_elem):
+            cnt = ss_elem_node_idx[i]
+            ss_elem_node_idx[i] = sum
+            sum += cnt
+
+        node_list = numpy.empty(node_ctr, self.int)
+
+        elem_ctr = 0
+        connect = None
+        for j in range(num_ss_elem):
+            elem_idx = ss_elem_idx[j]
+            elem = elem_list[elem_idx]
+            side = side_list[elem_idx]
+            param_idx = ss_param_idx[elem_idx]
+
+            if elem > elem_ctr:
+                # We're doing this the C way because copying code from SEACAS saves development time
+                connect = numpy.ndarray.flatten(self.get_elem_block_connectivity(eb_params[param_idx].elem_blk_id))
+                elem_ctr = eb_params[param_idx].elem_ctr
+
+            if connect is None:
+                raise ValueError("connect is None in get_side_set_node_list. This is likely the result of an abnormal"
+                                 " Exodus file.")
+
+            elem_num = elem - 1
+            elem_num_pos = elem_num - (eb_params[param_idx].elem_ctr - eb_params[param_idx].num_elem_in_blk)
+
+            num_nodes_per_elem = eb_params[param_idx].num_nodes_per_elem
+            connect_offset = num_nodes_per_elem * elem_num_pos
+            side_num = side - 1
+            node_pos = ss_elem_node_idx[elem_idx]
+
+            if eb_params[param_idx].elem_type_val == CIRCLE or eb_params[param_idx].elem_type_val == SPHERE:
+                node_list[node_pos] = connect[connect_offset]
+            elif eb_params[param_idx].elem_type_val == TRUSS:
+                node_list[node_pos] = connect[connect_offset + side_num]
+            elif eb_params[param_idx].elem_type_val == BEAM:
+                for i in range(num_nodes_per_elem):
+                    node_list[node_pos + i] = connect[connect_offset + i]
+            elif eb_params[param_idx].elem_type_val == TRIANGLE:
+                if ndim == 2:
+                    if side_num + 1 < 1 or side_num + 1 > 3:
+                        raise ValueError("Invalid triangle side number %d!" % (side_num + 1))
+                    node_list[node_pos] = connect[connect_offset + tri_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + tri_table[side_num][1] - 1]
+                    if num_nodes_per_elem > 3:
+                        node_list[node_pos + 2] = connect[connect_offset + tri_table[side_num][2] - 1]
+                elif ndim == 3:
+                    if side_num + 1 < 1 or side_num + 1 > 5:
+                        raise ValueError("Invalid triangle side number %d!" % (side_num + 1))
+                    node_list[node_pos] = connect[connect_offset + tri3_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + tri3_table[side_num][1] - 1]
+                    if side_num + 1 <= 2:
+                        if num_nodes_per_elem == 3:
+                            node_list[node_pos + 2] = connect[connect_offset + tri3_table[side_num][2] - 1]
+                        elif num_nodes_per_elem == 4:
+                            node_list[node_pos + 2] = connect[connect_offset + tri3_table[side_num][2] - 1]
+                            # This looks wrong, but it's what the C library does...
+                            node_list[node_pos + 2] = connect[connect_offset + 4 - 1]
+                        elif num_nodes_per_elem == 6:
+                            node_list[node_pos + 2] = connect[connect_offset + tri3_table[side_num][2] - 1]
+                            node_list[node_pos + 3] = connect[connect_offset + tri3_table[side_num][3] - 1]
+                            node_list[node_pos + 4] = connect[connect_offset + tri3_table[side_num][4] - 1]
+                            node_list[node_pos + 5] = connect[connect_offset + tri3_table[side_num][5] - 1]
+                        elif num_nodes_per_elem == 7:
+                            node_list[node_pos + 2] = connect[connect_offset + tri3_table[side_num][2] - 1]
+                            node_list[node_pos + 3] = connect[connect_offset + tri3_table[side_num][3] - 1]
+                            node_list[node_pos + 4] = connect[connect_offset + tri3_table[side_num][4] - 1]
+                            node_list[node_pos + 5] = connect[connect_offset + tri3_table[side_num][5] - 1]
+                            node_list[node_pos + 6] = connect[connect_offset + tri3_table[side_num][6] - 1]
+                        else:
+                            raise ValueError("%d is an unsupported number of nodes for triangle elements!" %
+                                             num_nodes_per_elem)
+                    else:
+                        if num_nodes_per_elem > 3:
+                            node_list[node_pos + 2] = connect[connect_offset + tri3_table[side_num][2] - 1]
+            elif eb_params[param_idx].elem_type_val == QUAD:
+                if side_num + 1 < 1 or side_num + 1 > 4:
+                    raise ValueError("Invalid quad side number %d!" % (side_num + 1))
+                node_list[node_pos + 0] = connect[connect_offset + quad_table[side_num][0] - 1]
+                node_list[node_pos + 1] = connect[connect_offset + quad_table[side_num][1] - 1]
+                if num_nodes_per_elem > 5:
+                    node_list[node_pos + 2] = connect[connect_offset + quad_table[side_num][2] - 1]
+            elif eb_params[param_idx].elem_type_val == SHELL:
+                if side_num + 1 < 1 or side_num + 1 > 6:
+                    raise ValueError("Invalid shell side number %d!" % (side_num + 1))
+                node_list[node_pos + 0] = connect[connect_offset + shell_table[side_num][0] - 1]
+                node_list[node_pos + 1] = connect[connect_offset + shell_table[side_num][1] - 1]
+                if num_nodes_per_elem > 2:
+                    if side_num + 1 <= 2:
+                        node_list[node_pos + 2] = connect[connect_offset + shell_table[side_num][2] - 1]
+                        node_list[node_pos + 3] = connect[connect_offset + shell_table[side_num][3] - 1]
+                if num_nodes_per_elem == 8:
+                    if side_num + 1 <= 2:
+                        node_list[node_pos + 4] = connect[connect_offset + shell_table[side_num][4] - 1]
+                        node_list[node_pos + 5] = connect[connect_offset + shell_table[side_num][5] - 1]
+                        node_list[node_pos + 6] = connect[connect_offset + shell_table[side_num][6] - 1]
+                        node_list[node_pos + 7] = connect[connect_offset + shell_table[side_num][7] - 1]
+                    else:
+                        node_list[node_pos + 2] = connect[connect_offset + shell_table[side_num][2] - 1]
+                if num_nodes_per_elem == 9:
+                    if side_num + 1 <= 2:
+                        node_list[node_pos + 4] = connect[connect_offset + shell_table[side_num][4] - 1]
+                        node_list[node_pos + 5] = connect[connect_offset + shell_table[side_num][5] - 1]
+                        node_list[node_pos + 6] = connect[connect_offset + shell_table[side_num][6] - 1]
+                        node_list[node_pos + 7] = connect[connect_offset + shell_table[side_num][7] - 1]
+                        node_list[node_pos + 8] = connect[connect_offset + shell_table[side_num][8] - 1]
+                    else:
+                        node_list[node_pos + 2] = connect[connect_offset + shell_table[side_num][2] - 1]
+            elif eb_params[param_idx].elem_type_val == TETRA:
+                if side_num + 1 < 1 or side_num + 1 > 4:
+                    raise ValueError("Invalid tetra side number %d!" % (side_num + 1))
+                node_list[node_pos + 0] = connect[connect_offset + tetra_table[side_num][0] - 1]
+                node_list[node_pos + 1] = connect[connect_offset + tetra_table[side_num][1] - 1]
+                node_list[node_pos + 2] = connect[connect_offset + tetra_table[side_num][2] - 1]
+                if num_nodes_per_elem == 8:
+                    node_list[node_pos + 3] = connect[connect_offset + tetra_table[side_num][3] - 1]
+                elif num_nodes_per_elem > 8:
+                    node_list[node_pos + 3] = connect[connect_offset + tetra_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + tetra_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + tetra_table[side_num][5] - 1]
+            elif eb_params[param_idx].elem_type_val == WEDGE:
+                if side_num + 1 < 1 or side_num + 1 > 5:
+                    raise ValueError("Invalid wedge side number %d!" % (side_num + 1))
+                if num_nodes_per_elem == 6 or num_nodes_per_elem == 7:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge6_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge6_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge6_table[side_num][2] - 1]
+                    if side_num == 3 or side_num == 4:
+                        pass
+                    else:
+                        node_list[node_pos + 3] = connect[connect_offset + wedge6_table[side_num][3] - 1]
+                elif num_nodes_per_elem == 15 or num_nodes_per_elem == 16:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge15_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge15_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge15_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + wedge15_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + wedge15_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + wedge15_table[side_num][5] - 1]
+                    if side_num == 3 or side_num == 4:
+                        pass
+                    else:
+                        node_list[node_pos + 6] = connect[connect_offset + wedge15_table[side_num][6] - 1]
+                        node_list[node_pos + 7] = connect[connect_offset + wedge15_table[side_num][7] - 1]
+                elif num_nodes_per_elem == 12:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge12_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge12_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge12_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + wedge12_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + wedge12_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + wedge12_table[side_num][5] - 1]
+                elif num_nodes_per_elem == 20:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge20_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge20_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge20_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + wedge20_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + wedge20_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + wedge20_table[side_num][5] - 1]
+                    node_list[node_pos + 6] = connect[connect_offset + wedge20_table[side_num][6] - 1]
+                    if side_num == 3 or side_num == 4:
+                        pass
+                    else:
+                        node_list[node_pos + 7] = connect[connect_offset + wedge20_table[side_num][7] - 1]
+                        node_list[node_pos + 8] = connect[connect_offset + wedge20_table[side_num][8] - 1]
+                elif num_nodes_per_elem == 21:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge21_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge21_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge21_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + wedge21_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + wedge21_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + wedge21_table[side_num][5] - 1]
+                    node_list[node_pos + 6] = connect[connect_offset + wedge21_table[side_num][6] - 1]
+                    if side_num == 3 or side_num == 4:
+                        pass
+                    else:
+                        node_list[node_pos + 7] = connect[connect_offset + wedge21_table[side_num][7] - 1]
+                        node_list[node_pos + 8] = connect[connect_offset + wedge21_table[side_num][8] - 1]
+                elif num_nodes_per_elem == 18:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge18_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge18_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge18_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + wedge18_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + wedge18_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + wedge18_table[side_num][5] - 1]
+                    if side_num == 3 or side_num == 4:
+                        pass
+                    else:
+                        node_list[node_pos + 6] = connect[connect_offset + wedge18_table[side_num][6] - 1]
+                        node_list[node_pos + 7] = connect[connect_offset + wedge18_table[side_num][7] - 1]
+                        node_list[node_pos + 8] = connect[connect_offset + wedge18_table[side_num][8] - 1]
+            elif eb_params[param_idx].elem_type_val == PYRAMID:
+                if side_num + 1 < 1 or side_num + 1 > 5:
+                    raise ValueError("Invalid pyramid side number %d!" % (side_num + 1))
+                node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][0] - 1]
+                node_pos += 1
+                node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][1] - 1]
+                node_pos += 1
+                node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][2] - 1]
+                node_pos += 1
+                if pyramid_table[side_num][3] == 0:
+                    pass  # this one even confuses the C library
+                else:
+                    node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][3] - 1]
+                    node_pos += 1
+                if num_nodes_per_elem > 5:
+                    node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][4] - 1]
+                    node_pos += 1
+                    node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][5] - 1]
+                    node_pos += 1
+                    node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][6] - 1]
+                    node_pos += 1
+                    if side_num == 4:
+                        node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][7] - 1]
+                        node_pos += 1
+                        if num_nodes_per_elem >= 14:
+                            node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][8] - 1]
+                            node_pos += 1
+                    else:
+                        if num_nodes_per_elem >= 18:
+                            node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][8] - 1]
+                            node_pos += 1
+            elif eb_params[param_idx].elem_type_val == HEX:
+                if side_num + 1 < 1 or side_num + 1 > 6:
+                    raise ValueError("Invalid hex side number %d!" % (side_num + 1))
+                if num_nodes_per_elem == 16:
+                    node_list[node_pos + 0] = connect[connect_offset + hex16_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + hex16_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + hex16_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + hex16_table[side_num][3] - 1]
+                    # I have no idea whats going on with these next two statements
+                    node_list[node_pos + 3] = connect[connect_offset + hex16_table[side_num][4] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + hex16_table[side_num][5] - 1]
+                    if side_num + 1 == 5 or side_num + 1 == 6:
+                        # Also no idea about these ones
+                        node_list[node_pos] = connect[connect_offset + hex16_table[side_num][6] - 1]
+                        node_pos += 1
+                        node_list[node_pos] = connect[connect_offset + hex16_table[side_num][7] - 1]
+                        node_pos += 1
+                else:
+                    node_list[node_pos + 0] = connect[connect_offset + hex_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + hex_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + hex_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + hex_table[side_num][3] - 1]
+                    if num_nodes_per_elem > 12:
+                        node_list[node_pos + 4] = connect[connect_offset + hex_table[side_num][4] - 1]
+                        node_list[node_pos + 5] = connect[connect_offset + hex_table[side_num][5] - 1]
+                        node_list[node_pos + 6] = connect[connect_offset + hex_table[side_num][6] - 1]
+                        node_list[node_pos + 7] = connect[connect_offset + hex_table[side_num][7] - 1]
+                    if num_nodes_per_elem == 27:
+                        node_list[node_pos + 8] = connect[connect_offset + hex_table[side_num][8] - 1]
+            else:
+                raise ValueError("%s is an unsupported element type." % eb_params[param_idx].elem_type_str)
+        return node_list, node_count_list
+
     def get_partial_side_set(self, obj_id, start, count):
         """
         Returns tuple containing a subset of the elements and sides contained in the side set with given ID.
@@ -1315,7 +1679,7 @@ class Exodus:
         internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_partial_elem_block_connectivity(obj_id, internal_id, start, count)
 
-    def get_elem_block_params(self, obj_id):
+    def get_elem_block_params(self, obj_id) -> Tuple[builtins.int, builtins.int, str, builtins.int]:
         """
         Returns a tuple containing the parameters for the element block with given ID.
 
@@ -1323,6 +1687,304 @@ class Exodus:
         """
         internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_elem_block_params(obj_id, internal_id)
+
+    def _int_get_elem_block_param_object(self, obj_id, ndim) -> ElemBlockParam:
+        """Returns parameters used to describe an elem block."""
+        # Adapted from ex_int_get_block_param.c
+        # Used to get side set node count list
+        num_el, nod_el, topo, num_att = self.get_elem_block_params(obj_id)
+        topo = topo.upper()
+        num_nod_side = numpy.zeros(6, builtins.int)
+        if topo[:3] == CIRCLE[:3]:
+            el_type = CIRCLE
+            num_sides = 1
+            num_nod_side[0] = 1
+        elif topo[:3] == SPHERE[:3]:
+            el_type = SPHERE
+            num_sides = 1
+            num_nod_side[0] = 1
+        elif topo[:3] == QUAD[:3]:
+            el_type = QUAD
+            num_sides = 4
+            if nod_el == 4 or nod_el == 5:
+                num_nod_side[0] = 2
+                num_nod_side[1] = 2
+                num_nod_side[2] = 2
+                num_nod_side[3] = 2
+            elif nod_el == 9 or nod_el == 8:
+                num_nod_side[0] = 3
+                num_nod_side[1] = 3
+                num_nod_side[2] = 3
+                num_nod_side[3] = 3
+            elif nod_el == 12 or nod_el == 16:
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+                num_nod_side[2] = 4
+                num_nod_side[3] = 4
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == TRIANGLE[:3]:
+            el_type = TRIANGLE
+            if ndim == 2:
+                num_sides = 3
+                if nod_el == 3 or nod_el == 4:
+                    num_nod_side[0] = 2
+                    num_nod_side[1] = 2
+                    num_nod_side[2] = 2
+                elif nod_el == 6 or nod_el == 7:
+                    num_nod_side[0] = 3
+                    num_nod_side[1] = 3
+                    num_nod_side[2] = 3
+                elif nod_el == 9 or nod_el == 13:
+                    num_nod_side[0] = 4
+                    num_nod_side[1] = 4
+                    num_nod_side[2] = 4
+                else:
+                    raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+            elif ndim == 3:
+                num_sides = 5
+                if nod_el == 3 or nod_el == 4:
+                    num_nod_side[0] = nod_el
+                    num_nod_side[1] = nod_el
+                    num_nod_side[2] = 2
+                    num_nod_side[3] = 2
+                    num_nod_side[4] = 2
+                elif nod_el == 6 or nod_el == 7:
+                    num_nod_side[0] = nod_el
+                    num_nod_side[1] = nod_el
+                    num_nod_side[2] = 3
+                    num_nod_side[3] = 3
+                    num_nod_side[4] = 3
+                elif nod_el == 9 or nod_el == 13:
+                    num_nod_side[0] = nod_el
+                    num_nod_side[1] = nod_el
+                    num_nod_side[2] = 4
+                    num_nod_side[3] = 4
+                    num_nod_side[4] = 4
+                else:
+                    raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == SHELL[:3]:
+            el_type = SHELL
+            if nod_el == 2:
+                num_sides = 2
+                num_nod_side[0] = 2
+                num_nod_side[1] = 2
+            elif nod_el == 4:
+                num_sides = 6
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+                num_nod_side[2] = 2
+                num_nod_side[3] = 2
+                num_nod_side[4] = 2
+                num_nod_side[5] = 2
+            elif nod_el == 8 or nod_el == 9:
+                num_sides = 6
+                num_nod_side[0] = nod_el
+                num_nod_side[1] = nod_el
+                num_nod_side[2] = 3
+                num_nod_side[3] = 3
+                num_nod_side[4] = 3
+                num_nod_side[5] = 3
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == HEX[:3]:
+            el_type = HEX
+            num_sides = 6
+            if nod_el == 8 or nod_el == 9:
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+                num_nod_side[2] = 4
+                num_nod_side[3] = 4
+                num_nod_side[4] = 4
+                num_nod_side[5] = 4
+            elif nod_el == 12:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+                num_nod_side[4] = 4
+                num_nod_side[5] = 4
+            elif nod_el == 16:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+                num_nod_side[4] = 8
+                num_nod_side[5] = 8
+            elif nod_el == 20:
+                num_nod_side[0] = 8
+                num_nod_side[1] = 8
+                num_nod_side[2] = 8
+                num_nod_side[3] = 8
+                num_nod_side[4] = 8
+                num_nod_side[5] = 8
+            elif nod_el == 27:
+                num_nod_side[0] = 9
+                num_nod_side[1] = 9
+                num_nod_side[2] = 9
+                num_nod_side[3] = 9
+                num_nod_side[4] = 9
+                num_nod_side[5] = 9
+            elif nod_el == 32:
+                num_nod_side[0] = 12
+                num_nod_side[1] = 12
+                num_nod_side[2] = 12
+                num_nod_side[3] = 12
+                num_nod_side[4] = 12
+                num_nod_side[5] = 12
+            elif nod_el == 64:
+                num_nod_side[0] = 16
+                num_nod_side[1] = 16
+                num_nod_side[2] = 16
+                num_nod_side[3] = 16
+                num_nod_side[4] = 16
+                num_nod_side[5] = 16
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == TETRA[:3]:
+            el_type = TETRA
+            num_sides = 4
+            if nod_el == 4 or nod_el == 5:
+                num_nod_side[0] = 3
+                num_nod_side[1] = 3
+                num_nod_side[2] = 3
+                num_nod_side[3] = 3
+            elif nod_el == 8:
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+                num_nod_side[2] = 4
+                num_nod_side[3] = 4
+            elif nod_el == 10 or nod_el == 11:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+            elif nod_el == 14 or nod_el == 15:
+                num_nod_side[0] = 7
+                num_nod_side[1] = 7
+                num_nod_side[2] = 7
+                num_nod_side[3] = 7
+            elif nod_el == 16:
+                num_nod_side[0] = 9
+                num_nod_side[1] = 9
+                num_nod_side[2] = 9
+                num_nod_side[3] = 9
+            elif nod_el == 40:
+                num_nod_side[0] = 13
+                num_nod_side[1] = 13
+                num_nod_side[2] = 13
+                num_nod_side[3] = 13
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == WEDGE[:3]:
+            el_type = WEDGE
+            num_sides = 5
+            if nod_el == 6:
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+                num_nod_side[2] = 4
+                num_nod_side[3] = 3
+                num_nod_side[4] = 3
+            elif nod_el == 12:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+                num_nod_side[4] = 6
+            elif nod_el == 15 or nod_el == 16:
+                num_nod_side[0] = 8
+                num_nod_side[1] = 8
+                num_nod_side[2] = 8
+                num_nod_side[3] = 6
+                num_nod_side[4] = 6
+            elif nod_el == 18:
+                num_nod_side[0] = 9
+                num_nod_side[1] = 9
+                num_nod_side[2] = 9
+                num_nod_side[3] = 6
+                num_nod_side[4] = 6
+            elif nod_el == 20 or nod_el == 21:
+                num_nod_side[0] = 9
+                num_nod_side[1] = 9
+                num_nod_side[2] = 9
+                num_nod_side[3] = 7
+                num_nod_side[4] = 7
+            elif nod_el == 24:
+                num_nod_side[0] = 12
+                num_nod_side[1] = 12
+                num_nod_side[2] = 12
+                num_nod_side[3] = 9
+                num_nod_side[4] = 9
+            elif nod_el == 52:
+                num_nod_side[0] = 16
+                num_nod_side[1] = 16
+                num_nod_side[2] = 16
+                num_nod_side[3] = 13
+                num_nod_side[4] = 13
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == PYRAMID[:3]:
+            el_type = PYRAMID
+            num_sides = 5
+            if nod_el == 5:
+                num_nod_side[0] = 3
+                num_nod_side[1] = 3
+                num_nod_side[2] = 3
+                num_nod_side[3] = 3
+                num_nod_side[4] = 4
+            elif nod_el == 13:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+                num_nod_side[4] = 8
+            elif nod_el == 14:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+                num_nod_side[4] = 9
+            elif nod_el == 18 or nod_el == 19:
+                num_nod_side[0] = 7
+                num_nod_side[1] = 7
+                num_nod_side[2] = 7
+                num_nod_side[3] = 7
+                num_nod_side[4] = 9
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == BEAM[:3]:
+            el_type = BEAM
+            num_sides = 2
+            if nod_el == 2:
+                num_nod_side[0] = 2
+                num_nod_side[1] = 2
+            elif nod_el == 3:
+                num_nod_side[0] = 3
+                num_nod_side[1] = 3
+            elif nod_el == 4:
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == TRUSS[:3] or topo[:3] == BAR[:3] or topo[:3] == EDGE[:3]:
+            el_type = TRUSS
+            num_sides = 2
+            if nod_el == 2 or nod_el == 3:
+                num_nod_side[0] = 1
+                num_nod_side[1] = 1
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        # Special case for null elements
+        elif topo[:3] == NULL[:3]:
+            el_type = NULL
+            num_sides = 0
+            num_nod_side[0] = 0
+            num_el = 0
+        else:
+            el_type = UNKNOWN
+            num_sides = 0
+            num_nod_side[0] = 0
+        return ElemBlockParam(topo, obj_id, num_el, nod_el, num_sides, num_nod_side, num_att, 0, el_type)
 
     #########
     # Names #
@@ -2050,7 +2712,7 @@ class Exodus:
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_element(elem_id)
-        
+
     def write(self, path=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to write")
@@ -2116,66 +2778,56 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
 
     has_time_steps = False
     # Time steps
+    output.createDimension(DIM_NUM_TIME_STEP, None)  # unlimited
+    var = output.createVariable(VAR_TIME_WHOLE, input.float, DIM_NUM_TIME_STEP)
     if len(time_steps) > 0:
         has_time_steps = True
-        output.createDimension(DIM_NUM_TIME_STEP, None)  # unlimited
-        var = output.createVariable(VAR_TIME_WHOLE, input.float, DIM_NUM_TIME_STEP)
         try:
             var[:] = input.data.variables[VAR_TIME_WHOLE][time_steps]
         except IndexError:
             raise IndexError("Time step range provided contains invalid indices")
 
-    # Easy stuff done. now its selector time
+    # We will keep track of which nodes we add in our selectors for later use
+    added_nodes = set()
+    # Element Blocks
+    # We will keep track of which elements we add so that if the side set selectors select an unadded element we can
+    # throw an exception
+    eb_added_elements = []
     if len(eb_selectors) > 0:
         if input.num_elem_blk == 0:
             raise ValueError("Element blocks selectors were provided for a database with no element blocks!")
         # Check for duplicate or misplaced selectors
         ids = []  # list of obj ids
         idmap = {}  # dict mapping internal ids to eb selectors
-        for ebs in eb_selectors:
-            if ebs.obj_id in ids:
+        for sel in eb_selectors:
+            if sel.obj_id in ids:
                 raise ValueError("Multiple selectors for the same entity were provided!")
-            if ebs.exodus != input:
+            if sel.exodus != input:
                 raise ValueError("Provided selector is for a different exodus object!")
-            ids.append(ebs.obj_id)
-            internal_id = input._lookup_id(ELEMBLOCK, ebs.obj_id)
-            idmap[internal_id] = ebs
+            ids.append(sel.obj_id)
+            internal_id = input._lookup_id(ELEMBLOCK, sel.obj_id)
+            idmap[internal_id] = sel
+        # This cannot happen until we figure out which elements are being carried over
         output.createDimension(DIM_NUM_EB, len(eb_selectors))
 
-        # If has_time_steps we do var stuff, otherwise don't
-        #  REQUIRED DIMENSIONS/VARIABLES
-        #  DONE
-        #  DIM_NUM_EB
-        #  DIM_NUM_NOD_PER_EL - (trivial read)
-        #  DIM_NUM_EL_IN_BLK - (trivial read)
-        #  VAR_CONNECT (and its attributes! (ATTR_ELEM_TYPE)) (requires num el in block and num nod per el)
-        #  VAR_EB_NAMES - copy this if it exists (requires num el blk, which we have immediately)
-        #  DIM_NUM_ATT_IN_BLK
-        #  VAR_ELEM_ATTRIB
-        #  VAR_ELEM_ATTRIB_NAME
-        #  VAR_EB_PROP (AND ITS ATTRIBUTES (ATTR_NAME))
-        #   since we need prop1, if its not included, regenerate it
-        #  DIM_NUM_ELEM - count how many elements each block has, add it up (DO LAST)
-        #  VAR_ELEM_NUM_MAP - keep track of which elements we add and keep their entry (DO LAST)
-        #  DIM_NUM_ELEM_VAR - number of unique variables the blocks have (VAR RELATED)
-        #  VAR_ELEM_TAB - this can be done with the one above it (VAR RELATED)
-        #  VAR_VALS_ELEM_VAR - (VAR RELATED)
-        #  VAR_NAME_ELEM_VAR - (VAR RELATED)
-        #  VAR_ELEM_ORDER_MAP
-
-        selected_blk_indices = [x - 1 for x in idmap.keys()]
+        selected_block_indices = [x - 1 for x in idmap.keys()]
 
         # EB names
         if VAR_EB_NAMES in input.data.variables:
             var = output.createVariable(VAR_EB_NAMES, '|S1', (DIM_NUM_EB, DIM_NAME_LENGTH))
-            var[:] = input.data.variables[VAR_EB_NAMES][selected_blk_indices]
+            var[:] = input.data.variables[VAR_EB_NAMES][selected_block_indices]
 
-        elblock_id_map = input.data.variables[VAR_EB_PROP % 1]
+        # Status array
+        if VAR_EB_STATUS in input.data.variables:
+            var = output.createVariable(VAR_EB_STATUS, input.int, DIM_NUM_EB)
+            var[:] = input.data.variables[VAR_EB_STATUS][selected_block_indices]
+
+        block_id_map = input.data.variables[VAR_EB_PROP % 1]
         # EB ID map / prop1
         var = output.createVariable(VAR_EB_PROP % 1, input.int, DIM_NUM_EB)
         if 'ID' in prop_selector.eb_prop:
             # Keep ID map
-            var[:] = elblock_id_map[selected_blk_indices]
+            var[:] = block_id_map[selected_block_indices]
         else:
             # Generate ID map
             var[:] = numpy.arange(1, len(eb_selectors) + 1, dtype=input.int)
@@ -2202,14 +2854,13 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
                     # We looked at every property and didn't find this one. This should never happen.
                     break
 
-        # EB properties
         propid = 1  # we've already handled prop1
         # Loop over all the properties and add them if they were selected
         for i in range(2, input.num_elem_block_prop + 1):
             if i in propids.keys():
                 propid += 1  # id of current property in output
                 var = output.createVariable(VAR_EB_PROP % propid, input.int, DIM_NUM_EB)
-                var[:] = input.data.variables[VAR_EB_PROP % i][selected_blk_indices]
+                var[:] = input.data.variables[VAR_EB_PROP % i][selected_block_indices]
 
         # Figure out which variables we're keeping
         vars_to_keep = []
@@ -2227,7 +2878,7 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
                 var = output.createVariable(VAR_NAME_ELEM_VAR, '|S1', (DIM_NUM_ELEM_VAR, DIM_STRING_LENGTH))
                 var[:] = input.data.variables[VAR_NAME_ELEM_VAR][vars_to_keep]
             # Create truth table. We'll set its values in a moment.
-            var_elem_tab = output.createVariable(VAR_ELEM_TAB, input.int, (DIM_NUM_EB, DIM_NUM_ELEM_VAR))
+            var_truth_tab = output.createVariable(VAR_ELEM_TAB, input.int, (DIM_NUM_EB, DIM_NUM_ELEM_VAR))
 
         # EB connectivity list
         output_id = 0
@@ -2237,29 +2888,30 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
         for n in range(input.num_elem_blk):
             input_id = n + 1
             # retrieve info for this element block
-            num_el, nod_per_el, topology, num_attr = input.get_elem_block_params(elblock_id_map[n])
+            num_el, nod_per_el, topology, num_attr = input.get_elem_block_params(block_id_map[n])
             if input_id in idmap.keys():
                 output_id += 1  # id of current block in output
                 eb = idmap[input_id]  # selector of current block in output
 
                 # Dimensions
-                dim_el_in_blk = DIM_NUM_EL_IN_BLK % output_id
-                output.createDimension(dim_el_in_blk, len(eb.elements))
+                dim_num_el_in_blk = DIM_NUM_EL_IN_BLK % output_id
+                output.createDimension(dim_num_el_in_blk, len(eb.elements))
                 dim_nod_per_el = DIM_NUM_NOD_PER_EL % output_id
                 output.createDimension(dim_nod_per_el, nod_per_el)
 
                 # Connectivity list
-                var = output.createVariable(VAR_CONNECT % output_id, input.int, (dim_el_in_blk, dim_nod_per_el))
+                var = output.createVariable(VAR_CONNECT % output_id, input.int, (dim_num_el_in_blk, dim_nod_per_el))
                 var.setncattr(ATTR_ELEM_TYPE, topology)
                 var[:] = input.data.variables[VAR_CONNECT % input_id][eb.elements, :]
                 output_elem_indices.append([x + sum_elem for x in eb.elements])
+                added_nodes.update(input.data.variables[VAR_CONNECT % input_id][eb.elements, :])
 
                 # EB attributes
                 if len(eb.attributes) > 0:
                     dim_att_in_blk = DIM_NUM_ATT_IN_BLK % output_id
                     output.createDimension(dim_att_in_blk, len(eb.attributes))
                     var = output.createVariable(VAR_ELEM_ATTRIB % output_id, input.float,
-                                                (dim_el_in_blk, dim_att_in_blk))
+                                                (dim_num_el_in_blk, dim_att_in_blk))
                     var[:] = input.data.variables[VAR_ELEM_ATTRIB % input_id][eb.elements, eb.attributes]
                     var = output.createVariable(VAR_ELEM_ATTRIB_NAME % output_id, '|S1',
                                                 (dim_att_in_blk, DIM_NAME_LENGTH))
@@ -2273,13 +2925,16 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
                         row[out_var_idx] = 1  # Set true in truth table row
                         # We only want to copy over variable values if we're keeping time steps
                         if has_time_steps:
-                            var = output.createVariable(VAR_VALS_ELEM_VAR % (out_var_idx + 1, output_id), input.float,
-                                                        (DIM_NUM_TIME_STEP, dim_el_in_blk))
+                            var = output.createVariable(VAR_VALS_ELEM_VAR % (out_var_idx + 1, output_id),
+                                                        input.float,
+                                                        (DIM_NUM_TIME_STEP, dim_num_el_in_blk))
                             var[:] = input.data.variables[VAR_VALS_ELEM_VAR % (j + 1, input_id)][time_steps,
                                                                                                  eb.elements]
-                    var_elem_tab[output_id - 1] = row  # put row in table
+                    var_truth_tab[output_id - 1] = row  # put row in table
             # Keep track of how many elements we've looked at
             sum_elem += num_el
+
+        eb_added_elements = [x + 1 for x in output_elem_indices]
 
         # Number of elements
         output.createDimension(DIM_NUM_ELEM, len(output_elem_indices))
@@ -2294,16 +2949,444 @@ def output_subset(input: Exodus, eb_selectors: List[ElementBlockSelector],
             var[:] = input.data.variables[VAR_ELEM_ORDER_MAP][output_elem_indices]
     # END OF ELEMENT BLOCK PROCESSING
 
+    old_new_elem_id_map = {}  # keyed on old, value is new
+    newid = 1
+    for oldid in eb_added_elements:
+        old_new_elem_id_map[oldid] = newid
+        newid += 1
+
+    # Side sets
+    # If the side set selectors include an element that was not selected in the element blocks, the function will throw
+    # an exception. Figuring out which elements are in side sets but not in blocks and then putting them in blocks is
+    # pretty complicated, so we make the user do that for us.
+    if len(ss_selectors) > 0:
+        num_side_sets = len(ss_selectors)
+        if input.num_side_sets == 0:
+            raise ValueError("Side set selectors were provided for a database with no side sets!")
+        # Check for duplicate or misplaced selectors
+        ids = []  # list of obj ids
+        idmap = {}  # dict mapping internal ids to ns selectors
+        for sss in ss_selectors:
+            if sss.obj_id in ids:
+                raise ValueError("Multiple selectors for the same entity were provided!")
+            if sss.exodus != input:
+                raise ValueError("Provided selector is for a different exodus object!")
+            ids.append(sss.obj_id)
+            internal_id = input._lookup_id(SIDESET, sss.obj_id)
+            idmap[internal_id] = sss
+        output.createDimension(DIM_NUM_SS, num_side_sets)
+
+        selected_set_indices = [x - 1 for x in idmap.keys()]
+
+        # SS names
+        if VAR_SS_NAMES in input.data.variables:
+            var = output.createVariable(VAR_SS_NAMES, '|S1', (DIM_NUM_SS, DIM_NAME_LENGTH))
+            var[:] = input.data.variables[VAR_SS_NAMES][selected_set_indices]
+
+        # Status array
+        if VAR_SS_STATUS in input.data.variables:
+            var = output.createVariable(VAR_SS_STATUS, input.int, DIM_NUM_SS)
+            var[:] = input.data.variables[VAR_SS_STATUS][selected_set_indices]
+
+        set_id_map = input.data.variables[VAR_SS_PROP % 1]
+        # SS ID map / prop1
+        var = output.createVariable(VAR_SS_PROP % 1, input.int, DIM_NUM_SS)
+        if 'ID' in prop_selector.ss_prop:
+            # Keep ID map
+            var[:] = set_id_map[selected_set_indices]
+        else:
+            # Generate ID map
+            var[:] = numpy.arange(1, num_side_sets + 1, dtype=input.int)
+
+        # Other SS properties
+        propids = {}  # dict mapping property ids to names
+        for propname in prop_selector.ss_prop:
+            # We've already handled ids so we can skip this
+            if propname == 'ID':
+                continue
+            n = 1
+            while True:
+                if VAR_SS_PROP % n in input.data.variables:
+                    name = input.data.variables[VAR_SS_PROP % n].getncattr(ATTR_NAME)
+                    if propname == name:
+                        # we've found our property
+                        propids[n] = propname
+                        break
+                    else:
+                        # check next property
+                        n += 1
+                        continue
+                else:
+                    # We looked at every property and didn't find this one. This should never happen.
+                    break
+
+        propid = 1  # we've already handled prop1
+        # Loop over all the properties and add them if they were selected
+        for i in range(2, input.num_side_set_prop + 1):
+            if i in propids.keys():
+                propid += 1  # id of current property in output
+                var = output.createVariable(VAR_SS_PROP % propid, input.int, DIM_NUM_SS)
+                var[:] = input.data.variables[VAR_SS_PROP % i][selected_set_indices]
+
+        # Figure out which variables we're keeping
+        vars_to_keep = []
+        for sel in ss_selectors:
+            for v in sel.variables:
+                if v not in vars_to_keep:
+                    vars_to_keep.append(v)
+        vars_to_keep.sort()  # sort to keep ordering
+        has_variables = False
+        if len(vars_to_keep) > 0:
+            has_variables = True
+            output.createDimension(DIM_NUM_SS_VAR, len(vars_to_keep))
+            # Only copy names if they were previously defined
+            if VAR_NAME_SS_VAR in input.data.variables:
+                var = output.createVariable(VAR_NAME_SS_VAR, '|S1', (DIM_NUM_SS_VAR, DIM_STRING_LENGTH))
+                var[:] = input.data.variables[VAR_NAME_SS_VAR][vars_to_keep]
+            # Create truth table. We'll set its values in a moment.
+            var_truth_tab = output.createVariable(VAR_SS_TAB, input.int, (DIM_NUM_SS, DIM_NUM_SS_VAR))
+
+        output_id = 0
+        # Loop over all the input side sets and add them if they were selected
+        for n in range(input.num_side_sets):
+            input_id = n + 1
+            if input_id in idmap.keys():
+                output_id += 1  # id of current block in output
+                sel = idmap[input_id]  # selector of current block in output
+
+                # Dimensions
+                dim_num_side_ss = DIM_NUM_SIDE_SS % output_id
+                output.createDimension(dim_num_side_ss, len(sel.sides))
+
+                # Element list
+                var = output.createVariable(VAR_ELEM_SS % output_id, input.int, dim_num_side_ss)
+                to_add = input.data.variables[VAR_ELEM_SS % input_id][sel.sides]
+                converted_to_add = []
+                for id in to_add:
+                    converted_to_add.append(old_new_elem_id_map[id])
+                # The output's elem array needs to have the elem ids for the output!
+                var[:] = converted_to_add
+
+                # Confirm that every element used in side sets is in an element block now
+                ss_added_elements = to_add
+                difference = set(ss_added_elements) - set(eb_added_elements)
+                if not len(difference) > 0:
+                    raise ValueError(
+                        "Side set selectors include elements that are not selected by element block selectors. Put"
+                        " these in your element block selection, or remove them from your side set selection. {0}"
+                            .format(difference))
+
+                # Side list
+                var = output.createVariable(VAR_SIDE_SS % output_id, input.int, dim_num_side_ss)
+                var[:] = input.data.variables[VAR_SIDE_SS % input_id][sel.sides]
+
+                # Distribution factors
+                if VAR_DF_SS % input_id in input.data.variables:
+                    dim_num_df_ss = DIM_NUM_DF_SS % output_id
+                    node_count_list = input.get_side_set_node_count_list(input_id)
+                    # Count how many nodes are on the selected sides only
+                    num_nodes_selected = sum(node_count_list[sel.sides])
+                    output.createDimension(dim_num_df_ss, num_nodes_selected)
+
+                    var = output.createVariable(VAR_DF_SS % output_id, input.float, dim_num_df_ss)
+                    # Now for the fun part...
+                    # Grab the old dist facts
+                    old_df = input.data.variables[VAR_DF_SS % input_id]
+                    # Create an array for the new ones
+                    output_df = numpy.empty(num_nodes_selected, input.float)
+                    # We're going to iterate over each side in the side set and get the number of nodes that side has.
+                    # If we selected it, we're going to copy the next cnt nodes from old_df to output_df. If we did not
+                    # we will skip over that many nodes in old_df
+                    old_df_idx = 0
+                    output_df_idx = 0
+                    for k in range(len(node_count_list)):
+                        cnt = node_count_list[k]  # number of nodes in this side
+                        if k in sel.sides:  # If this is a selected side
+                            while cnt > 0:
+                                output_df[output_df_idx] = old_df[old_df_idx]
+                                output_df_idx += 1
+                                old_df_idx += 1
+                                cnt -= 1
+                        else:
+                            old_df_idx += cnt
+                    # ...and finally put the output distribution factors in the file
+                    var[:] = output_df
+
+                # Variable data and truth table filling
+                if has_variables:
+                    row = numpy.zeros(len(vars_to_keep), input.int)  # init row
+                    for j in sel.variables:
+                        out_var_idx = vars_to_keep.index(j)
+                        row[out_var_idx] = 1  # Set true in truth table row
+                        # We only want to copy over variable values if we're keeping time steps
+                        if has_time_steps:
+                            var = output.createVariable(VAR_VALS_SS_VAR % (out_var_idx + 1, output_id), input.float,
+                                                        (DIM_NUM_TIME_STEP, dim_num_side_ss))
+                            var[:] = input.data.variables[VAR_VALS_SS_VAR % (j + 1, input_id)][time_steps, sel.sides]
+                    var_truth_tab[output_id - 1] = row  # put row in table
+    # END SIDE SET PROCESSING
+
+    # Node sets
+    if len(ns_selectors) > 0:
+        num_side_sets = len(ns_selectors)
+        if input.num_node_sets == 0:
+            raise ValueError("Node set selectors were provided for a database with no node sets!")
+        # Check for duplicate or misplaced selectors
+        ids = []  # list of obj ids
+        idmap = {}  # dict mapping internal ids to ns selectors
+        for sel in ns_selectors:
+            if sel.obj_id in ids:
+                raise ValueError("Multiple selectors for the same entity were provided!")
+            if sel.exodus != input:
+                raise ValueError("Provided selector is for a different exodus object!")
+            ids.append(sel.obj_id)
+            internal_id = input._lookup_id(NODESET, sel.obj_id)
+            idmap[internal_id] = sel
+        output.createDimension(DIM_NUM_NS, num_side_sets)
+
+        selected_set_indices = [x - 1 for x in idmap.keys()]
+
+        # NS names
+        if VAR_NS_NAMES in input.data.variables:
+            var = output.createVariable(VAR_NS_NAMES, '|S1', (DIM_NUM_NS, DIM_NAME_LENGTH))
+            var[:] = input.data.variables[VAR_NS_NAMES][selected_set_indices]
+
+        # Status array
+        if VAR_NS_STATUS in input.data.variables:
+            var = output.createVariable(VAR_NS_STATUS, input.int, DIM_NUM_NS)
+            var[:] = input.data.variables[VAR_NS_STATUS][selected_set_indices]
+
+        set_id_map = input.data.variables[VAR_NS_PROP % 1]
+        # NS ID map / prop1
+        var = output.createVariable(VAR_NS_PROP % 1, input.int, DIM_NUM_NS)
+        if 'ID' in prop_selector.ns_prop:
+            # Keep ID map
+            var[:] = set_id_map[selected_set_indices]
+        else:
+            # Generate ID map
+            var[:] = numpy.arange(1, num_side_sets + 1, dtype=input.int)
+
+        # Other NS properties
+        propids = {}  # dict mapping property ids to names
+        for propname in prop_selector.ns_prop:
+            # We've already handled ids so we can skip this
+            if propname == 'ID':
+                continue
+            n = 1
+            while True:
+                if VAR_NS_PROP % n in input.data.variables:
+                    name = input.data.variables[VAR_NS_PROP % n].getncattr(ATTR_NAME)
+                    if propname == name:
+                        # we've found our property
+                        propids[n] = propname
+                        break
+                    else:
+                        # check next property
+                        n += 1
+                        continue
+                else:
+                    # We looked at every property and didn't find this one. This should never happen.
+                    break
+
+        propid = 1  # we've already handled prop1
+        # Loop over all the properties and add them if they were selected
+        for i in range(2, input.num_node_set_prop + 1):
+            if i in propids.keys():
+                propid += 1  # id of current property in output
+                var = output.createVariable(VAR_NS_PROP % propid, input.int, DIM_NUM_NS)
+                var[:] = input.data.variables[VAR_NS_PROP % i][selected_set_indices]
+
+        # Figure out which variables we're keeping
+        vars_to_keep = []
+        for sel in ns_selectors:
+            for v in sel.variables:
+                if v not in vars_to_keep:
+                    vars_to_keep.append(v)
+        vars_to_keep.sort()  # sort to keep ordering
+        has_variables = False
+        if len(vars_to_keep) > 0:
+            has_variables = True
+            output.createDimension(DIM_NUM_NS_VAR, len(vars_to_keep))
+            # Only copy names if they were previously defined
+            if VAR_NAME_NS_VAR in input.data.variables:
+                var = output.createVariable(VAR_NAME_NS_VAR, '|S1', (DIM_NUM_NS_VAR, DIM_STRING_LENGTH))
+                var[:] = input.data.variables[VAR_NAME_NS_VAR][vars_to_keep]
+            # Create truth table. We'll set its values in a moment.
+            var_truth_tab = output.createVariable(VAR_NS_TAB, input.int, (DIM_NUM_NS, DIM_NUM_NS_VAR))
+
+        # Node set
+        output_id = 0
+        # Loop over all the input element blocks and add them if they were selected
+        for n in range(input.num_elem_blk):
+            input_id = n + 1
+            # retrieve info for this node set
+            if input_id in idmap.keys():
+                output_id += 1  # id of current block in output
+                ns = idmap[input_id]  # selector of current set in output
+
+                # Dimensions
+                dim_num_node_ns = DIM_NUM_NODE_NS % output_id
+                output.createDimension(dim_num_node_ns, len(ns.nodes))
+
+                # Node list
+                var = output.createVariable(VAR_NODE_NS % output_id, input.int, dim_num_node_ns)
+                var[:] = input.data.variables[VAR_NODE_NS % input_id][ns.nodes]
+                added_nodes.update(input.data.variables[VAR_NODE_NS % input_id][ns.nodes])
+
+                # Distribution factors
+                if VAR_DF_NS % input_id in input.data.variables:
+                    var = output.createVariable(VAR_DF_NS % output_id, input.float, dim_num_node_ns)
+                    var[:] = input.data.variables[VAR_DF_NS % input_id][ns.nodes]
+
+                # Variable data and truth table filling
+                if has_variables:
+                    row = numpy.zeros(len(vars_to_keep), input.int)  # init row
+                    for j in ns.variables:
+                        out_var_idx = vars_to_keep.index(j)
+                        row[out_var_idx] = 1  # Set true in truth table row
+                        # We only want to copy over variable values if we're keeping time steps
+                        if has_time_steps:
+                            var = output.createVariable(VAR_VALS_NS_VAR % (out_var_idx + 1, output_id), input.float,
+                                                        (DIM_NUM_TIME_STEP, dim_num_node_ns))
+                            var[:] = input.data.variables[VAR_VALS_NS_VAR % (j + 1, input_id)][time_steps,
+                                                                                               ns.nodes]
+                    var_truth_tab[output_id - 1] = row  # put row in table
+    # END OF NODE SET PROCESSING
+
+    # if we want to make this method really fast and really robust, do a pre-pass on the selectors and gather
+    # all of the elements and nodes they need. Elements would let us add elements that are in side sets selectors but
+    # not elblock selectors. Nodes will make rescaling the node ids much faster.
+
+    # We need to sort the added nodes to maintain ordering
+    added_nodes = list(added_nodes)
+    added_nodes.sort()
+    # 0-indexed version for indexing arrays later
+    added_nodes_indices = [x - 1 for x in added_nodes]
+
+    # Now that we know which nodes are in the output file, we need to go back and change all the indices in the output
+    # file from input node indices to output node indices
+    old_new_node_id_map = {}  # keyed on old, value is new
+    newid = 1
+    for oldid in added_nodes:
+        old_new_node_id_map[oldid] = newid
+        newid += 1
+
+    # Node set node lists
+    for i in range(1, output.dimensions[DIM_NUM_NS].size + 1):
+        var = output.variables[VAR_NODE_NS % i]
+        num_nodes = output.dimensions[DIM_NUM_NODE_NS % i].size
+        new_var = numpy.empty(num_nodes, input.int)
+        for j in range(num_nodes):
+            new_var[j] = old_new_node_id_map[var[j]]
+        var[:] = new_var
+
+    # Element block connectivity lists
+    for i in range(1, output.dimensions[DIM_NUM_EB].size + 1):
+        var = output.variable[VAR_CONNECT % i]
+        num_elem = output.dimensions[DIM_NUM_EL_IN_BLK % i]
+        num_node = output.dimensions[DIM_NUM_NOD_PER_EL % i]
+        new_var = numpy.empty(num_elem, num_node)
+        for j in range(num_elem):
+            for k in range(num_node):
+                new_var[j, k] = old_new_node_id_map[var[j, k]]
+        var[:] = new_var
+
+    # Dimension for number of nodes
+    output.createDimension(DIM_NUM_NODES, len(added_nodes))
+
+    # Node id map
+    var = output.createVariable(VAR_NODE_ID_MAP, input.int, DIM_NUM_NODES)
+    var[:] = input.get_node_id_map()[added_nodes_indices]
+
+    # Coordinates
+    if input.large_model:
+        num_dim = input.num_dim
+        if num_dim >= 1:
+            var = output.createVariable(VAR_COORD_X, input.float, DIM_NUM_NODES)
+            var[:] = input.data.variables[VAR_COORD_X][added_nodes_indices]
+            if num_dim >= 2:
+                var = output.createVariable(VAR_COORD_Y, input.float, DIM_NUM_NODES)
+                var[:] = input.data.variables[VAR_COORD_Y][added_nodes_indices]
+                if num_dim >= 3:
+                    var = output.createVariable(VAR_COORD_Z, input.float, DIM_NUM_NODES)
+                    var[:] = input.data.variables[VAR_COORD_Z][added_nodes_indices]
+    else:
+        var = output.createVariable(VAR_COORD, input.float, (DIM_NUM_DIM, DIM_NUM_NODES))
+        var[:] = input.data.variables[VAR_COORD][:, added_nodes_indices]
+
+    if VAR_COORD_NAMES in input.data.variables:
+        var = output.createVariable(VAR_COORD_NAMES, '|S1', (DIM_NUM_DIM, DIM_NAME_LENGTH))
+        var[:] = input.data.variables[VAR_COORD_NAMES][:]
+
+    # Global Variables
+    if len(glo_vars) > 0:
+        if VAR_VALS_GLO_VAR not in input.data.variables:
+            raise ValueError("Global variables selected, but no global variables exist!")
+        output.createDimension(DIM_NUM_GLO_VAR, len(glo_vars))
+        var = output.createVariable(VAR_VALS_GLO_VAR, input.float, (DIM_NUM_TIME_STEP, DIM_NUM_GLO_VAR))
+        glo_var_idx = [x - 1 for x in glo_vars]
+        try:
+            # Need to subtract 1 to convert variables ids into indices
+            var[:] = input.data.variables[VAR_VALS_GLO_VAR][time_steps, glo_var_idx]
+        except IndexError:
+            raise IndexError("Global variables provided contain invalid indices")
+        if VAR_NAME_GLO_VAR in input.data.variables:
+            var = output.createVariable(VAR_NAME_GLO_VAR, '|S1', (DIM_NUM_GLO_VAR, DIM_STRING_LENGTH))
+            var[:] = input.data.variables[VAR_NAME_GLO_VAR][glo_var_idx]
+
+    # Nodal Variables
+    if len(nod_vars) > 0:
+        if input.large_model:
+            if VAR_VALS_NOD_VAR_LARGE % 1 not in input.data.variables:
+                raise ValueError("Nodal variables selected, but no nodal variables exist!")
+        else:
+            if VAR_VALS_NOD_VAR_SMALL not in input.data.variables:
+                raise ValueError("Nodal variables selected, but no nodal variables exist!")
+        output.createDimension(DIM_NUM_NOD_VAR, len(nod_vars))
+        nod_var_idx = [x - 1 for x in nod_vars]
+        if input.large_model:
+            output_id = 1
+            for id in nod_vars:
+                var = output.createVariable(VAR_VALS_NOD_VAR_LARGE % output_id, input.float, (DIM_NUM_TIME_STEP,
+                                                                                              DIM_NUM_NODES))
+                var[:] = input.data.variables[VAR_VALS_NOD_VAR_LARGE % id][time_steps, added_nodes_indices]
+                output_id += 1
+        else:
+            var = output.createVariable(VAR_VALS_NOD_VAR_SMALL, input.float, (DIM_NUM_TIME_STEP, DIM_NUM_NOD_VAR,
+                                                                              DIM_NUM_NODES))
+            var[:] = input.data.variables[time_steps, nod_var_idx, added_nodes_indices]
+        if VAR_NAME_NOD_VAR in input.data.variables:
+            var = output.createVariable(VAR_NAME_NOD_VAR, '|S1', (DIM_NUM_NOD_VAR, DIM_STRING_LENGTH))
+            var[:] = input.data.variables[VAR_NAME_NOD_VAR][nod_var_idx]
+
     # Every block/set can have its own variables
     # The truth table shows which block has which variables
+    # TODO I don't think the code enforces this last one
     # All blocks/set have to have the same properties
     output.close()
 
 
 if __name__ == "__main__":
-    ex = Exodus("sample-files/can.ex2", 'r')
-    print(ex.data.variables[VAR_ELEM_ORDER_MAP])
-    output_subset(ex, [], [], [], PropertySelector(ex), [], [], [], "sample-files/outputtest.ex2", "output test")
-    ds = nc.Dataset("sample-files/outputtest.ex2")
-    print(ds)
-    ex.close()
+    # import os
+    #
+    # directory = "sample-files/"
+    #
+    # for filename in os.listdir(directory):
+    #     f = os.path.join(directory, filename)
+    #     # checking if it is a file
+    #     if os.path.isfile(f):
+    #         ex = Exodus(str(f), 'r')
+    #         print("%s -- Node sets: %d, Side sets: %d, Element Blocks: %d" % (
+    #             ex.path, ex.num_node_sets, ex.num_side_sets, ex.num_elem_blk))
+    #         ex.close()
+    ex = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    print(ex.data.variables[VAR_VALS_NOD_VAR_LARGE % 1])
+    # print(ex.data.variables['side_ss1'])
+    # print(ex.data.variables['dist_fact_ss1'])
+    # print(ex.get_side_set_df(ex.get_side_set_id_map()[0]))
+
+    # print(ex.data.variables[VAR_ELEM_ORDER_MAP])
+    # output_subset(ex, [], [], [], PropertySelector(ex), [], [], [], "sample-files/outputtest.ex2", "output test")
+    # ds = nc.Dataset("sample-files/outputtest.ex2")
+    # print(ds)
+    # ex.close()

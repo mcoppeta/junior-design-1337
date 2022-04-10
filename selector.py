@@ -69,7 +69,7 @@ class ElementBlockSelector(ObjectSelector):
                 raise ValueError("variable index out of range!")
             self.variables = [x - 1 for x in self.variables]
             if len(self.variables) != len(variables):
-                warnings.warn("Duplicate elements were automatically removed.")
+                warnings.warn("Duplicate variables were automatically removed.")
 
         if attributes is None:
             self.attributes = []
@@ -77,10 +77,12 @@ class ElementBlockSelector(ObjectSelector):
             self.attributes = list(range(exodus.get_num_elem_attrib(obj_id)))
         else:
             if all(isinstance(n, int) for n in attributes):
-                self.attributes = attributes
+                self.attributes = list(set(attributes))
                 self.attributes.sort()
                 if self.attributes[0] < 1 or self.attributes[-1] > exodus.get_num_elem_attrib(obj_id):
                     raise ValueError("attribute index out of range!")
+                if len(self.attributes) != len(attributes):
+                    warnings.warn("Duplicate attributes were automatically removed.")
                 self.attributes = [x - 1 for x in self.attributes]
             elif all(isinstance(n, str) for n in attributes):
                 name_list = list(exodus.get_elem_attrib_names(obj_id))
@@ -90,7 +92,10 @@ class ElementBlockSelector(ObjectSelector):
                         self.attributes.append(name_list.index(name))
                     except ValueError:
                         raise ValueError("Provided attribute %s does not exist!" % name)
+                self.attributes = list(set(self.attributes))
                 self.attributes.sort()
+                if len(self.attributes) != len(attributes):
+                    warnings.warn("Duplicate attributes were automatically removed.")
             else:
                 raise TypeError("attributes must contain either all strings or all integers!")
 
@@ -110,25 +115,77 @@ class NodeSetSelector(ObjectSelector):
         :param variables: the range of variables to select (1-indexed)
         """
         ObjectSelector.__init__(self, exodus, obj_id, NODESET)
-        self.elements = nodes
-        self.variables = variables
+
+        if nodes is None:
+            self.nodes = []
+        elif nodes is ...:
+            num_nod, _ = exodus.get_node_set_params(obj_id)
+            self.nodes = list(range(num_nod))
+        else:
+            self.nodes = list(set(nodes))
+            self.nodes.sort()
+            num_nod, _ = exodus.get_node_set_params(obj_id)
+            if self.nodes[0] < 1 or self.nodes[-1] > num_nod:
+                raise ValueError("nodes out of range!")
+            self.nodes = [x - 1 for x in self.nodes]
+            if len(self.nodes) != len(nodes):
+                warnings.warn("Duplicate nodes were automatically removed.")
+
+        if variables is None:
+            self.variables = []
+        elif variables is ...:
+            self.variables = list(range(exodus.num_node_set_var))
+        else:
+            self.variables = list(set(variables))
+            self.variables.sort()
+            if self.variables[0] < 1 or self.variables[-1] > exodus.num_node_set_var:
+                raise ValueError("variable index out of range!")
+            self.variables = [x - 1 for x in self.variables]
+            if len(self.variables) != len(variables):
+                warnings.warn("Duplicate variables were automatically removed.")
 
 
 class SideSetSelector(ObjectSelector):
     """Selects a subset of a side set's components."""
     # input a range
-    def __init__(self, exodus: Exodus, obj_id: int, elements=..., variables=...):
+    def __init__(self, exodus: Exodus, obj_id: int, sides=..., variables=...):
         """
         Create a new selector object for a side set.
 
         :param exodus: the exodus object this side set is stored in
         :param obj_id: the id of the side set this represents
-        :param elements: the range of elements to select (1-indexed, internal)
+        :param sides: the range of sides to select (1-indexed, internal)
         :param variables: the range of variables to select (1-indexed)
         """
         ObjectSelector.__init__(self, exodus, obj_id, SIDESET)
-        self.elements = elements
-        self.variables = variables
+
+        if sides is None:
+            self.sides = []
+        elif sides is ...:
+            num_el, _ = exodus.get_side_set_params(obj_id)
+            self.sides = list(range(num_el))
+        else:
+            self.sides = list(set(sides))
+            self.sides.sort()
+            num_el, _ = exodus.get_side_set_params(obj_id)
+            if self.sides[0] < 1 or self.sides[-1] > num_el:
+                raise ValueError("sides out of range!")
+            self.sides = [x - 1 for x in self.sides]
+            if len(self.sides) != len(sides):
+                warnings.warn("Duplicate sides were automatically removed.")
+
+        if variables is None:
+            self.variables = []
+        elif variables is ...:
+            self.variables = list(range(exodus.num_side_set_var))
+        else:
+            self.variables = list(set(variables))
+            self.variables.sort()
+            if self.variables[0] < 1 or self.variables[-1] > exodus.num_side_set_var:
+                raise ValueError("variable index out of range!")
+            self.variables = [x - 1 for x in self.variables]
+            if len(self.variables) != len(variables):
+                warnings.warn("Duplicate variables were automatically removed.")
 
 
 class PropertySelector:
