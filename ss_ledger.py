@@ -101,7 +101,7 @@ class SSLedger:
 
         # if no distribution factors specified, just use 1
         if (dist_fact is None):
-            dist_fact = np.ones(len(elem_ids))
+            dist_fact = None
 
         # if no variables specified, just use 0
         # this is a 3-d array of num_var by time_step by num_sides
@@ -117,8 +117,12 @@ class SSLedger:
         self.ss_sizes.append(len(elem_ids))
         self.ss_status.append(1)
         self.ss_names.append(ss_name)
-        self.num_dist_fact.append(len(dist_fact))
+        if (dist_fact is None):
+            self.num_dist_fact.append(0)
+        else:
+            self.num_dist_fact.append(len(dist_fact))
         self.ss_dist_fact.append(dist_fact)
+
         if (self.num_ss_var > 0):
             self.ss_vars.append(variables)
         # need to update ss_var_tab which is status of each variable
@@ -414,7 +418,7 @@ class SSLedger:
         for i in range(self.num_ss):
             # create elem, sides, and dist facts
             data.createVariable("elem_ss" + str(i+1), "int32", dimensions=("num_side_ss" + str(i+1)))
-            if (self.num_dist_fact[i] > 0): # if there are no distribution factors, don't write out the variables
+            if ("num_df_ss" + str(i + 1) in data.dimensions.keys() or self.num_dist_fact[i] > 0): 
                 data.createVariable("dist_fact_ss" + str(i+1), "int32", dimensions=("num_df_ss" + str(i+1)))
             data.createVariable("side_ss" + str(i+1), "int32", dimensions=("num_side_ss" + str(i+1)))
             
