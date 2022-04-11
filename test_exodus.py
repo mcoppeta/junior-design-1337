@@ -433,6 +433,14 @@ def test_merge_ns_with_duplicate_nodes(tmpdir):
     assert np.array_equal([1, 5, 6, 7, 8, 9, 10, 11, 12], exofile.get_node_set(3))
 
 
+def test_get_nodeset_by_name(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    exofile.add_nodeset([12, 11, 10], 1, "def")
+    exofile.add_nodeset([10, 9, 8, 7, 6, 5, 1], 2, "abc")
+
+    ns_1 = exofile.ledger.nodeset_ledger.get_node_set("def")
+    assert np.array_equal(ns_1, [12, 11, 10])
+
 def test_remove_duplicate_nodes(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
     exofile.add_nodeset([10, 9, 8, 7, 6, 5, 1], 2)

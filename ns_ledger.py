@@ -27,6 +27,8 @@ class NSLedger:
         self.nodeset_name_set = set()
         self.ex = ex
 
+        self.nodeset_name_lookup = {}
+
         # if no existing nodesets, no need to set up variables
         # beyond initialization
         if 'num_node_sets' not in ex.data.dimensions.keys():
@@ -51,14 +53,18 @@ class NSLedger:
 
         # setup user-specified nodeset names
         if "ns_names" in ex.data.variables.keys():
+            i = 0
             for name in ex.data.variables['ns_names']:
                 n = util.lineparse(name)
                 self.nodeset_names.append(n)
                 self.nodeset_name_set.add(n)
+                self.nodeset_name_lookup[n] = self.nodeset_ids[i]
+                i += 1
         else:
             for i in self.nodeset_ids:
                 self.nodeset_names.append("NodeSet %d" % i)
                 self.nodeset_name_set.add("NodeSet %d" % i)
+                self.nodeset_name_lookup["NodeSet %d" % i] = int(i)
 
     def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
 
@@ -75,9 +81,11 @@ class NSLedger:
         if nodeset_name == "":
             self.nodeset_names.append("NodeSet %d" % nodeset_id)
             self.nodeset_name_set.add("NodeSet %d" % nodeset_id)
+            self.nodeset_name_lookup["NodeSet %d" % nodeset_id] = int(nodeset_id)
         else:
             self.nodeset_names.append(nodeset_name)
             self.nodeset_name_set.add(nodeset_name)
+            self.nodeset_name_lookup[nodeset_name] = int(nodeset_id)
 
         self.new_nodeset_name += 1
 
@@ -94,6 +102,7 @@ class NSLedger:
 
         name = self.nodeset_names.pop(nodeset_num)
         self.nodeset_name_set.remove(name)
+        self.nodeset_name_lookup.pop(name)
 
     def merge_nodesets(self, new_id, nodeset_id1, nodeset_id2, delete=True):
         if new_id in self.nodeset_id_set:
@@ -245,7 +254,19 @@ class NSLedger:
     def num_node_sets(self):
         return len(self.nodesets)
 
-    def get_node_set(self, nodeset_id):
+    def get_node_set(self, identifier):
+        if isinstance(identifier, str):
+            return self._str_get_node_set(identifier)
+        elif isinstance(identifier, int):
+            return self._id_get_node_set(identifier)
+        else:
+            raise TypeError("Identifier must be of type str or int")
+
+    def _str_get_node_set(self, name):
+        nodeset_id = self.nodeset_name_lookup[name]
+        return self._id_get_node_set(nodeset_id)
+
+    def _id_get_node_set(self, nodeset_id):
         num = self.find_nodeset_num(nodeset_id)
         name = self.nodesets[num]
         if name not in self.nodeset_map.keys():
@@ -255,7 +276,18 @@ class NSLedger:
             return np.array(self.ex.data[name])
         return np.array(self.nodeset_map[name])
 
-    def get_partial_node_set(self, nodeset_id, start, count):
+    def get_partial_node_set(self, identifier, start, count):
+        if isinstance(identifier, str):
+            return self._str_get_partial_node_set(identifier, start, count)
+        elif isinstance(identifier, int):
+            return self._id_get_partial_node_set(identifier, start, count)
+        else:
+            raise TypeError("Identifier must be of type str or int")
+
+    def _str_get_partial_node_set(self, nodeset_name, start, count):
+        pass
+
+    def _id_get_partial_node_set(self, nodeset_id, start, count):
         num = self.find_nodeset_num(id)
         name = self.nodesets[num]
         if name not in self.nodeset_map.keys():
