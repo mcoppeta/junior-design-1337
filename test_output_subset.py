@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy
 import pytest
 import numpy as np
@@ -10,9 +12,53 @@ import netCDF4 as nc
 # Disables all warnings in this module
 pytestmark = pytest.mark.filterwarnings('ignore')
 
+
 # pytest=dependency might be useful in here to require the read tests to pass...
 
 
+# Test output_subset, selecting the entire model
+def test_whole_subset(tmpdir):
+    input_file = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    p = str(tmpdir) + '\\output_test.ex2'
+    t = "test whole subset"
+    eb_sels = []
+    for obj_id in input_file.get_elem_block_id_map():
+        sel = ElementBlockSelector(input_file, obj_id)
+        eb_sels.append(sel)
+    ss_sels = []
+    for obj_id in input_file.get_side_set_id_map():
+        sel = SideSetSelector(input_file, obj_id)
+        ss_sels.append(sel)
+    ns_sels = []
+    for obj_id in input_file.get_node_set_id_map():
+        sel = NodeSetSelector(input_file, obj_id)
+        ns_sels.append(sel)
+    prop_sel = PropertySelector(input_file)
+    nodal_var = list(range(input_file.num_node_var))
+    global_var = list(range(input_file.num_global_var))
+    steps = list(range(input_file.num_time_steps))
+
+    output_subset(input_file, p, t, eb_sels, ss_sels, ns_sels, prop_sel, nodal_var, global_var, steps)
+
+    output_file = Exodus(p, 'r')
+
+    assert_required_features(input_file, output_file, t, steps)
+
+    assert output_file.num_global_var == input_file.num_global_var
+    assert output_file.num_node_var == input_file.num_global_var
+    assert output_file.num_time_steps == input_file.num_global_var
+    assert output_file.num_elem_blk == input_file.num_global_var
+    assert output_file.num_node_sets == input_file.num_global_var
+    assert output_file.num_side_sets == input_file.num_global_var
+    assert output_file.num_elem == input_file.num_global_var
+    assert output_file.num_nodes == input_file.num_global_var
+
+
+    output_file.close()
+    input_file.close()
+
+
+# Tests output_subset with all empty arguments
 def test_empty_subset(tmpdir):
     input_file = Exodus("sample-files/cube_1ts_mod.e", 'r')
     p = str(tmpdir) + '\\output_test.ex2'

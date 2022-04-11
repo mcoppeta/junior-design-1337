@@ -2937,7 +2937,10 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
                 var.setncattr(ATTR_ELEM_TYPE, topology)
                 var[:] = input.data.variables[VAR_CONNECT % input_id][eb.elements, :]
                 output_elem_indices.extend([x + sum_elem for x in eb.elements])
-                added_nodes.update(input.data.variables[VAR_CONNECT % input_id][eb.elements, :])
+                # Compress the masked array
+                thing = input.data.variables[VAR_CONNECT % input_id][eb.elements, :]
+                thing = thing.compressed()
+                added_nodes.update(thing)
 
                 # EB attributes
                 if len(eb.attributes) > 0:
@@ -3483,7 +3486,7 @@ if __name__ == "__main__":
     # print(ex.get_node_set_df(3))
     #
     # ns = NodeSetSelector(ex, 3)
-
+    #
     # output_subset(ex, p, t, eb_sels, ss_sels, ns_sels, prop_sel, nodal_var, global_var, steps)
     #
     # ds = nc.Dataset(p)
@@ -3493,41 +3496,27 @@ if __name__ == "__main__":
     #
     # out = Exodus(p, 'r')
     # out.close()
-
+    #
     # ex.close()
 
+    input_file = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    p = 'sample-files/output_test.ex2'
+    t = "test whole subset"
+    eb_sels = []
+    for obj_id in input_file.get_elem_block_id_map():
+        sel = ElementBlockSelector(input_file, obj_id)
+        eb_sels.append(sel)
+    ss_sels = []
+    for obj_id in input_file.get_side_set_id_map():
+        sel = SideSetSelector(input_file, obj_id)
+        ss_sels.append(sel)
+    ns_sels = []
+    for obj_id in input_file.get_node_set_id_map():
+        sel = NodeSetSelector(input_file, obj_id)
+        ns_sels.append(sel)
+    prop_sel = PropertySelector(input_file)
+    nodal_var = list(range(input_file.num_node_var))
+    global_var = list(range(input_file.num_global_var))
+    steps = list(range(input_file.num_time_steps))
 
-    input_file = Exodus("sample-files/cube_with_data.exo", 'r')
-
-    print(input_file.get_elem_block_property_names())
-    print(input_file.get_node_set_property_names())
-    print(input_file.get_side_set_property_names())
-
-    # print(input_file.data)
-
-    # eb_id = input_file.get_elem_block_id_map()[8 - 1]
-    # num_elem_eb, _, _, num_attr_eb = input_file.get_elem_block_params(eb_id)
-    # eb_num = input_file.get_elem_block_number(eb_id)
-    # tab_eb = input_file.get_elem_block_truth_table()[eb_num - 1]
-    # num_var_eb = sum(tab_eb)  # Number of 1s in truth table
-    # connect = input_file.get_elem_block_connectivity(eb_id)
-    # # ss = SideSetSelector(input_file, ss_id, [1, 3, 2, 5], [2, 1])
-    # print(input_file.get_elem_block_params(eb_id))
-    # print(connect)
-    # print(tab_eb)
-    # print(input_file.get_elem_attrib_names(eb_id))
-    # eb = ElementBlockSelector(input_file, eb_id, attributes=['', ''])
-    # print(eb.attributes)
-
-    # ss = SideSetSelector(input_file, ss_id, range(1, 4))
-    # print(ss.sides)
-    # print(side_ss[ss.sides])
-    # assert len(ns.nodes) == num_nod_ns
-    # assert ns.nodes == list(range(num_nod_ns))
-    # assert len(ns.variables) == num_var_ns
-    # print(ns.variables)
-    # print(tab_ns)
-    # ns = NodeSetSelector(input_file, ns_id, [4])
-    # print(list(set([4]))[-1] > input_file.num_node_set_var)
-
-    input_file.close()
+    output_subset(input_file, p, t, eb_sels, ss_sels, ns_sels, prop_sel, nodal_var, global_var, steps)
