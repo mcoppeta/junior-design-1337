@@ -99,10 +99,6 @@ class SSLedger:
             internal_id = np.where(map == id)[0][0] + 1 # conversion, add 1 to the index to get internal id
             converted_elem_ids.append(internal_id)
 
-        # if no distribution factors specified, just use 1
-        if (dist_fact is None):
-            dist_fact = None
-
         # if no variables specified, just use 0
         # this is a 3-d array of num_var by time_step by num_sides
         if (variables is None and self.num_ss_var > 0):
@@ -434,7 +430,7 @@ class SSLedger:
                 data["side_ss" + str(i+1)][:] = self.ss_sides[i][:]
             
             if (self.ss_dist_fact[i] is None):
-                if("dist_fact_ss" + str(i+1) in data.variables):
+                if("dist_fact_ss" + str(i+1) in self.ex.variables):
                     data["dist_fact_ss" + str(i+1)][:] = self.ex.get_side_set_df(self.ss_prop1[i])[:]
             else:
                 data["dist_fact_ss" + str(i+1)][:] = self.ss_dist_fact[i][:]
