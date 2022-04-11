@@ -33,7 +33,6 @@ class SSLedger:
 
         # Fill in lists with sideset data
         for i in range(self.num_ss):
-            print(i)
             # load in ids for each sideset
             if ("ss_prop1" in ex.data.variables):
                 self.ss_prop1.append(ex.data["ss_prop1"][i])
@@ -59,7 +58,7 @@ class SSLedger:
                 self.ss_names.append("") # if name does not exist, just add empty string
             
             # load number of df for each sideset
-            if ("num_df" + str(i + 1) in ex.data.dimensions.keys()):
+            if ("num_df_" + str(i + 1) in ex.data.dimensions.keys()):
                 self.num_dist_fact.append(ex.get_side_set_params(self.ss_prop1[i])[1])
             else:
                 self.num_dist_fact.append(0) # if num_df does not exist, just set to 0
@@ -414,8 +413,10 @@ class SSLedger:
         for i in range(self.num_ss):
             # create elem, sides, and dist facts
             data.createVariable("elem_ss" + str(i+1), "int32", dimensions=("num_side_ss" + str(i+1)))
-            if ("num_df_ss" + str(i + 1) in data.dimensions.keys() or self.num_dist_fact[i] > 0): 
+
+            if (self.num_dist_fact[i] > 0): # if distribution factors exist for this sideset, make a variable
                 data.createVariable("dist_fact_ss" + str(i+1), "int32", dimensions=("num_df_ss" + str(i+1)))
+            
             data.createVariable("side_ss" + str(i+1), "int32", dimensions=("num_side_ss" + str(i+1)))
             
             # if None, just copy over old data, otherwise copy over new stuff
