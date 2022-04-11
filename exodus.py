@@ -942,12 +942,15 @@ class Exodus:
         return result
 
     def get_elem_block_truth_table(self):
+        """Returns the variable truth table for element blocks."""
         return self._get_truth_table(ELEMBLOCK)
 
     def get_node_set_truth_table(self):
+        """Returns the variable truth table for node sets."""
         return self._get_truth_table(NODESET)
 
     def get_side_set_truth_table(self):
+        """Returns the variable truth table for side sets."""
         return self._get_truth_table(SIDESET)
 
     def _get_var_names(self, var_type: VariableType):
@@ -1701,7 +1704,7 @@ class Exodus:
         """
         Returns a partial connectivity list for the element block with given ID.
 
-        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
         internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_partial_elem_block_connectivity(obj_id, internal_id, start, count)
@@ -3398,6 +3401,9 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
     output.close()
 
 
+# TODO some functions return numpy arrays, some return Python lists. Should be consistently one or the other.
+
+
 if __name__ == "__main__":
     # import os
     #
@@ -3493,19 +3499,29 @@ if __name__ == "__main__":
 
     input_file = Exodus("sample-files/cube_with_data.exo", 'r')
 
-    ns_id = input_file.get_node_set_id_map()[0]
-    num_nod_ns, num_df_ns = input_file.get_node_set_params(ns_id)
-    ns_num = input_file.get_node_set_number(ns_id)
-    tab_ns = input_file.get_node_set_truth_table()[ns_num - 1]
-    num_var_ns = sum(tab_ns)
-    nod_ns = input_file.get_node_set(ns_id)
-    df_ns = input_file.get_node_set_df(ns_id)
-    ns = NodeSetSelector(input_file, ns_id)
-    print(nod_ns)
-    print(tab_ns)
-    ns = NodeSetSelector(input_file, ns_id, range(1, 4))
-    print(ns.nodes)
-    print(nod_ns[ns.nodes])
+    print(input_file.get_elem_block_property_names())
+    print(input_file.get_node_set_property_names())
+    print(input_file.get_side_set_property_names())
+
+    # print(input_file.data)
+
+    # eb_id = input_file.get_elem_block_id_map()[8 - 1]
+    # num_elem_eb, _, _, num_attr_eb = input_file.get_elem_block_params(eb_id)
+    # eb_num = input_file.get_elem_block_number(eb_id)
+    # tab_eb = input_file.get_elem_block_truth_table()[eb_num - 1]
+    # num_var_eb = sum(tab_eb)  # Number of 1s in truth table
+    # connect = input_file.get_elem_block_connectivity(eb_id)
+    # # ss = SideSetSelector(input_file, ss_id, [1, 3, 2, 5], [2, 1])
+    # print(input_file.get_elem_block_params(eb_id))
+    # print(connect)
+    # print(tab_eb)
+    # print(input_file.get_elem_attrib_names(eb_id))
+    # eb = ElementBlockSelector(input_file, eb_id, attributes=['', ''])
+    # print(eb.attributes)
+
+    # ss = SideSetSelector(input_file, ss_id, range(1, 4))
+    # print(ss.sides)
+    # print(side_ss[ss.sides])
     # assert len(ns.nodes) == num_nod_ns
     # assert ns.nodes == list(range(num_nod_ns))
     # assert len(ns.variables) == num_var_ns
