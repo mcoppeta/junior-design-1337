@@ -58,7 +58,7 @@ class SSLedger:
                 self.ss_names.append("") # if name does not exist, just add empty string
             
             # load number of df for each sideset
-            if ("num_df_" + str(i + 1) in ex.data.dimensions.keys()):
+            if ("num_df_ss" + str(i + 1) in ex.data.dimensions.keys()):
                 self.num_dist_fact.append(ex.get_side_set_params(self.ss_prop1[i])[1])
             else:
                 self.num_dist_fact.append(0) # if num_df does not exist, just set to 0
