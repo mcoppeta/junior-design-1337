@@ -34,9 +34,9 @@ def test_whole_subset(tmpdir):
         sel = NodeSetSelector(input_file, obj_id)
         ns_sels.append(sel)
     prop_sel = PropertySelector(input_file)
-    nodal_var = list(range(input_file.num_node_var))
-    global_var = list(range(input_file.num_global_var))
-    steps = list(range(input_file.num_time_steps))
+    nodal_var = list(range(1, input_file.num_node_var + 1))
+    global_var = list(range(1, input_file.num_global_var + 1))
+    steps = list(range(1, input_file.num_time_steps + 1))
 
     output_subset(input_file, p, t, eb_sels, ss_sels, ns_sels, prop_sel, nodal_var, global_var, steps)
 
@@ -45,14 +45,42 @@ def test_whole_subset(tmpdir):
     assert_required_features(input_file, output_file, t, steps)
 
     assert output_file.num_global_var == input_file.num_global_var
-    assert output_file.num_node_var == input_file.num_global_var
-    assert output_file.num_time_steps == input_file.num_global_var
-    assert output_file.num_elem_blk == input_file.num_global_var
-    assert output_file.num_node_sets == input_file.num_global_var
-    assert output_file.num_side_sets == input_file.num_global_var
-    assert output_file.num_elem == input_file.num_global_var
-    assert output_file.num_nodes == input_file.num_global_var
+    assert output_file.num_node_var == input_file.num_node_var
+    assert output_file.num_time_steps == input_file.num_time_steps
+    assert output_file.num_elem_blk == input_file.num_elem_blk
+    assert output_file.num_node_sets == input_file.num_node_sets
+    assert output_file.num_side_sets == input_file.num_side_sets
+    assert output_file.num_elem == input_file.num_elem
+    assert output_file.num_nodes == input_file.num_nodes
 
+    # Check that node and element ids are valid as well
+    # Check that coordinates were carried over correctly
+    # Check that coord names were carried over correctly
+    # Check that global variables and their names were carried over
+    # Check that nodal variables and their names were carried over
+    # each variable and whatnot set in each processing algorithm
+    # Really just make sure every function in the library returns the same output
+
+    # Before anything, we need to make sure ID maps carried over
+    assert np.array_equal(output_file.get_node_id_map(), input_file.get_node_id_map())
+    assert np.array_equal(output_file.get_elem_id_map(), input_file.get_elem_id_map())
+    assert np.array_equal(output_file.get_elem_block_id_map(), input_file.get_elem_block_id_map())
+    assert np.array_equal(output_file.get_node_set_id_map(), input_file.get_node_set_id_map())
+    assert np.array_equal(output_file.get_side_set_id_map(), input_file.get_side_set_id_map())
+
+    # Element order map
+    assert np.array_equal(output_file.get_elem_order_map(), input_file.get_elem_order_map())
+
+    # Nodal and global variables
+    # TODO I should have a way to find if var names exist. I have no way of knowing otherwise!
+    assert np.array_equal(output_file.get_nodal_var_names(), input_file.get_nodal_var_names())
+    assert np.array_equal(output_file.get_global_var_names(), input_file.get_global_var_names())
+    for i in range(input_file.num_node_var):
+        assert np.array_equal(output_file.get_nodal_var_across_times(1, output_file.num_time_steps, i + 1),
+                              input_file.get_nodal_var_across_times(1, input_file.num_time_steps, i + 1))
+    for i in range(input_file.num_global_var):
+        assert np.array_equal(output_file.get_global_var_across_times(1, output_file.num_time_steps, i + 1),
+                              input_file.get_global_var_across_times(1, input_file.num_time_steps, i + 1))
 
     output_file.close()
     input_file.close()
@@ -136,9 +164,10 @@ def assert_required_features(input_file, output_file, t, steps):
     # Output subset sorts this so we must too
     sorted_steps = steps
     sorted_steps.sort()
+    sorted_steps_idx = [x - 1 for x in sorted_steps]
     if input_file.num_time_steps > 0:
         assert np.array_equal(output_file.data.variables[VAR_TIME_WHOLE][:],
-                              input_file.data.variables[VAR_TIME_WHOLE][:][sorted_steps])
+                              input_file.data.variables[VAR_TIME_WHOLE][:][sorted_steps_idx])
 
     assert output_file.int == input_file.int
     assert output_file.float == output_file.float

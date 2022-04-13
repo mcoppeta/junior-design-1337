@@ -2774,6 +2774,13 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
     time_steps.sort()
     nod_vars.sort()
     glo_vars.sort()
+    # Check for input validity
+    if len(time_steps) > 0 and (time_steps[0] < 1 or time_steps[-1] > input.num_time_steps):
+        raise IndexError("Time step selector out of range!")
+    if len(nod_vars) > 0 and (nod_vars[0] < 1 or nod_vars[-1] > input.num_node_var):
+        raise IndexError("Nodal variable selector out of range!")
+    if len(glo_vars) > 0 and (glo_vars[0] < 1 or glo_vars[-1] > input.num_global_var):
+        raise IndexError("Global variable selector out of range!")
     output = nc.Dataset(path, 'w')
     output.set_fill_off()
 
@@ -2812,12 +2819,13 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
 
     has_time_steps = False
     # Time steps
+    time_step_indices = [x - 1 for x in time_steps]
     output.createDimension(DIM_NUM_TIME_STEP, None)  # unlimited
     var = output.createVariable(VAR_TIME_WHOLE, input.float, DIM_NUM_TIME_STEP)
     if len(time_steps) > 0:
         has_time_steps = True
         try:
-            var[:] = input.data.variables[VAR_TIME_WHOLE][time_steps]
+            var[:] = input.data.variables[VAR_TIME_WHOLE][time_step_indices]
         except IndexError:
             raise IndexError("Time step range provided contains invalid indices")
 
@@ -2964,7 +2972,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
                             var = output.createVariable(VAR_VALS_ELEM_VAR % (out_var_idx + 1, output_id),
                                                         input.float,
                                                         (DIM_NUM_TIME_STEP, dim_num_el_in_blk))
-                            var[:] = input.data.variables[VAR_VALS_ELEM_VAR % (j + 1, input_id)][time_steps,
+                            var[:] = input.data.variables[VAR_VALS_ELEM_VAR % (j + 1, input_id)][time_step_indices,
                                                                                                  eb.elements]
                     var_truth_tab[output_id - 1] = row  # put row in table
             # Keep track of how many elements we've looked at
@@ -3106,7 +3114,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
                 # Confirm that every element used in side sets is in an element block now
                 ss_added_elements = to_add
                 difference = set(ss_added_elements) - set(eb_added_elements)
-                if not len(difference) > 0:
+                if len(difference) > 0:
                     raise ValueError(
                         "Side set selectors include elements that are not selected by element block selectors. Put"
                         " these in your element block selection, or remove them from your side set selection. {0}"
@@ -3158,7 +3166,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
                         if has_time_steps:
                             var = output.createVariable(VAR_VALS_SS_VAR % (out_var_idx + 1, output_id), input.float,
                                                         (DIM_NUM_TIME_STEP, dim_num_side_ss))
-                            var[:] = input.data.variables[VAR_VALS_SS_VAR % (j + 1, input_id)][time_steps, sel.sides]
+                            var[:] = input.data.variables[VAR_VALS_SS_VAR % (j + 1, input_id)][time_step_indices, sel.sides]
                     var_truth_tab[output_id - 1] = row  # put row in table
     # END SIDE SET PROCESSING
 
@@ -3252,8 +3260,8 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
 
         # Node set
         output_id = 0
-        # Loop over all the input element blocks and add them if they were selected
-        for n in range(input.num_elem_blk):
+        # Loop over all the input node sets and add them if they were selected
+        for n in range(input.num_node_sets):
             input_id = n + 1
             # retrieve info for this node set
             if input_id in idmap.keys():
@@ -3284,7 +3292,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
                         if has_time_steps:
                             var = output.createVariable(VAR_VALS_NS_VAR % (out_var_idx + 1, output_id), input.float,
                                                         (DIM_NUM_TIME_STEP, dim_num_node_ns))
-                            var[:] = input.data.variables[VAR_VALS_NS_VAR % (j + 1, input_id)][time_steps,
+                            var[:] = input.data.variables[VAR_VALS_NS_VAR % (j + 1, input_id)][time_step_indices,
                                                                                                ns.nodes]
                     var_truth_tab[output_id - 1] = row  # put row in table
     # END OF NODE SET PROCESSING
@@ -3310,7 +3318,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
     # Node set node lists
     if DIM_NUM_NS in output.dimensions:  # only if we have node sets
         for i in range(1, output.dimensions[DIM_NUM_NS].size + 1):
-            var = output.variables[VAR_NODE_NS % i]
+            var = output.variables[VAR_NODE_NS % i][:]
             num_nodes = output.dimensions[DIM_NUM_NODE_NS % i].size
             new_var = numpy.empty(num_nodes, input.int)
             for j in range(num_nodes):
@@ -3320,10 +3328,10 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
     # Element block connectivity lists
     if DIM_NUM_EB in output.dimensions:  # only if we have element blocks
         for i in range(1, output.dimensions[DIM_NUM_EB].size + 1):
-            var = output.variable[VAR_CONNECT % i]
-            num_elem = output.dimensions[DIM_NUM_EL_IN_BLK % i]
-            num_node = output.dimensions[DIM_NUM_NOD_PER_EL % i]
-            new_var = numpy.empty(num_elem, num_node)
+            var = output.variables[VAR_CONNECT % i][:]
+            num_elem = output.dimensions[DIM_NUM_EL_IN_BLK % i].size
+            num_node = output.dimensions[DIM_NUM_NOD_PER_EL % i].size
+            new_var = numpy.empty((num_elem, num_node), input.int)
             for j in range(num_elem):
                 for k in range(num_node):
                     new_var[j, k] = old_new_node_id_map[var[j, k]]
@@ -3365,7 +3373,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
         glo_var_idx = [x - 1 for x in glo_vars]
         try:
             # Need to subtract 1 to convert variables ids into indices
-            var[:] = input.data.variables[VAR_VALS_GLO_VAR][time_steps, glo_var_idx]
+            var[:] = input.data.variables[VAR_VALS_GLO_VAR][time_step_indices, glo_var_idx]
         except IndexError:
             raise IndexError("Global variables provided contain invalid indices")
         if VAR_NAME_GLO_VAR in input.data.variables:
@@ -3387,12 +3395,12 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
             for id in nod_vars:
                 var = output.createVariable(VAR_VALS_NOD_VAR_LARGE % output_id, input.float, (DIM_NUM_TIME_STEP,
                                                                                               DIM_NUM_NODES))
-                var[:] = input.data.variables[VAR_VALS_NOD_VAR_LARGE % id][time_steps, added_nodes_indices]
+                var[:] = input.data.variables[VAR_VALS_NOD_VAR_LARGE % id][time_step_indices, added_nodes_indices]
                 output_id += 1
         else:
             var = output.createVariable(VAR_VALS_NOD_VAR_SMALL, input.float, (DIM_NUM_TIME_STEP, DIM_NUM_NOD_VAR,
                                                                               DIM_NUM_NODES))
-            var[:] = input.data.variables[time_steps, nod_var_idx, added_nodes_indices]
+            var[:] = input.data.variables[time_step_indices, nod_var_idx, added_nodes_indices]
         if VAR_NAME_NOD_VAR in input.data.variables:
             var = output.createVariable(VAR_NAME_NOD_VAR, '|S1', (DIM_NUM_NOD_VAR, DIM_STRING_LENGTH))
             var[:] = input.data.variables[VAR_NAME_NOD_VAR][nod_var_idx]
@@ -3515,8 +3523,8 @@ if __name__ == "__main__":
         sel = NodeSetSelector(input_file, obj_id)
         ns_sels.append(sel)
     prop_sel = PropertySelector(input_file)
-    nodal_var = list(range(input_file.num_node_var))
-    global_var = list(range(input_file.num_global_var))
-    steps = list(range(input_file.num_time_steps))
+    nodal_var = list(range(1, input_file.num_node_var + 1))
+    global_var = list(range(1, input_file.num_global_var + 1))
+    steps = list(range(1, input_file.num_time_steps + 1))
 
     output_subset(input_file, p, t, eb_sels, ss_sels, ns_sels, prop_sel, nodal_var, global_var, steps)
