@@ -33,7 +33,6 @@ class SSLedger:
 
         # Fill in lists with sideset data
         for i in range(self.num_ss):
-            print(i)
             # load in ids for each sideset
             if ("ss_prop1" in ex.data.variables):
                 self.ss_prop1.append(ex.data["ss_prop1"][i])
@@ -433,7 +432,8 @@ class SSLedger:
                 if("dist_fact_ss" + str(i+1) in data.variables):
                     data["dist_fact_ss" + str(i+1)][:] = self.ex.get_side_set_df(self.ss_prop1[i])[:]
             else:
-                data["dist_fact_ss" + str(i+1)][:] = self.ss_dist_fact[i][:]
+                if self.num_dist_fact[i] > 0:
+                    data["dist_fact_ss" + str(i+1)][:] = self.ss_dist_fact[i][:]
 
             # write out sideset variables
             for j in range(self.num_ss_var):
