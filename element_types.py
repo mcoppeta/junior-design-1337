@@ -63,6 +63,13 @@ class QUAD4(ElementType):
 			4: [4, 1]
 		}
 
+# Assumes same ordering as QUAD4, overwrite here if not
+class QUAD5(QUAD4):
+	def __init__(self):
+		super().__init__()
+		self.type = "QUAD5"
+		self.num_nodes = 5
+
 class QUAD8(ElementType):
 	def __init__(self):
 		self.type = "QUAD8"
@@ -73,6 +80,13 @@ class QUAD8(ElementType):
 			3: [3, 4, 7],
 			4: [4, 1, 8]
 		}
+
+# Assumes same ordering as QUAD8, overwrite here if not
+class QUAD9(QUAD8):
+	def __init__(self):
+		super().__init__()
+		self.type = "QUAD9"
+		self.num_nodes = 9
 
 class SHELL4(ElementType):
 	def __init__(self):
@@ -203,6 +217,13 @@ class WEDGE15(ElementType):
 			5: [4, 5, 6, 13, 14, 15]
 		}
 
+# Assumes same ordering as WEDGE15, overwrite here if not
+class WEDGE16(WEDGE15):
+	def __init__(self):
+		super().__init__()
+		self.type = "WEDGE16"
+		self.num_nodes = 16
+
 class WEDGE20(ElementType):
 	def __init__(self):
 		self.type = "WEDGE20"
@@ -214,6 +235,13 @@ class WEDGE20(ElementType):
 			4: [1, 3, 2, 9, 8, 7, 16],
 			5: [4, 5, 6, 13, 14, 15, 17]
 		}
+
+# Assumes same ordering as WEDGE20, overwrite here if not
+class WEDGE21(WEDGE20):
+	def __init__(self):
+		super().__init__()
+		self.type = "WEDGE21"
+		self.num_nodes = 21
 
 class HEX8(ElementType):
 	def __init__(self):
@@ -227,6 +255,13 @@ class HEX8(ElementType):
 			5: [1, 4, 3, 2],
 			6: [5, 6, 7, 8]
 		}
+
+# Assumes same ordering as HEX8, overwrite here if not
+class HEX9(HEX8):
+	def __init__(self):
+		super().__init__()
+		self.type = "HEX9"
+		self.num_nodes = 9
 
 class HEX20(ElementType):
 	def __init__(self):
@@ -278,6 +313,13 @@ class PYRA13(ElementType):
 			5: [1, 4, 3, 2, 9, 8, 7, 6]
 		}
 
+# Assumes same ordering as QUAD4, overwrite here if not
+class PYRA14(PYRA13):
+	def __init__(self):
+		super().__init__()
+		self.type = "PYRA14"
+		self.num_nodes = 14
+
 
 # Takes in uppercase string of type
 # Returns (class, num faces)
@@ -291,16 +333,16 @@ elem_types = {
 	"BAR3": BAR3,
 	"QUAD": QUAD4, #Assumption
 	"QUAD4": QUAD4,
-	#"QUAD5": QUAD4,
+	"QUAD5": QUAD5,
 	"QUAD8": QUAD8,
-	#"QUAD9": QUAD8,
-	##"SHELL": SHELL4, #Assumption
-	##"SHELL4": SHELL4,
-	##"SHELL8": SHELL8,
-	##"SHELL9": SHELL9, 
-	##"TRI": TRI3, #Assumption
-	##"TRI3": TRI3,
-	##"TRI6": TRI6,
+	"QUAD9": QUAD9,
+	"SHELL": SHELL4, #Assumption
+	"SHELL4": SHELL4,
+	"SHELL8": SHELL8,
+	"SHELL9": SHELL9, 
+	"TRI": TRI3, #Assumption
+	"TRI3": TRI3,
+	"TRI6": TRI6,
 	"TRISHELL": TRISHELL3, #Assumption
 	"TRISHELL3": TRISHELL3,
 	"TRISHELL6": TRISHELL6,
@@ -310,18 +352,18 @@ elem_types = {
 	"WEDGE": WEDGE6, #Assumption
 	"WEDGE6": WEDGE6,
 	"WEDGE15": WEDGE15,
-	#"WEDGE16": WEDGE15,
+	"WEDGE16": WEDGE16,
 	"WEDGE20": WEDGE20, # Assumption
-	#"WEDGE21": WEDGE20,
+	"WEDGE21": WEDGE21,
 	"HEX": HEX8, #Assumption
 	"HEX8": HEX8,
-	#"HEX9": HEX8,
+	"HEX9": HEX9,
 	"HEX20": HEX20,
 	"HEX27": HEX27,
 	"PYRA": PYRA5, #Assumption
 	"PYRA5": PYRA5,
 	"PYRA13": PYRA13,
-	#"PYRA14": PYRA13
+	"PYRA14": PYRA14
 }
 
 # Returns an object of type ElementType
