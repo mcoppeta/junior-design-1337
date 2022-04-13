@@ -165,21 +165,21 @@ class NSLedger:
         return self._id_add_nodes_to_nodeset(node_ids, node_set_id)
 
     # node_ids must be array-like per numpy
-    def _id_add_nodes_to_nodeset(self, node_ids, nodeset_id):
-        nodeset_num = self.find_nodeset_num(nodeset_id)
+    def _id_add_nodes_to_nodeset(self, node_ids, node_set_id):
+        node_set_num = self.find_nodeset_num(node_set_id)
 
         # determine whether nodeset exists in memory or still only exists in the exodus object
         # needs to be pulled into memory regardless
-        program_name = self.node_sets[nodeset_num]
-        curr_nodeset = self.node_set_map[program_name]
-        if curr_nodeset is None:
-            curr_nodeset = self.ex.data[program_name][:]
+        program_name = self.node_sets[node_set_num]
+        curr_node_set = self.node_set_map[program_name]
+        if curr_node_set is None:
+            curr_node_set = self.ex.data[program_name][:]
             program_name = str(self.new_node_set_name)
-            self.node_set_map[program_name] = curr_nodeset
+            self.node_set_map[program_name] = curr_node_set
             self.new_node_set_name += 1
 
-        new_nodeset = np.unique(np.append(curr_nodeset, node_ids))
-        self.node_set_map[program_name] = new_nodeset
+        new_node_set = np.unique(np.append(curr_node_set, node_ids))
+        self.node_set_map[program_name] = new_node_set
 
     def remove_nodes_from_nodeset(self, node_ids, identifier):
         if isinstance(identifier, str):
@@ -190,29 +190,29 @@ class NSLedger:
             raise TypeError("Identifier must be of type str or int")
 
     def _str_remove_nodes_from_nodeset(self, node_ids, name):
-        nodeset_id = self.node_set_name_lookup[name]
-        return self._id_remove_nodes_from_nodeset(node_ids, nodeset_id)
+        node_set_id = self.node_set_name_lookup[name]
+        return self._id_remove_nodes_from_nodeset(node_ids, node_set_id)
 
-    def _id_remove_nodes_from_nodeset(self, node_ids, nodeset_id):
-        nodeset_num = self.find_nodeset_num(nodeset_id)
+    def _id_remove_nodes_from_nodeset(self, node_ids, node_set_id):
+        node_set_num = self.find_nodeset_num(node_set_id)
 
-        # determine whether nodeset exists in memory or still only exists in the exodus object
+        # determine whether node set exists in memory or still only exists in the exodus object
         # needs to be pulled into memory regardless
-        program_name = self.node_sets[nodeset_num]
-        curr_nodeset = self.node_set_map[program_name]
-        if curr_nodeset is None:
-            curr_nodeset = self.ex.data[program_name][:]
+        program_name = self.node_sets[node_set_num]
+        curr_node_set = self.node_set_map[program_name]
+        if curr_node_set is None:
+            curr_node_set = self.ex.data[program_name][:]
             program_name = str(self.new_node_set_name)
-            self.node_set_map[program_name] = curr_nodeset
+            self.node_set_map[program_name] = curr_node_set
             self.new_node_set_name += 1
 
-        new_nodeset = np.setdiff1d(curr_nodeset, node_ids)
-        if len(curr_nodeset) - len(new_nodeset) != len(node_ids):
-            raise IndexError("One or more nodes could not be found in NodeSet " + str(nodeset_id))
-        self.node_set_map[program_name] = new_nodeset
+        new_node_set = np.setdiff1d(curr_node_set, node_ids)
+        if len(curr_node_set) - len(new_node_set) != len(node_ids):
+            raise IndexError("One or more nodes could not be found in NodeSet " + str(node_set_id))
+        self.node_set_map[program_name] = new_node_set
 
     def write_dimensions(self, data):
-        # if no nodesets exist, no writing needs to be performed
+        # if no node sets exist, no writing needs to be performed
         if len(self.node_sets) == 0:
             return
 
@@ -220,21 +220,21 @@ class NSLedger:
         data.createDimension("num_node_sets", len(self.node_sets))
 
         for i in range(len(self.node_sets)):
-            # if nodeset exists in old file, copy directly
-            nodeset_name = self.node_sets[i]
-            if self.node_set_map[nodeset_name] is None:
-                dimension = self.ex.data.variables[nodeset_name].dimensions[0]
+            # if node set exists in old file, copy directly
+            node_set_name = self.node_sets[i]
+            if self.node_set_map[node_set_name] is None:
+                dimension = self.ex.data.variables[node_set_name].dimensions[0]
                 data.createDimension("num_nod_ns" + str(i + 1),
                                      self.ex.data.dimensions[dimension].size)
 
             # else, create according to np array
             else:
                 data.createDimension("num_nod_ns" + str(i + 1),
-                                     len(self.node_set_map[nodeset_name]))
+                                     len(self.node_set_map[node_set_name]))
 
     def write_variables(self, data):
 
-        # if no nodesets exist, no writing needs to be performed
+        # if no node sets exist, no writing needs to be performed
         if len(self.node_sets) == 0:
             return
 
@@ -248,21 +248,21 @@ class NSLedger:
         for i in range(len(self.node_set_names)):
             data['ns_names'][i] = util.convert_string(self.node_set_names[i], self.ex.max_allowed_name_length)
 
-        # add nodeset data
+        # add node set data
         for i in range(len(self.node_sets)):
-            nodeset_name = self.node_sets[i]
-            # if nodeset exists in old file, copy directly
-            if self.node_set_map[nodeset_name] is None:
+            node_set_name = self.node_sets[i]
+            # if node set exists in old file, copy directly
+            if self.node_set_map[node_set_name] is None:
 
                 data.createVariable("node_ns" + str(i+1), "int32",
                                     dimensions=("num_nod_ns" + str(i+1)))
 
                 # copy data
-                data["node_ns" + str(i+1)][:] = self.ex.data[nodeset_name][:]
+                data["node_ns" + str(i+1)][:] = self.ex.data[node_set_name][:]
 
-                if "dist_fact_ns" + nodeset_name[-1:] in self.ex.data.variables.keys():
+                if "dist_fact_ns" + node_set_name[-1:] in self.ex.data.variables.keys():
                     data.createVariable("dist_fact_ns" + str(i+1), "float64", dimensions=("num_nod_ns" + str(i+1)))
-                    data["dist_fact_ns" + str(i+1)][:] = self.ex.data["dist_fact_ns" + nodeset_name[-1:]][:]
+                    data["dist_fact_ns" + str(i+1)][:] = self.ex.data["dist_fact_ns" + node_set_name[-1:]][:]
                 else:
                     data.createVariable("dist_fact_ns" + str(i + 1), "float64", dimensions=("num_nod_ns" + str(i + 1)))
                     ns_size = data.dimensions['num_nod_ns' + str(i+1)].size
@@ -272,26 +272,26 @@ class NSLedger:
             else:
                 data.createVariable("node_ns" + str(i+1), "int32",
                                     dimensions=("num_nod_ns" + str(i+1)))
-                data["node_ns"+str(i+1)][:] = self.node_set_map[nodeset_name][:]
+                data["node_ns"+str(i+1)][:] = self.node_set_map[node_set_name][:]
                 data.createVariable("dist_fact_ns" + str(i + 1), "float64", dimensions=("num_nod_ns" + str(i + 1)))
                 ns_size = data.dimensions['num_nod_ns' + str(i + 1)].size
                 data["dist_fact_ns" + str(i + 1)][:] = np.ones(ns_size, dtype=np.float64)[:]
 
         # TODO: add ns_status
 
-    def find_nodeset_num(self, nodeset_id):
-        nodeset_num = -1
-        # search for nodeset that corresponds with given ID
+    def find_nodeset_num(self, node_set_id):
+        node_set_num = -1
+        # search for node set that corresponds with given ID
         for i in range(len(self.node_set_ids)):
-            if self.node_set_ids[i] == nodeset_id:
-                nodeset_num = i
+            if self.node_set_ids[i] == node_set_id:
+                node_set_num = i
                 break
 
-        # raise IndexError if no nodeset is found
-        if nodeset_num == -1:
-            raise KeyError("Cannot find nodeset with ID " + str(nodeset_id))
+        # raise IndexError if no node set is found
+        if node_set_num == -1:
+            raise KeyError("Cannot find node set with ID " + str(node_set_id))
 
-        return nodeset_num
+        return node_set_num
 
     #############################################
     #                                           #
@@ -311,14 +311,14 @@ class NSLedger:
             raise TypeError("Identifier must be of type str or int")
 
     def _str_get_node_set(self, name):
-        nodeset_id = self.node_set_name_lookup[name]
-        return self._id_get_node_set(nodeset_id)
+        node_set_id = self.node_set_name_lookup[name]
+        return self._id_get_node_set(node_set_id)
 
-    def _id_get_node_set(self, nodeset_id):
-        num = self.find_nodeset_num(nodeset_id)
+    def _id_get_node_set(self, node_set_id):
+        num = self.find_nodeset_num(node_set_id)
         name = self.node_sets[num]
         if name not in self.node_set_map.keys():
-            raise KeyError(f"NodeSet {nodeset_id} does not exist")
+            raise KeyError(f"Node Set {node_set_id} does not exist")
 
         if self.node_set_map[name] is None:
             return np.array(self.ex.data[name])
@@ -332,17 +332,16 @@ class NSLedger:
         else:
             raise TypeError("Identifier must be of type str or int")
 
-    def _str_get_partial_node_set(self, nodeset_name, start, count):
-        nodeset_id = self.node_set_name_lookup[nodeset_name]
-        print(nodeset_id)
-        return self._id_get_partial_node_set(nodeset_id, start, count)
+    def _str_get_partial_node_set(self, node_set_name, start, count):
+        node_set_id = self.node_set_name_lookup[node_set_name]
+        print(node_set_id)
+        return self._id_get_partial_node_set(node_set_id, start, count)
 
-
-    def _id_get_partial_node_set(self, nodeset_id, start, count):
-        num = self.find_nodeset_num(nodeset_id)
+    def _id_get_partial_node_set(self, node_set_id, start, count):
+        num = self.find_nodeset_num(node_set_id)
         name = self.node_sets[num]
         if name not in self.node_set_map.keys():
-            raise KeyError(f"NodeSet {nodeset_id} does not exist")
+            raise KeyError(f"Node Set {node_set_id} does not exist")
 
         if self.node_set_map[name] is None:
             return np.unique(self.ex.data[name])[start - 1:start + count - 1]
@@ -352,8 +351,8 @@ class NSLedger:
         """ Returns the id map for node sets (ns_prop1). """
         return np.array(self.node_set_ids)
 
-    def get_node_set_name(self, nodeset_id):
-        num = self.find_nodeset_num(nodeset_id)
+    def get_node_set_name(self, node_set_id):
+        num = self.find_nodeset_num(node_set_id)
         return self.node_set_names[num]
 
     def get_node_set_names(self):
