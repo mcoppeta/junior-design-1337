@@ -1006,26 +1006,26 @@ class Exodus:
             num_df = 0
         return num_entries, num_df
 
-    def get_node_set(self, obj_id):
+    def get_node_set(self, identifier):
         """Returns an array of the nodes contained in the node set with given ID."""
         if self.mode == 'w' or self.mode == 'a':
-            return self.ledger.get_node_set(obj_id)
+            return self.ledger.get_node_set(identifier)
 
-        internal_id = self._lookup_id('nodeset', obj_id)
-        size = self._int_get_node_set_params(obj_id, internal_id)[0]
-        return self._int_get_partial_node_set(obj_id, internal_id, 1, size)
+        internal_id = self._lookup_id('nodeset', identifier)
+        size = self._int_get_node_set_params(identifier, internal_id)[0]
+        return self._int_get_partial_node_set(identifier, internal_id, 1, size)
 
-    def get_partial_node_set(self, obj_id, start, count):
+    def get_partial_node_set(self, identifier, start, count):
         """
         Returns a partial array of the nodes contained in the node set with given ID.
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
         if self.mode == 'w' or self.mode == 'a':
-            return self.ledger.get_partial_node_set(id, start, count)
+            return self.ledger.get_partial_node_set(identifier, start, count)
 
-        internal_id = self._lookup_id('nodeset', obj_id)
-        return self._int_get_partial_node_set(obj_id, internal_id, start, count)
+        internal_id = self._lookup_id('nodeset', identifier)
+        return self._int_get_partial_node_set(identifier, internal_id, start, count)
 
     def get_node_set_df(self, obj_id):
         """Returns an array containing the distribution factors in the node set with given ID."""
