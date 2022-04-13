@@ -187,8 +187,21 @@ class ElemLedger:
             e, f = i
             e = self.elem_num_map[e]
             converted_unique_faces.append((e, f))
-            
+
         return converted_unique_faces
+
+    def skin(self):
+        faces = []
+        for i in range(len(self.blocks)):
+            faces += self.skin_block(self.eb_prop1[i])
+
+        el_list = []
+        face_list = []
+        for i in faces:
+            el_list.append(i[0])
+            face_list.append(i[1])
+
+        return el_list, face_list
 
     # Writes out element dimension data to the new dataset
     def write_dimensions(self, data):

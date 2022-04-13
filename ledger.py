@@ -158,6 +158,11 @@ class Ledger:
             face_list.append(f)
         self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name, df)
 
+    def skin(self, skin_id, skin_name):
+        el_list, face_list = self.element_ledger.skin()
+        df = []
+        self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name, df)
+
 
     def write(self, path):
         """
