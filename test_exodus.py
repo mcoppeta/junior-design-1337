@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from exodus import Exodus
-import netCDF4 as nc
+from netCDF4 import Dataset
 import util
 from iterate import SampleFiles
 
@@ -12,9 +12,13 @@ pytestmark = pytest.mark.filterwarnings('ignore')
 
 def test_open():
     # Test that we can open a file without any errors
-    exofile = Exodus('sample-files/can.ex2', 'r')
-    assert exofile.data
-    exofile.close()
+    for file in SampleFiles():
+        exofile = Exodus(file, 'r')
+        assert exofile.data
+        exofile.close()
+        exofile = Exodus(file, 'a')
+        assert exofile.data
+        exofile.close()
 
 
 def test_create(tmpdir):
@@ -216,7 +220,7 @@ def test_get_coord_z():
 
 def test_write_exceptions(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.exo', 'w')
-    exofile.add_nodeset([1,2,3], 30, "This is a ns")
+    exofile.add_nodeset([1, 2, 3], 30, "This is a ns")
 
     with pytest.raises(AttributeError):
         exofile.write(str(tmpdir) + '\\newfile.exo')
@@ -233,7 +237,6 @@ def test_write_exceptions(tmpdir):
     # Uncomment when Element Ledger bug fixes are pushed
     # exofile.write(str(tmpdir) + '\\newfile.exo')
     exofile.close()
-
 
 
 #############################################################################
@@ -268,7 +271,7 @@ def test_add_ns_write(tmpdir):
     exofile.write()
     exofile.close()
 
-    data = nc.Dataset(str(tmpdir) + '\\test.ex2', 'r')
+    data = Dataset(str(tmpdir) + '\\test.ex2', 'r')
 
     # check to see the number of node sets increased
     assert data.dimensions['num_node_sets'].size == 2
@@ -411,7 +414,7 @@ def test_add_duplicate_nodes(tmpdir):
     exofile.add_node_to_nodeset(10, 99)
 
     exofile.write()
-    data = nc.Dataset(str(tmpdir) + '\\test.ex2', 'r')
+    data = Dataset(str(tmpdir) + '\\test.ex2', 'r')
     assert data.dimensions['num_nod_ns1'].size == 3
     assert np.array_equal(np.array([10, 11, 12]), data['node_ns1'])
 
@@ -435,11 +438,27 @@ def test_merge_ns_with_duplicate_nodes(tmpdir):
 
 def test_get_nodeset_by_name(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
-    exofile.add_nodeset([12, 11, 10], 1, "def")
-    exofile.add_nodeset([10, 9, 8, 7, 6, 5, 1], 2, "abc")
+    exofile.add_nodeset([10, 11, 12], 1, "def")
+    exofile.add_nodeset([1, 2, 3, 4, 5, 100], 2, "abc")
 
     ns_1 = exofile.ledger.nodeset_ledger.get_node_set("def")
-    assert np.array_equal(ns_1, [12, 11, 10])
+    assert np.array_equal(ns_1, [10, 11, 12])
+
+    ns_2 = exofile.ledger.nodeset_ledger.get_node_set("abc")
+    assert np.array_equal(ns_2, [1, 2, 3, 4, 5, 100])
+
+    ns_1 = exofile.ledger.nodeset_ledger.get_node_set(1)
+    assert np.array_equal(ns_1, [10, 11, 12])
+
+    ns_2 = exofile.ledger.nodeset_ledger.get_node_set(2)
+    assert np.array_equal(ns_2, [1, 2, 3, 4, 5, 100])
+
+    ns_1_partial = exofile.ledger.nodeset_ledger.get_partial_node_set("def", 1, 2)
+    assert np.array_equal(ns_1_partial, [10, 11])
+
+    ns_2_partial = exofile.ledger.nodeset_ledger.get_partial_node_set("abc", 3, 4)
+    assert np.array_equal(ns_2_partial, [3, 4, 5, 100])
+
 
 def test_remove_duplicate_nodes(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
@@ -519,7 +538,7 @@ def test_empty_sideset_remove(tmpdir):
 def test_get_coords_comprehensive():
     for file in SampleFiles():
         ex = Exodus(file, 'r')
-        data = nc.Dataset(file, 'r')
+        data = Dataset(file, 'r')
         if 'coord' in data.variables:
             assert np.array_equal(ex.get_coords(), data['coord'][:])
 
