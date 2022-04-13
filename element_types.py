@@ -329,6 +329,7 @@ elem_types = {
 	"CIRCLE": CIRCLE,
 	"SPHERE": CIRCLE, #both 1 node
 	"BEAM": BAR2,
+	"BAR": BAR2, #???
 	"BAR2": BAR2,
 	"BAR3": BAR3,
 	"QUAD": QUAD4, #Assumption
@@ -340,9 +341,15 @@ elem_types = {
 	"SHELL4": SHELL4,
 	"SHELL8": SHELL8,
 	"SHELL9": SHELL9, 
-	"TRI": TRI3, #Assumption
-	"TRI3": TRI3,
-	"TRI6": TRI6,
+	#"TRI": TRI3, #Assumption
+	#"TRI3": TRI3,
+	#"TRI6": TRI6,
+
+	# TRI -> TRISHELL
+	"TRI": TRISHELL3,
+	"TRI3": TRISHELL3,
+	"TRI6": TRISHELL6,
+
 	"TRISHELL": TRISHELL3, #Assumption
 	"TRISHELL3": TRISHELL3,
 	"TRISHELL6": TRISHELL6,
