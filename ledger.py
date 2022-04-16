@@ -125,14 +125,14 @@ class Ledger:
         self.nodeset_ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
 
     # sideset methods
-    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None):
-        self.sideset_ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact)
+    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
+        self.sideset_ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact, variables)
 
     def remove_sideset(self, ss_id):
         self.sideset_ledger.remove_sideset(ss_id)
 
-    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None):
-        self.sideset_ledger.add_sides_to_sideset(elem_ids, side_ids, dist_facts, ss_id)
+    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
+        self.sideset_ledger.add_sides_to_sideset(elem_ids, side_ids, ss_id, dist_facts, variables)
 
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
         self.sideset_ledger.remove_sides_from_sideset(elem_ids, side_ids, ss_id)
@@ -191,7 +191,7 @@ class Ledger:
             if dimension == "num_node_sets" or dimension[:10] == "num_nod_ns":
                 continue
             # ignore dimensions that will be written by ss ledger
-            if dimension == "num_side_sets" or dimension[:11] == "num_side_ss" or dimension[:9] == "num_df_ss":
+            if dimension == "num_side_sets" or dimension[:11] == "num_side_ss" or dimension[:9] == "num_df_ss"  or dimension[:12] == "num_sset_var":
                 continue
 
             # ignore dimensions that will be written by elem ledger
@@ -222,7 +222,8 @@ class Ledger:
                 continue
 
             # ignore variables that will be written by ss ledger
-            if var[:3] == "ss_" or var[:7] == "side_ss" or var[:7] == "elem_ss" or var[:12] == "dist_fact_ss":
+            if var[:3] == "ss_" or var[:7] == "side_ss" or var[:7] == "elem_ss" or var[:12] == "dist_fact_ss"\
+                or var[:13] == "vals_sset_var" or var[:13] == "name_sset_var" or var[:12] == "sset_var_tab":
                 continue
 
             #TODO -> elem_map is not for IDs
