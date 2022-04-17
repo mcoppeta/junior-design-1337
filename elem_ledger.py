@@ -35,10 +35,17 @@ class ElemLedger:
 
         # ID map of individual elements
         self.elem_num_map = []
+        if 'elem_num_map' in self.ex.data.variables.keys() and 'elem_map' in self.ex.data.variables.keys():
+            # raise NotImplementedError("Both elem_num_map and elem_map variables present. Ambiguous meaning")
+            # print("Both elem_num_map and elem_map variables present. Ambiguous meaning")
+            self.elem_num_map = self.ex.data.variables['elem_num_map'][:].tolist()
+            # self.elem_num_map = self.ex.data.variables['elem_map'][:].tolist()
         if 'elem_num_map' in self.ex.data.variables.keys():
             self.elem_num_map = self.ex.data.variables['elem_num_map'][:].tolist()
+        elif 'elem_map' in self.ex.data.variables.keys():
+            self.elem_num_map = self.ex.data.variables['elem_map'][:].tolist()
         elif 'num_elem' in self.ex.data.dimensions.keys():
-            self.elem_num_map = [i for i in range(self.ex.data.dimensions['num_elem'].size)]
+            self.elem_num_map = [i + 1 for i in range(self.ex.data.dimensions['num_elem'].size)]
 
         self.num_elem_var = 0
         if 'num_elem_var' in self.ex.data.dimensions.keys():
@@ -174,14 +181,27 @@ class ElemLedger:
 
         unique_faces = block.skin_block(shift)
 
-        # we have the intern id's, need the elem_num_map id's instead
+        # we have the internal id's, need the elem_num_map id's instead
         converted_unique_faces = []
         for i in unique_faces:
             e, f = i
             e = self.elem_num_map[e]
             converted_unique_faces.append((e, f))
-        
+
         return converted_unique_faces
+
+    def skin(self):
+        faces = []
+        for i in range(len(self.blocks)):
+            faces += self.skin_block(self.eb_prop1[i])
+
+        el_list = []
+        face_list = []
+        for i in faces:
+            el_list.append(i[0])
+            face_list.append(i[1])
+
+        return el_list, face_list
 
     # Writes out element dimension data to the new dataset
     def write_dimensions(self, data):

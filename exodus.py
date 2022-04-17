@@ -2020,6 +2020,11 @@ class Exodus:
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to skin element into new sideset")
         self.ledger.skin_element_block(block_id, skin_id, skin_name)
+
+    def skin(self, skin_id, skin_name):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to skin element into new sideset")
+        self.ledger.skin(skin_id, skin_name)
         
     def write(self, path=None):
         if self.mode != 'w' and self.mode != 'a':
