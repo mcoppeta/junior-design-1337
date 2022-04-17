@@ -3,9 +3,10 @@ from typing import List
 import numpy
 import pytest
 import numpy as np
-from exodus import Exodus, output_subset
+from exodus import Exodus
 from selector import ElementBlockSelector, NodeSetSelector, SideSetSelector, PropertySelector
 from constants import *
+from output_subset import output_subset
 import util
 import netCDF4 as nc
 
@@ -73,6 +74,7 @@ def test_whole_subset(tmpdir):
 
     # Nodal and global variables
     # TODO I should have a way to find if var names exist. I have no way of knowing otherwise!
+    #  right now this errors!
     assert np.array_equal(output_file.get_nodal_var_names(), input_file.get_nodal_var_names())
     assert np.array_equal(output_file.get_global_var_names(), input_file.get_global_var_names())
     for i in range(input_file.num_node_var):
