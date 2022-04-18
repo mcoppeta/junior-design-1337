@@ -980,6 +980,27 @@ class Exodus:
             result[i] = util.lineparse(names[i])
         return result
 
+    def has_var_names(self, var_type: VariableType):
+        """
+        .Test if this Exodus file has variable names for a variable type.
+
+        :param var_type: GLOBAL_VAR, NODAL_VAR, ELEMENTAL_VAR, NODESET_VAR, or SIDESET_VAR from `constants`
+        :return: True if this variable type has names defined, false otherwise
+        """
+        if var_type == GLOBAL_VAR:
+            varname = VAR_NAME_GLO_VAR
+        elif var_type == NODAL_VAR:
+            varname = VAR_NAME_NOD_VAR
+        elif var_type == ELEMENTAL_VAR:
+            varname = VAR_NAME_ELEM_VAR
+        elif var_type == NODESET_VAR:
+            varname = VAR_NAME_NS_VAR
+        elif var_type == SIDESET_VAR:
+            varname = VAR_NAME_SS_VAR
+        else:
+            raise ValueError("Invalid variable type {}!".format(var_type))
+        return varname in self.data.variables
+
     def get_global_var_names(self):
         """Returns a list of all global variable names. Index of the variable is the index of the name + 1."""
         return self._get_var_names(GLOBAL_VAR)

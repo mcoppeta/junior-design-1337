@@ -55,10 +55,6 @@ def test_whole_subset(tmpdir):
     assert output_file.num_nodes == input_file.num_nodes
 
     # Check that node and element ids are valid as well
-    # Check that coordinates were carried over correctly
-    # Check that coord names were carried over correctly
-    # Check that global variables and their names were carried over
-    # Check that nodal variables and their names were carried over
     # each variable and whatnot set in each processing algorithm
     # Really just make sure every function in the library returns the same output
 
@@ -73,16 +69,50 @@ def test_whole_subset(tmpdir):
     assert np.array_equal(output_file.get_elem_order_map(), input_file.get_elem_order_map())
 
     # Nodal and global variables
-    # TODO I should have a way to find if var names exist. I have no way of knowing otherwise!
-    #  right now this errors!
-    assert np.array_equal(output_file.get_nodal_var_names(), input_file.get_nodal_var_names())
-    assert np.array_equal(output_file.get_global_var_names(), input_file.get_global_var_names())
+    if output_file.has_var_names(NODAL_VAR):
+        assert np.array_equal(output_file.get_nodal_var_names(), input_file.get_nodal_var_names())
+    if output_file.has_var_names(GLOBAL_VAR):
+        assert np.array_equal(output_file.get_global_var_names(), input_file.get_global_var_names())
     for i in range(input_file.num_node_var):
         assert np.array_equal(output_file.get_nodal_var_across_times(1, output_file.num_time_steps, i + 1),
                               input_file.get_nodal_var_across_times(1, input_file.num_time_steps, i + 1))
     for i in range(input_file.num_global_var):
         assert np.array_equal(output_file.get_global_var_across_times(1, output_file.num_time_steps, i + 1),
                               input_file.get_global_var_across_times(1, input_file.num_time_steps, i + 1))
+
+    # Coordinates
+    assert np.array_equal(output_file.get_coord_names(), input_file.get_coord_names())
+    assert np.array_equal(output_file.get_coords(), input_file.get_coords())
+
+    # Node sets
+    # Names
+    assert np.array_equal(output_file.get_node_set_names(), input_file.get_node_set_names())
+    # Variables
+    assert output_file.num_node_set_var == input_file.num_node_set_var
+    assert np.array_equal(output_file.get_node_set_truth_table(), input_file.get_node_set_truth_table())
+    if input_file.has_var_names(NODESET_VAR):
+        assert np.array_equal(output_file.get_node_set_var_names(), input_file.get_node_set_var_names())
+    # Properties
+    assert output_file.num_node_set_prop == input_file.num_node_set_prop
+    assert np.array_equal(output_file.get_node_set_property_names(), input_file.get_node_set_property_names())
+    for n in input_file.get_node_set_property_names():
+        assert np.array_equal(output_file.get_node_set_property_array(n), input_file.get_node_set_property_array(n))
+    # Per node set comparison
+    for i in input_file.get_node_set_id_map():
+        out_nod, out_df = output_file.get_node_set_params(i)
+        in_nod, in_df = input_file.get_node_set_params(i)
+        # Nodes
+        assert out_nod == in_nod
+        assert np.array_equal(output_file.get_node_set(i), input_file.get_node_set(i))
+        # Dist fact
+        assert out_df == in_df
+        assert np.array_equal(output_file.get_node_set_df(i), input_file.get_node_set_df(i))
+        # Variables
+        for j in range(input_file.num_node_set_var):
+            assert np.array_equal(output_file.get_node_set_var_across_times(i, 1, output_file.num_time_steps, j + 1),
+                                  input_file.get_node_set_var_across_times(i, 1, input_file.num_time_steps, j + 1))
+
+    
 
     output_file.close()
     input_file.close()

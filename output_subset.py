@@ -131,6 +131,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
         block_id_map = input.data.variables[VAR_EB_PROP % 1]
         # EB ID map / prop1
         var = output.createVariable(VAR_EB_PROP % 1, input.int, DIM_NUM_EB)
+        var.setncattr(ATTR_NAME, 'ID')
         if 'ID' in prop_selector.eb_prop:
             # Keep ID map
             var[:] = block_id_map[selected_block_indices]
@@ -167,6 +168,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
                 propid += 1  # id of current property in output
                 var = output.createVariable(VAR_EB_PROP % propid, input.int, DIM_NUM_EB)
                 var[:] = input.data.variables[VAR_EB_PROP % i][selected_block_indices]
+                var.setncattr(ATTR_NAME, propids[i])
 
         # Figure out which variables we're keeping
         vars_to_keep = []
@@ -299,6 +301,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
         set_id_map = input.data.variables[VAR_SS_PROP % 1]
         # SS ID map / prop1
         var = output.createVariable(VAR_SS_PROP % 1, input.int, DIM_NUM_SS)
+        var.setncattr(ATTR_NAME, 'ID')
         if 'ID' in prop_selector.ss_prop:
             # Keep ID map
             var[:] = set_id_map[selected_set_indices]
@@ -335,6 +338,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
                 propid += 1  # id of current property in output
                 var = output.createVariable(VAR_SS_PROP % propid, input.int, DIM_NUM_SS)
                 var[:] = input.data.variables[VAR_SS_PROP % i][selected_set_indices]
+                var.setncattr(ATTR_NAME, propids[i])
 
         # Figure out which variables we're keeping
         vars_to_keep = []
@@ -468,6 +472,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
         set_id_map = input.data.variables[VAR_NS_PROP % 1]
         # NS ID map / prop1
         var = output.createVariable(VAR_NS_PROP % 1, input.int, DIM_NUM_NS)
+        var.setncattr(ATTR_NAME, 'ID')
         if 'ID' in prop_selector.ns_prop:
             # Keep ID map
             var[:] = set_id_map[selected_set_indices]
@@ -504,6 +509,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
                 propid += 1  # id of current property in output
                 var = output.createVariable(VAR_NS_PROP % propid, input.int, DIM_NUM_NS)
                 var[:] = input.data.variables[VAR_NS_PROP % i][selected_set_indices]
+                var.setncattr(ATTR_NAME, propids[i])
 
         # Figure out which variables we're keeping
         vars_to_keep = []
