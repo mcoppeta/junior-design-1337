@@ -19,7 +19,7 @@ class Exodus:
     _EXODUS_VERSION = 7.22
 
     # Should creating a new file (mode 'w') be a function on its own?
-    def __init__(self, path, mode, shared=False, clobber=False, format='EX_NETCDF4', word_size=4):
+    def __init__(self, path, mode, shared=False, format='EX_NETCDF4', word_size=4):
         # clobber and format and word_size only apply to mode w
         if mode not in ['r', 'w', 'a']:
             raise ValueError("mode must be 'w', 'r', or 'a', got '{}'".format(mode))
@@ -27,31 +27,38 @@ class Exodus:
             raise ValueError("invalid file format: '{}'".format(format))
         if word_size not in [4, 8]:
             raise ValueError("word_size must be 4 or 8 bytes, {} is not supported".format(word_size))
-        # if path.split(".")[-1] not in ['e', 'ex2']:
-        #     raise ValueError("file must be an exodus file with extension .e or .ex2")
         nc_format = Exodus._FORMAT_MAP[format]
+
+        self.mode = mode
+        self.path = path
+
+        # file should never actually be opened in append mode
+        # if append mode is specified, open file in read mode and write out changes to separate file
+        if mode == 'a':
+            mode = 'r'
+
         # Sets shared mode if the user asked for it. I have no idea what this does :)
         if shared:
             smode = mode + 's'
         else:
             smode = mode
         try:
-            self.data = nc.Dataset(path, smode, clobber, format=nc_format)
+            self.data = nc.Dataset(path, smode, clobber=False, format=nc_format)
         except FileNotFoundError:
             raise FileNotFoundError("file '{}' does not exist".format(path)) from None
         except PermissionError:
             raise PermissionError("You do not have access to '{}'".format(path)) from None
         # TODO this can actually hide some errors which is bad. This check should be done explicitly
         except OSError:
-            raise OSError("file '{}' exists, but clobber is set to False".format(path)) from None
+            raise OSError("file '{}' already exists".format(path)) from None
 
-        self.mode = mode
-        self.path = path
-        self.clobber = clobber
 
-        if mode == 'w' or mode == 'a':
+
+        if self.mode == 'w':
             # This is important according to ex_open.c
             self.data.set_fill_off()
+
+        if self.mode == 'a' or self.mode == 'w':
             self.ledger = Ledger(self)
 
         # save path variable for future use
