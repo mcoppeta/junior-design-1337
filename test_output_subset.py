@@ -112,7 +112,71 @@ def test_whole_subset(tmpdir):
             assert np.array_equal(output_file.get_node_set_var_across_times(i, 1, output_file.num_time_steps, j + 1),
                                   input_file.get_node_set_var_across_times(i, 1, input_file.num_time_steps, j + 1))
 
-    
+    # Element blocks
+    # Names
+    assert np.array_equal(output_file.get_elem_block_names(), input_file.get_elem_block_names())
+    # Variables
+    assert output_file.num_elem_block_var == input_file.num_elem_block_var
+    assert np.array_equal(output_file.get_elem_block_truth_table(), input_file.get_elem_block_truth_table())
+    if input_file.has_var_names(ELEMENTAL_VAR):
+        assert np.array_equal(output_file.get_elem_var_names(), input_file.get_elem_var_names())
+    # Properties
+    assert output_file.num_elem_block_prop == input_file.num_elem_block_prop
+    assert np.array_equal(output_file.get_elem_block_property_names(), input_file.get_elem_block_property_names())
+    for n in input_file.get_elem_block_property_names():
+        assert np.array_equal(output_file.get_elem_block_property_array(n),
+                              input_file.get_elem_block_property_array(n))
+    # Per element block comparison
+    for i in input_file.get_elem_block_id_map():
+        out_el, out_nel, out_top, out_att = output_file.get_elem_block_params(i)
+        in_el, in_nel, in_top, in_att = input_file.get_elem_block_params(i)
+        # Elements
+        assert out_nel == in_nel
+        assert out_top == in_top
+        assert out_el == out_el
+        assert np.array_equal(output_file.get_elem_block_connectivity(i), input_file.get_elem_block_connectivity(i))
+        # Attributes
+        assert out_att == in_att
+        assert output_file.get_num_elem_attrib(i) == input_file.get_num_elem_attrib(i)
+        assert np.array_equal(output_file.get_elem_attrib_names(i), input_file.get_elem_attrib_names(i))
+        assert np.array_equal(output_file.get_elem_attrib(i), input_file.get_elem_attrib(i))
+        # Variables
+        for j in range(input_file.num_elem_block_var):
+            assert np.array_equal(
+                output_file.get_elem_block_var_across_times(i, 1, output_file.num_time_steps, j + 1),
+                input_file.get_elem_block_var_across_times(i, 1, input_file.num_time_steps, j + 1))
+
+    # Side sets
+    # Names
+    assert np.array_equal(output_file.get_side_set_names(), input_file.get_side_set_names())
+    # Variables
+    assert output_file.num_side_set_var == input_file.num_side_set_var
+    assert np.array_equal(output_file.get_side_set_truth_table(), input_file.get_side_set_truth_table())
+    if input_file.has_var_names(SIDESET_VAR):
+        assert np.array_equal(output_file.get_side_set_var_names(), input_file.get_side_set_var_names())
+    # Properties
+    assert output_file.num_side_set_prop == input_file.num_side_set_prop
+    assert np.array_equal(output_file.get_side_set_property_names(), input_file.get_side_set_property_names())
+    for n in input_file.get_side_set_property_names():
+        assert np.array_equal(output_file.get_side_set_property_array(n), input_file.get_side_set_property_array(n))
+    # Per side set comparison
+    for i in input_file.get_side_set_id_map():
+        out_num_el, out_num_df = output_file.get_side_set_params(i)
+        in_num_el, in_num_df = input_file.get_side_set_params(i)
+        out_el, out_side = output_file.get_side_set(i)
+        in_el, in_side = input_file.get_side_set(i)
+        # Elements and their sides
+        assert out_num_el == in_num_el
+        assert np.array_equal(out_el, in_el)
+        assert np.array_equal(out_side, in_side)
+        # Dist fact
+        assert out_num_df == in_num_df
+        assert np.array_equal(output_file.get_side_set_df(i), input_file.get_side_set_df(i))
+        # Variables
+        for j in range(input_file.num_side_set_var):
+            assert np.array_equal(
+                output_file.get_side_set_var_across_times(i, 1, output_file.num_time_steps, j + 1),
+                input_file.get_side_set_var_across_times(i, 1, input_file.num_time_steps, j + 1))
 
     output_file.close()
     input_file.close()

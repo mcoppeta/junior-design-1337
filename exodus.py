@@ -1324,8 +1324,8 @@ class Exodus:
             eb_params.append(self._int_get_elem_block_param_object(id, ndim))
             elem_ctr += eb_params[i].num_elem_in_blk
             eb_params[i].elem_ctr = elem_ctr
-        ss_param_idx = numpy.empty(num_ss_elem)  # ss element to eb param index
-        ss_elem_node_idx = numpy.empty(num_ss_elem)  # ss element to node list index
+        ss_param_idx = numpy.empty(num_ss_elem, int)  # ss element to eb param index
+        ss_elem_node_idx = numpy.empty(num_ss_elem, int)  # ss element to node list index
         node_count_list = numpy.empty(num_ss_elem, self.int)
         node_ctr = 0
         j = 0  # current elem block
