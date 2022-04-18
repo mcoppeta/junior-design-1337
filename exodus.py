@@ -11,8 +11,8 @@ from dataclasses import dataclass
 
 @dataclass
 class ElemBlockParam:
-    # Used to get the side set node count list
-    # Adapted from exodusII_int.h
+    """Stores data used to create a side set node count list."""
+    # Adapted from exodusII_int.h on SEACAS
     elem_type_str: str
     elem_blk_id: numpy.int64
     num_elem_in_blk: numpy.int64

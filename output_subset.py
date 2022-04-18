@@ -1,3 +1,5 @@
+"""Allows you to create a new Exodus file by copying selected parts of an opened Exodus file."""
+
 from __future__ import annotations  # use the magic of python 3.7 to let use write Exodus instead of "Exodus"
 
 import warnings

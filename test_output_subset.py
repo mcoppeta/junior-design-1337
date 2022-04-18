@@ -1,20 +1,22 @@
-from typing import List
-
-import numpy
 import pytest
 import numpy as np
 from exodus import Exodus
 from selector import ElementBlockSelector, NodeSetSelector, SideSetSelector, PropertySelector
 from constants import *
 from output_subset import output_subset
-import util
-import netCDF4 as nc
 
 # Disables all warnings in this module
 pytestmark = pytest.mark.filterwarnings('ignore')
 
 
-# pytest=dependency might be useful in here to require the read tests to pass...
+# pytest-dependency might be useful in here to require the read tests to pass...
+
+# It's probably worth doing a test that only copies part of each thing in a file
+# A test that copies everything, but not node sets
+# Also you could just delete the id maps and see if everything works out still
+# The most breakable part involves the node list
+def test_partial_side_set(tmpdir):
+    pass
 
 
 # Test output_subset, selecting the entire model
@@ -53,10 +55,6 @@ def test_whole_subset(tmpdir):
     assert output_file.num_side_sets == input_file.num_side_sets
     assert output_file.num_elem == input_file.num_elem
     assert output_file.num_nodes == input_file.num_nodes
-
-    # Check that node and element ids are valid as well
-    # each variable and whatnot set in each processing algorithm
-    # Really just make sure every function in the library returns the same output
 
     # Before anything, we need to make sure ID maps carried over
     assert np.array_equal(output_file.get_node_id_map(), input_file.get_node_id_map())
