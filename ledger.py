@@ -185,7 +185,7 @@ class Ledger:
         self.element_ledger.write_variables(self.ex.data)
 
     def a_write(self, path):
-        out = nc.Dataset(path, "w", True, format="NETCDF4")
+        out = nc.Dataset(path, "w", clobber=False, format="NETCDF4")
         old = self.ex.data
 
         out.setncatts(old.__dict__)
