@@ -1145,26 +1145,26 @@ class Exodus:
             num_df = 0
         return num_entries, num_df
 
-    def get_node_set(self, obj_id):
+    def get_node_set(self, identifier):
         """Returns an array of the nodes contained in the node set with given ID."""
         if self.mode == 'w' or self.mode == 'a':
-            return self.ledger.get_node_set(obj_id)
+            return self.ledger.get_node_set(identifier)
 
-        internal_id = self._lookup_id(NODESET, obj_id)
-        size = self._int_get_node_set_params(obj_id, internal_id)[0]
-        return self._int_get_partial_node_set(obj_id, internal_id, 1, size)
+        internal_id = self._lookup_id(NODESET, identifier)
+        size = self._int_get_node_set_params(identifier, internal_id)[0]
+        return self._int_get_partial_node_set(identifier, internal_id, 1, size)
 
-    def get_partial_node_set(self, obj_id, start, count):
+    def get_partial_node_set(self, identifier, start, count):
         """
         Returns a partial array of the nodes contained in the node set with given ID.
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
         if self.mode == 'w' or self.mode == 'a':
-            return self.ledger.get_partial_node_set(id, start, count)
+            return self.ledger.get_partial_node_set(identifier, start, count)
 
-        internal_id = self._lookup_id(NODESET, obj_id)
-        return self._int_get_partial_node_set(obj_id, internal_id, start, count)
+        internal_id = self._lookup_id(NODESET, identifier)
+        return self._int_get_partial_node_set(identifier, internal_id, start, count)
 
     def get_node_set_df(self, obj_id):
         """Returns an array containing the distribution factors in the node set with given ID."""
@@ -2104,12 +2104,12 @@ class Exodus:
             return self.ledger.get_node_set_names()
         return self._get_set_block_names(NODESET)
 
-    def get_node_set_name(self, obj_id):
+    def get_node_set_name(self, identifier):
         """Returns the name of the given node set."""
         if self.mode == 'a' or self.mode == 'w':
-            return self.ledger.get_node_set_name(obj_id)
+            return self.ledger.get_node_set_name(identifier)
 
-        internal_id = self._lookup_id(NODESET, obj_id)
+        internal_id = self._lookup_id(NODESET, identifier)
         names = self._get_set_block_names(NODESET)
         if len(names) > 0:
             return names[internal_id - 1]
@@ -2734,54 +2734,91 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
 
-    def remove_nodeset(self, nodeset_id):
+    def remove_nodeset(self, identifier):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.remove_nodeset(nodeset_id)
+        self.ledger.remove_nodeset(identifier)
 
     def merge_nodeset(self, new_id, ns1, ns2, delete=True):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.merge_nodesets(new_id, ns1, ns2, delete)
 
-    def add_node_to_nodeset(self, node_id, nodeset_id):
+    def add_node_to_nodeset(self, node_id, identifier):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.add_node_to_nodeset(node_id, nodeset_id)
+        self.ledger.add_node_to_nodeset(node_id, identifier)
 
-    def add_nodes_to_nodeset(self, node_ids, nodeset_id):
+    def add_nodes_to_nodeset(self, node_ids, identifier):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.add_nodes_to_nodeset(node_ids, nodeset_id)
+        self.ledger.add_nodes_to_nodeset(node_ids, identifier)
 
-    def remove_node_from_nodeset(self, node_id, nodeset_id):
+    def remove_node_from_nodeset(self, node_id, identifier):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.remove_node_from_nodeset(node_id, nodeset_id)
+        self.ledger.remove_node_from_nodeset(node_id, identifier)
 
-    def remove_nodes_from_nodeset(self, node_ids, nodeset_id):
+    def remove_nodes_from_nodeset(self, node_ids, identifier):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
+        self.ledger.remove_nodes_from_nodeset(node_ids, identifier)
 
-    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact):
+    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact)
+        self.ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact, variables)
 
     def remove_sideset(self, ss_id):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_sideset(ss_id)
 
+
+    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.add_sides_to_sideset(elem_ids, side_ids, ss_id, dist_facts, variables)
+
+    def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        self.ledger.remove_sides_from_sideset(elem_ids, side_ids, ss_id)
+
+    def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to split sideset")
+        self.ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+    
+
+    def add_element(self, block_id, nodelist):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to add nodeset")
+        return self.ledger.add_element(block_id, nodelist)
+
+
     def remove_element(self, elem_id):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.remove_element(elem_id)
+        return self.ledger.remove_element(elem_id)
 
+    def skin_element_block(self, block_id, skin_id, skin_name):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to skin element into new sideset")
+        self.ledger.skin_element_block(block_id, skin_id, skin_name)
+
+    def skin(self, skin_id, skin_name):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to skin element into new sideset")
+        self.ledger.skin(skin_id, skin_name)
+        
     def write(self, path=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to write")
+        elif self.mode == 'a' and path is None:
+            raise AttributeError("Must specify a new path when in append mode")
+        elif self.mode == 'w' and path is not None:
+            raise AttributeError("Do not specify a new path in write mode. Initialization path will be used")
         self.ledger.write(path)
 
 

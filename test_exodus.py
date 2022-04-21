@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from exodus import Exodus
-import netCDF4 as nc
+from netCDF4 import Dataset
 import util
 from iterate import SampleFiles
 
@@ -12,9 +12,13 @@ pytestmark = pytest.mark.filterwarnings('ignore')
 
 def test_open():
     # Test that we can open a file without any errors
-    exofile = Exodus('sample-files/disk_out_ref.ex2', 'r')
-    assert exofile.data
-    exofile.close()
+    for file in SampleFiles():
+        exofile = Exodus(file, 'r')
+        assert exofile.data
+        exofile.close()
+        exofile = Exodus(file, 'a')
+        assert exofile.data
+        exofile.close()
 
 
 def test_create(tmpdir):
@@ -214,6 +218,27 @@ def test_get_coord_z():
     exofile.close()
 
 
+def test_write_exceptions(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.exo', 'w')
+    exofile.add_nodeset([1, 2, 3], 30, "This is a ns")
+
+    with pytest.raises(AttributeError):
+        exofile.write(str(tmpdir) + '\\newfile.exo')
+
+    exofile.write()
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + '\\test.exo', 'a')
+    exofile.remove_nodeset(30)
+
+    with pytest.raises(AttributeError):
+        exofile.write()
+
+    # Uncomment when Element Ledger bug fixes are pushed
+    # exofile.write(str(tmpdir) + '\\newfile.exo')
+    exofile.close()
+
+
 #############################################################################
 #                                                                           #
 #                            NodeSet Tests                                  #
@@ -246,7 +271,7 @@ def test_add_ns_write(tmpdir):
     exofile.write()
     exofile.close()
 
-    data = nc.Dataset(str(tmpdir) + '\\test.ex2', 'r')
+    data = Dataset(str(tmpdir) + '\\test.ex2', 'r')
 
     # check to see the number of node sets increased
     assert data.dimensions['num_node_sets'].size == 2
@@ -389,7 +414,7 @@ def test_add_duplicate_nodes(tmpdir):
     exofile.add_node_to_nodeset(10, 99)
 
     exofile.write()
-    data = nc.Dataset(str(tmpdir) + '\\test.ex2', 'r')
+    data = Dataset(str(tmpdir) + '\\test.ex2', 'r')
     assert data.dimensions['num_nod_ns1'].size == 3
     assert np.array_equal(np.array([10, 11, 12]), data['node_ns1'])
 
@@ -411,6 +436,30 @@ def test_merge_ns_with_duplicate_nodes(tmpdir):
     assert np.array_equal([1, 5, 6, 7, 8, 9, 10, 11, 12], exofile.get_node_set(3))
 
 
+def test_get_nodeset_by_name(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    exofile.add_nodeset([10, 11, 12], 1, "def")
+    exofile.add_nodeset([1, 2, 3, 4, 5, 100], 2, "abc")
+
+    ns_1 = exofile.ledger.nodeset_ledger.get_node_set("def")
+    assert np.array_equal(ns_1, [10, 11, 12])
+
+    ns_2 = exofile.ledger.nodeset_ledger.get_node_set("abc")
+    assert np.array_equal(ns_2, [1, 2, 3, 4, 5, 100])
+
+    ns_1 = exofile.ledger.nodeset_ledger.get_node_set(1)
+    assert np.array_equal(ns_1, [10, 11, 12])
+
+    ns_2 = exofile.ledger.nodeset_ledger.get_node_set(2)
+    assert np.array_equal(ns_2, [1, 2, 3, 4, 5, 100])
+
+    ns_1_partial = exofile.ledger.nodeset_ledger.get_partial_node_set("def", 1, 2)
+    assert np.array_equal(ns_1_partial, [10, 11])
+
+    ns_2_partial = exofile.ledger.nodeset_ledger.get_partial_node_set("abc", 3, 4)
+    assert np.array_equal(ns_2_partial, [3, 4, 5, 100])
+
+
 def test_remove_duplicate_nodes(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
     exofile.add_nodeset([10, 9, 8, 7, 6, 5, 1], 2)
@@ -423,7 +472,7 @@ def test_basic_ns_append(tmpdir):
     exofile = Exodus('sample-files/can.ex2', 'a', clobber=False)
     exofile.add_nodeset([1, 2, 3, 4, 5], 10)
 
-    with pytest.raises(OSError):
+    with pytest.raises(AttributeError):
         exofile.write()
 
     exofile.write(str(tmpdir) + '\\test.ex2')
@@ -480,6 +529,221 @@ def test_empty_sideset_remove(tmpdir):
     with pytest.raises(IndexError):
         exofile.remove_sideset(10)
 
+def test_add_sideset_no_df_no_vars(tmpdir):
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New")
+    exofile.write(str(tmpdir) + "/new_file.exo")
+    exofile.close()
+    exofile = Exodus(str(tmpdir) + "/new_file.exo", "r")
+    sideset = exofile.get_side_set(3)
+    name = exofile.get_side_set_name(3)
+    params = exofile.get_side_set_params(3) # check that we have 0 dfs
+    for i in range(1, exofile.num_side_set_var):
+        timesteps_x_numsides = exofile.get_side_set_var_across_times(3, 1, exofile.num_time_steps, i)
+        for j in range(0, exofile.num_time_steps):
+            assert np.array_equal(timesteps_x_numsides[j], np.zeros(exofile.get_side_set_params(3)[0]))
+    assert exofile.get_side_set_property(3, "New") is None # check that have no properties
+    assert np.array_equal(sideset[0], [3, 4, 7, 8])
+    assert np.array_equal(sideset[1], [3, 3, 3, 3])
+    assert name == "New"
+    assert params[1] == 0
+    assert params[0] == 4
+    assert np.array_equal(exofile.data['sset_var_tab'], np.ones((3, 2)))
+    exofile.close()
+
+def test_add_sideset_df_no_vars(tmpdir):
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", [1, 1, 1, 1, 1, 1, 1, 1])
+    exofile.write(str(tmpdir) + "/add_sideset_df_no_vars.exo")
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + "/add_sideset_df_no_vars.exo", "r")
+    sideset = exofile.get_side_set(3)
+    name = exofile.get_side_set_name(3)
+    params = exofile.get_side_set_params(3) # check that we have 0 dfs
+    dfs = exofile.get_side_set_df(3)
+    assert np.array_equal(dfs, [1, 1, 1, 1, 1, 1, 1, 1])
+    for i in range(1, exofile.num_side_set_var):
+        timesteps_x_numsides = exofile.get_side_set_var_across_times(3, 1, exofile.num_time_steps, i)
+        for j in range(0, exofile.num_time_steps):
+            assert np.array_equal(timesteps_x_numsides[j], np.zeros(exofile.get_side_set_params(3)[0]))
+    assert exofile.get_side_set_property(3, "New") is None # check that have no properties
+    assert np.array_equal(sideset[0], [3, 4, 7, 8])
+    assert np.array_equal(sideset[1], [3, 3, 3, 3])
+    assert name == "New"
+    assert params[1] == 8
+    assert params[0] == 4
+    assert np.array_equal(exofile.data['sset_var_tab'], np.ones((3, 2)))
+    exofile.close()
+
+def test_add_sideset_df_vars(tmpdir):
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", [1, 1, 1, 1, 1, 1, 1, 1], [[1, 1, 1, 1], [1, 1, 1, 1]])
+    exofile.write(str(tmpdir) + "/add_sideset_df_vars.exo")
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + "/add_sideset_df_vars.exo", "r")
+    sideset = exofile.get_side_set(3)
+    name = exofile.get_side_set_name(3)
+    params = exofile.get_side_set_params(3) # check that we have 0 dfs
+    dfs = exofile.get_side_set_df(3)
+    assert np.array_equal(dfs, [1, 1, 1, 1, 1, 1, 1, 1])
+    for i in range(1, exofile.num_side_set_var):
+        timesteps_x_numsides = exofile.get_side_set_var_across_times(3, 1, exofile.num_time_steps, i)
+        for j in range(0, exofile.num_time_steps):
+            assert np.array_equal(timesteps_x_numsides[j], np.ones(exofile.get_side_set_params(3)[0]))
+    assert exofile.get_side_set_property(3, "New") is None # check that have no properties
+    assert np.array_equal(sideset[0], [3, 4, 7, 8])
+    assert np.array_equal(sideset[1], [3, 3, 3, 3])
+    assert name == "New"
+    assert params[1] == 8
+    assert params[0] == 4
+    assert np.array_equal(exofile.data['sset_var_tab'], np.ones((3, 2)))
+    exofile.close()
+
+def test_add_sideset_no_df_vars(tmpdir):
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", variables=[[1, 2, 3, 4], [1, 2, 3, 4]])
+    exofile.write(str(tmpdir) + "/add_sideset_no_df_vars.exo")
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + "/add_sideset_no_df_vars.exo", "r")
+    sideset = exofile.get_side_set(3)
+    name = exofile.get_side_set_name(3)
+    params = exofile.get_side_set_params(3) # check that we have 0 dfs
+    dfs = exofile.get_side_set_df(3)
+    for i in range(1, exofile.num_side_set_var):
+        timesteps_x_numsides = exofile.get_side_set_var_across_times(3, 1, exofile.num_time_steps, i)
+        for j in range(0, exofile.num_time_steps):
+            assert np.array_equal(timesteps_x_numsides[j], [1, 2, 3, 4])
+    assert exofile.get_side_set_property(3, "New") is None # check that have no properties
+    assert np.array_equal(sideset[0], [3, 4, 7, 8])
+    assert np.array_equal(sideset[1], [3, 3, 3, 3])
+    assert name == "New"
+    assert params[1] == 0
+    assert params[0] == 4
+    assert np.array_equal(exofile.data['sset_var_tab'], np.ones((3, 2)))
+    exofile.close()
+
+def test_add_sideset_df_cube1ts(tmpdir):
+    exofile = Exodus("./sample-files/cube_1ts_mod.e", 'a')
+    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", dist_fact =[1, 1, 1, 1, 1, 1, 1, 1])
+    exofile.write(str(tmpdir) + "/add_sideset_df_vars_cube1ts.exo")
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + "/add_sideset_df_vars_cube1ts.exo", "r")
+    sideset = exofile.get_side_set(3)
+    name = exofile.get_side_set_name(3)
+    params = exofile.get_side_set_params(3) # check that we have 0 dfs
+    dfs = exofile.get_side_set_df(3)
+    assert np.array_equal(dfs, [1, 1, 1, 1, 1, 1, 1, 1])
+    assert exofile.get_side_set_property(3, "New") is None # check that have no properties
+    assert np.array_equal(sideset[0], [3, 4, 7, 8])
+    assert np.array_equal(sideset[1], [3, 3, 3, 3])
+    assert name == "New"
+    assert params[1] == 8
+    assert params[0] == 4
+    exofile.close()
+
+def test_add_sideset_no_df_cube1ts(tmpdir):
+    exofile = Exodus("./sample-files/cube_1ts_mod.e", 'a')
+    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New")
+    exofile.write(str(tmpdir) + "/add_sideset_no_df_cube1ts.exo")
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + "/add_sideset_no_df_cube1ts.exo", "r")
+    sideset = exofile.get_side_set(3)
+    name = exofile.get_side_set_name(3)
+    params = exofile.get_side_set_params(3) # check that we have 0 dfs
+    assert exofile.get_side_set_property(3, "New") is None # check that have no properties
+    assert np.array_equal(sideset[0], [3, 4, 7, 8])
+    assert np.array_equal(sideset[1], [3, 3, 3, 3])
+    assert name == "New"
+    assert params[1] == 0
+    assert params[0] == 4
+    exofile.close()
+
+def test_add_sides_to_sideset_no_vars_no_df(tmpdir):
+    exofile = Exodus("./sample-files/cube_1ts_mod.e", 'a')
+    exofile.add_sides_to_sideset([1, 2, 3, 4], [4, 4, 4, 4], 1)
+    exofile.write(str(tmpdir) + "/add_sides_to_sideset_cube1ts.exo")
+    exofile.close()
+
+
+    exofile = Exodus(str(tmpdir) + "/add_sides_to_sideset_cube1ts.exo", "r")
+    sideset = exofile.get_side_set(1)
+    params = exofile.get_side_set_params(1) # check that we have 0 dfs
+    dfs = exofile.get_side_set_df(1)
+    assert params[1] == 272
+    assert params[0] == 68
+    assert np.array_equal(sideset[0][64:], [1, 2, 3, 4])
+    assert np.array_equal(sideset[1][64:], [4, 4, 4, 4])
+    assert np.array_equal(dfs[256:], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    exofile.close()
+
+
+def test_add_sides_to_sideset_vars_dfs(tmpdir):
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.add_sides_to_sideset([1, 2, 3, 4], [4, 4, 4, 4], 2, dist_facts=[4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], variables=[[[1, 2, 3, 4]], [[1, 2, 3, 4]]])
+    exofile.write(str(tmpdir) + "/add_sides_to_sideset_cubewdata.exo")
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + "/add_sides_to_sideset_cubewdata.exo", "r")
+    sideset = exofile.get_side_set(2)
+    params = exofile.get_side_set_params(2) # check that we have 0 dfs
+    dfs = exofile.get_side_set_df(2)
+    assert params[1] == 32
+    assert params[0] == 8
+    assert np.array_equal(sideset[0][4:], [1, 2, 3, 4])
+    assert np.array_equal(sideset[1][4:], [4, 4, 4, 4])
+    assert np.array_equal(dfs[16:], [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4])
+    for i in range(1, exofile.num_side_set_var):
+        timesteps_x_numsides = exofile.get_side_set_var_across_times(2, 1, exofile.num_time_steps, i)
+        for j in range(0, exofile.num_time_steps):
+            assert np.array_equal(timesteps_x_numsides[j][4:], [1, 2, 3, 4])
+    exofile.close()
+
+def test_add_sides_to_sideset_no_vars_no_df(tmpdir):
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.add_sides_to_sideset([1, 2, 3, 4], [4, 4, 4, 4], 2)
+    exofile.write(str(tmpdir) + "/add_sides_to_sideset_cubewdata.exo")
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + "/add_sides_to_sideset_cubewdata.exo", "r")
+    sideset = exofile.get_side_set(2)
+    params = exofile.get_side_set_params(2) # check that we have 0 dfs
+    dfs = exofile.get_side_set_df(2)
+    print(dfs[16:])
+    assert params[1] == 32
+    assert params[0] == 8
+    assert np.array_equal(sideset[0][4:], [1, 2, 3, 4])
+    assert np.array_equal(sideset[1][4:], [4, 4, 4, 4])
+    assert np.array_equal(dfs[16:], [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    for i in range(1, exofile.num_side_set_var):
+        timesteps_x_numsides = exofile.get_side_set_var_across_times(2, 1, exofile.num_time_steps, i)
+        for j in range(0, exofile.num_time_steps):
+            assert np.array_equal(timesteps_x_numsides[j][4:], [0, 0, 0, 0])
+    exofile.close()
+
+def test_var_fail_cube1ts():
+    exofile = Exodus("./sample-files/cube_1ts_mod.e", 'a')
+    with pytest.raises(Exception):
+        exofile.add_sides_to_sideset([1, 2, 3, 4], [4, 4, 4, 4], 1, variables=[1, 1, 1, 1])
+    exofile.close()
+
+# def test_add_sideset_biplane(tmpdir):
+#     exofile = Exodus("./sample-files/biplane.exo", 'a')
+#     exofile.add_sideset([15, 16, 19, 20], [4, 4, 4, 4], 5, "New")
+#     exofile.write(str(tmpdir) + "/add_sideset_biplane.exo")
+#     exofile.close()
+
+
+
+
+
+
+    
+
 
 # Below tests are based on what can be read according to current C Exodus API.
 # The contents, names, and number of tests are subject to change as work on the library progresses
@@ -489,7 +753,7 @@ def test_empty_sideset_remove(tmpdir):
 def test_get_coords_comprehensive():
     for file in SampleFiles():
         ex = Exodus(file, 'r')
-        data = nc.Dataset(file, 'r')
+        data = Dataset(file, 'r')
         if 'coord' in data.variables:
             assert np.array_equal(ex.get_coords(), data['coord'][:])
 
