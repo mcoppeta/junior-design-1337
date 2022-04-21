@@ -27,8 +27,6 @@ class ObjectSelector(ABC):
 class ElementBlockSelector(ObjectSelector):
     """Selects a subset of an element block's components."""
 
-    # input a range
-    # Data is stored in 0 indexed arrays
     def __init__(self, exodus: Exodus, obj_id: int, elements=..., variables=..., attributes=...):
         """
         Create a new selector object for an element block.
@@ -39,12 +37,13 @@ class ElementBlockSelector(ObjectSelector):
         ``elements``, ``variables``, and ``attributes`` take 1-based indices, meaning to select the first and second
         element you would pass in the list [1, 2].
 
+        ``attributes`` accepts attribute names as well, but you cannot use names and indices together!
+
         :param exodus: the exodus object this element block is stored in
         :param obj_id: the id of the element block this represents
         :param elements: list of elements to select within this block (1-based)
         :param variables: the variable indices to select (1-based)
-        :param attributes: the attribute indices (1-based) or a list of attribute names to select. Do not mix indices
-        and names!
+        :param attributes: the attribute indices (1-based) or a list of attribute names to select
         """
         ObjectSelector.__init__(self, exodus, obj_id, ELEMBLOCK)
 
@@ -139,7 +138,6 @@ class ElementBlockSelector(ObjectSelector):
 class NodeSetSelector(ObjectSelector):
     """Selects a subset of a node set's components."""
 
-    # input a range
     def __init__(self, exodus: Exodus, obj_id: int, nodes=..., variables=...):
         """
         Create a new selector object for a node set.
@@ -148,7 +146,7 @@ class NodeSetSelector(ObjectSelector):
         Lists will be sorted upon entry to maintain node order consistency.
 
         ``nodes`` and ``variables`` take 1-based indices, meaning to select the first and second node you would pass in
-         the list [1, 2].
+        the list [1, 2].
 
         :param exodus: the exodus object this node set is stored in
         :param obj_id: the id of the node set this represents
@@ -203,7 +201,6 @@ class NodeSetSelector(ObjectSelector):
 class SideSetSelector(ObjectSelector):
     """Selects a subset of a side set's components."""
 
-    # input a range
     def __init__(self, exodus: Exodus, obj_id: int, sides=..., variables=...):
         """
         Create a new selector object for a side set.

@@ -480,6 +480,14 @@ class Exodus:
         num_nodes = self.num_nodes
         return self.get_partial_node_id_map(1, num_nodes)
 
+    def get_reverse_node_id_dict(self):
+        """Returns a dictionary with user-defined IDs as the keys and internal IDs as the values."""
+        nim = self.get_node_id_map()
+        u2i_map = {}
+        for i in range(self.num_nodes):
+            u2i_map[nim[i]] = i + 1
+        return u2i_map
+
     def get_partial_node_id_map(self, start, count):
         """
         Return a subset of the node ID map for this database.
@@ -504,6 +512,14 @@ class Exodus:
         """Return the element ID map for this database."""
         num_elem = self.num_elem
         return self.get_partial_elem_id_map(1, num_elem)
+
+    def get_reverse_elem_id_dict(self):
+        """Returns a dictionary with user-defined IDs as the keys and internal IDs as the values."""
+        eim = self.get_elem_id_map()
+        u2i_map = {}
+        for i in range(self.num_elem):
+            u2i_map[eim[i]] = i + 1
+        return u2i_map
 
     def get_partial_elem_id_map(self, start, count):
         """
@@ -2770,6 +2786,9 @@ class Exodus:
 
 
 # TODO some functions return numpy arrays, some return Python lists. Should be consistently one or the other.
+# TODO you should be able to select variables by name as well as id!
+#  that's what Sandia told us to do originally!
+#  Same goes for other data types!
 
 
 if __name__ == "__main__":
@@ -2888,3 +2907,7 @@ if __name__ == "__main__":
     steps = list(range(1, input_file.num_time_steps + 1))
 
     output_subset(input_file, p, t, eb_sels, ss_sels, ns_sels, prop_sel, nodal_var, global_var, steps)
+
+    d = Exodus(p, 'r')
+    print(input_file.title)
+    print(d.title)

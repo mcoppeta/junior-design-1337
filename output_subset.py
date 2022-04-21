@@ -1,4 +1,4 @@
-"""Allows you to create a new Exodus file by copying selected parts of an opened Exodus file."""
+"""Allows creation of a new Exodus file by copying selected parts of an opened Exodus file."""
 
 from __future__ import annotations  # use the magic of python 3.7 to let use write Exodus instead of "Exodus"
 
@@ -34,8 +34,6 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
     :param time_steps: range of time steps to keep
     """
     # TODO you should be able to select variables by name as well as id!
-    #  that's what Sandia told us to do originally!
-    #  Same goes for other data types!
     # Sort lists to maintain input file order in output file
     time_steps.sort()
     nod_vars.sort()
@@ -50,7 +48,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
     output = nc.Dataset(path, 'w')
     output.set_fill_off()
 
-    output.setncattr_string(ATT_TITLE, title[0:input.max_line_length])
+    output.setncattr(ATT_TITLE, title[0:input.max_line_length])
     # This attribute does not include the extra C null character in its size
     output.setncattr(ATT_MAX_NAME_LENGTH, input.max_used_name_length)
     output.setncattr(ATT_API_VER, input.api_version)
@@ -113,7 +111,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
             if sel.exodus != input:
                 raise ValueError("Provided selector is for a different exodus object!")
             ids.append(sel.obj_id)
-            internal_id = input._lookup_id(ELEMBLOCK, sel.obj_id)
+            internal_id = input.get_elem_block_number(sel.obj_id)
             idmap[internal_id] = sel
         # This cannot happen until we figure out which elements are being carried over
         output.createDimension(DIM_NUM_EB, len(eb_selectors))
@@ -247,10 +245,9 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
             sum_elem += num_el
     # END OF ELEMENT BLOCK PROCESSING
 
-    eb_added_elements = [x + 1 for x in output_elem_indices]
 
     # Number of elements
-    output.createDimension(DIM_NUM_ELEM, len(eb_added_elements))
+    output.createDimension(DIM_NUM_ELEM, len(output_elem_indices))
 
     # Element ID map
     var = output.createVariable(VAR_ELEM_ID_MAP, input.int, DIM_NUM_ELEM)
@@ -261,6 +258,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
         var = output.createVariable(VAR_ELEM_ORDER_MAP, input.int, DIM_NUM_ELEM)
         var[:] = input.data.variables[VAR_ELEM_ORDER_MAP][output_elem_indices]
 
+    eb_added_elements = [x + 1 for x in output_elem_indices]
     old_new_elem_id_map = {}  # keyed on old, value is new
     newid = 1
     for oldid in eb_added_elements:
@@ -284,7 +282,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
             if sss.exodus != input:
                 raise ValueError("Provided selector is for a different exodus object!")
             ids.append(sss.obj_id)
-            internal_id = input._lookup_id(SIDESET, sss.obj_id)
+            internal_id = input.get_side_set_number(sss.obj_id)
             idmap[internal_id] = sss
         output.createDimension(DIM_NUM_SS, num_side_sets)
 
@@ -377,7 +375,13 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
                 to_add = input.data.variables[VAR_ELEM_SS % input_id][sel.sides]
                 converted_to_add = []
                 for id in to_add:
-                    converted_to_add.append(old_new_elem_id_map[id])
+                    try:
+                        converted_to_add.append(old_new_elem_id_map[id])
+                    except KeyError:
+                        raise ValueError(
+                            "Side set selector includes an element that is not selected by element block selectors. Put"
+                            " this in your element block selection, or remove it from your side set selection. [{0}]"
+                                .format(id))
                 # The output's elem array needs to have the elem ids for the output!
                 var[:] = converted_to_add
 
@@ -455,7 +459,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
             if sel.exodus != input:
                 raise ValueError("Provided selector is for a different exodus object!")
             ids.append(sel.obj_id)
-            internal_id = input._lookup_id(NODESET, sel.obj_id)
+            internal_id = input.get_node_set_number(sel.obj_id)
             idmap[internal_id] = sel
         output.createDimension(DIM_NUM_NS, num_side_sets)
 
@@ -570,9 +574,10 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
                     var_truth_tab[output_id - 1] = row  # put row in table
     # END OF NODE SET PROCESSING
 
-    # if we want to make this method really fast and really robust, do a pre-pass on the selectors and gather
-    # all of the elements and nodes they need. Elements would let us add elements that are in side sets selectors but
-    # not elblock selectors. Nodes will make rescaling the node ids much faster.
+    # Potential improvement: do a pre-pass on the selectors and gather all of the elements and nodes they need.
+    # This would allow addition of elements selected in side set selectors that are not in element block selectors since
+    # we could add them to a new element block. Doing nodes would save us the effort of remapping the node IDs after
+    # we've added the wrong, not remapped IDs to the output file.
 
     # We need to sort the added nodes to maintain ordering
     added_nodes = list(added_nodes)
@@ -591,23 +596,25 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
     # Node set node lists
     if DIM_NUM_NS in output.dimensions:  # only if we have node sets
         for i in range(1, output.dimensions[DIM_NUM_NS].size + 1):
-            var = output.variables[VAR_NODE_NS % i][:]
+            var = output.variables[VAR_NODE_NS % i]
+            vararr = var[:]
             num_nodes = output.dimensions[DIM_NUM_NODE_NS % i].size
             new_var = numpy.empty(num_nodes, input.int)
             for j in range(num_nodes):
-                new_var[j] = old_new_node_id_map[var[j]]
+                new_var[j] = old_new_node_id_map[vararr[j]]
             var[:] = new_var
 
     # Element block connectivity lists
     if DIM_NUM_EB in output.dimensions:  # only if we have element blocks
         for i in range(1, output.dimensions[DIM_NUM_EB].size + 1):
-            var = output.variables[VAR_CONNECT % i][:]
+            var = output.variables[VAR_CONNECT % i]
+            vararr = var[:]
             num_elem = output.dimensions[DIM_NUM_EL_IN_BLK % i].size
             num_node = output.dimensions[DIM_NUM_NOD_PER_EL % i].size
             new_var = numpy.empty((num_elem, num_node), input.int)
             for j in range(num_elem):
                 for k in range(num_node):
-                    new_var[j, k] = old_new_node_id_map[var[j, k]]
+                    new_var[j, k] = old_new_node_id_map[vararr[j, k]]
             var[:] = new_var
 
     # Dimension for number of nodes
@@ -678,6 +685,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
             var = output.createVariable(VAR_NAME_NOD_VAR, '|S1', (DIM_NUM_NOD_VAR, DIM_STRING_LENGTH))
             var[:] = input.data.variables[VAR_NAME_NOD_VAR][nod_var_idx]
 
+    # Warn the user if their file looks strange
     if output.dimensions[DIM_NUM_NODES].size == 0:
         warnings.warn("Output file is likely corrupt since it has 0 nodes!")
     if output.dimensions[DIM_NUM_ELEM].size == 0:

@@ -9,14 +9,89 @@ from output_subset import output_subset
 pytestmark = pytest.mark.filterwarnings('ignore')
 
 
-# pytest-dependency might be useful in here to require the read tests to pass...
+# Select all elements and parts of a side set, then make sure the side set's dist facts copied over successfully
+def test_side_set_df(tmpdir):
+    input_file = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    p = str(tmpdir) + '\\output_test.ex2'
+    t = "test whole subset"
+    eb_sels = [ElementBlockSelector(input_file, 1)]
+    ss_sels = [SideSetSelector(input_file, 1, list(range(1, 64, 3)))]
+    ns_sels = []
+    prop_sel = PropertySelector(input_file)
+    nodal_var = list(range(1, input_file.num_node_var + 1))
+    global_var = list(range(1, input_file.num_global_var + 1))
+    steps = list(range(1, input_file.num_time_steps + 1))
 
-# It's probably worth doing a test that only copies part of each thing in a file
-# A test that copies everything, but not node sets
-# Also you could just delete the id maps and see if everything works out still
-# The most breakable part involves the node list
-def test_partial_side_set(tmpdir):
-    pass
+    output_subset(input_file, p, t, eb_sels, ss_sels, ns_sels, prop_sel, nodal_var, global_var, steps)
+
+    output_file = Exodus(p, 'r')
+
+    assert_required_features(input_file, output_file, t, steps)
+
+    input_ncl = input_file.get_side_set_node_count_list(1)
+    output_ncl = output_file.get_side_set_node_count_list(1)
+    input_sides = input_file.get_side_set(1)[0]
+    output_sides = output_file.get_side_set(1)[0]
+
+    # We only have files with uniform distribution factors so rather than checking each one to make sure they match
+    # we will instead just make sure the counts make sense. If the whole subset test passed, then there shouldn't be
+    # any off by one errors in copying data anyway since that would have caused an OOB error or made the dimensions
+    # mismatch when we compared them.
+    i_summed_df = 0
+    o_summed_df = 0
+    o_idx = 0
+    i_idx = 0
+    for id in output_sides:
+        while input_sides[i_idx] != id:
+            i_idx += 1
+        i_summed_df += input_ncl[i_idx]
+        o_summed_df += output_ncl[o_idx]
+        o_idx += 1
+    assert i_summed_df == o_summed_df
+    assert i_summed_df == output_file.get_side_set_params(1)[1]
+
+    output_file.close()
+    input_file.close()
+
+
+# Select only parts of an element block and make sure the IDs remapped correctly
+def test_id_remap(tmpdir):
+    input_file = Exodus("sample-files/cube_1ts_mod.e", 'r')
+    p = str(tmpdir) + '\\output_test.ex2'
+    t = "test whole subset"
+    eb_sels = [ElementBlockSelector(input_file, 1, list(range(1, 513, 3)))]
+    ss_sels = []
+    ns_sels = []
+    prop_sel = PropertySelector(input_file)
+    nodal_var = list(range(1, input_file.num_node_var + 1))
+    global_var = list(range(1, input_file.num_global_var + 1))
+    steps = list(range(1, input_file.num_time_steps + 1))
+
+    output_subset(input_file, p, t, eb_sels, ss_sels, ns_sels, prop_sel, nodal_var, global_var, steps)
+
+    output_file = Exodus(p, 'r')
+
+    assert_required_features(input_file, output_file, t, steps)
+
+    iconnect = input_file.get_elem_block_connectivity(1)
+    oconnect = output_file.get_elem_block_connectivity(1)
+    output_elem_id_map = output_file.get_elem_id_map()
+    u2i_map = input_file.get_reverse_elem_id_dict()
+    input_node_id_map = input_file.get_node_id_map()
+    output_node_id_map = output_file.get_node_id_map()
+
+    for o_idx in range(output_file.num_elem):
+        o_id = output_elem_id_map[o_idx]
+        i_idx = u2i_map[o_id] - 1
+        i_elem = iconnect[i_idx]
+        o_elem = oconnect[o_idx]
+        for j in range(len(o_elem)):
+            input_node_id = input_node_id_map[i_elem[j] - 1]
+            output_node_id = output_node_id_map[o_elem[j] - 1]
+            assert input_node_id == output_node_id
+
+    output_file.close()
+    input_file.close()
 
 
 # Test output_subset, selecting the entire model
