@@ -274,12 +274,13 @@ class SSLedger:
         self.ss_dist_fact[ndx] = np.delete(self.ss_dist_fact[ndx], df_remove_ndx)
         self.num_dist_fact[ndx] -= len(df_remove_ndx)
     
-    # Create 2 new sidesets from old sideset based on user-specified function
-    # User function should return boolean and take in tuple of (element, side)
-    #TODO: Was getting an error (shown below) during write() at runtime when creating second sideset
-    # ss_ledger.py in write: "data.createDimension("num_side_ss" + str(i+1), self.ss_sizes[i])"
-    # (Some calls to netCDF4)
-    # "RuntimeError: NetCDF: NC_UNLIMITED size already in use"
+    # Create 2 new sidesets from old sideset based on user-specified function.
+    # User function should return boolean and take in tuple of (element, side).
+    # Function provided here as a model for users to add other split_sideset functions
+    # to library with more varied functionality (e.g. iterate over nodes instead of elem tuples,
+    # pass in function checking node values to some specififed value)
+    # TODO: known bug with bake.e sample file
+    # TODO: handle sideset variables
     def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2):
         # Get sideset that will be split
         ndx = self.find_sideset_num(old_ss)
@@ -292,28 +293,11 @@ class SSLedger:
             self.ss_elem[ndx] = np.array(elems)
             self.ss_sides[ndx] = np.array(sides)
             self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(old_ss))
+            # for i in range(self.num_ss_var):
+            #     if i == 0:
+            #         self.ss_vars[ndx] = []
+            #     self.ss_vars[ndx].append(self.ex.data["vals_sset_var" + str(i + 1) + "ss" + str(ndx + 1)])
 
-        #Original approach below, switched to a different approach based on iteration in
-        #remove_sides_from_sideset, approach 1 could be a different way to do this function
-        #where sides are added individually to new sidesets during iteration but approach 1
-        #is not currently working as written
-
-        #START OF APPROACH 1
-        # Create new sideset that will contain sides meeting user-specified criteria
-        # self.add_sideset([], [], ss_id1, ss_name1, [])
-
-        # Create new sideset that will contain sides NOT meeting user-specified criteria
-        # self.add_sideset([], [], ss_id2, ss_name2, [])
-
-        #Iterate through sides in sideset and check if they match user-specified criteria
-        # for i in self.ss_sides[ndx]:
-        #   if function(i): #Side returns true, add to sideset 1 
-        #       self.add_sides_to_sideset([self.ss_elem[ndx][i]], [self.ss_sides[ndx][i]], [self.ss_dist_fact[ndx][i]], ss_id1)
-        #   else: #Side returns false, add to sideset 2
-        #       self.add_sides_to_sideset([self.ss_elem[ndx][i]], [self.ss_sides[ndx][i]], [self.ss_dist_fact[ndx][i]], ss_id2)
-        #END OF APPROACH 1
-
-        #START OF APPROACH 2 (based on iteration for remove sides)
         num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
 
         meet_criteria_elem = []
@@ -337,19 +321,32 @@ class SSLedger:
                 if (num_df_per_side != 0):
                     not_met_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
 
-        self.add_sideset(meet_criteria_elem, meet_criteria_side, ss_id1, ss_name1, meet_criteria_df)
-        #TODO Was getting error writing second sideset, not sure how it resolved so may come up again
-        self.add_sideset(not_met_elem, not_met_side, ss_id2, ss_name2, not_met_df)
-        #END OF APPROACH 2
+        # If sideset did not previously have df, set df to a default of 1 for the new sideset
+        if len(meet_criteria_df) == 0:
+            meet_criteria_df = [1] * len(meet_criteria_side)
+        if len(not_met_df) == 0:
+            not_met_df = [1] * len(not_met_side)
+
+        # If none of the sides meet the splitting criteria, don't create an empty sideset
+        try:
+            self.add_sideset(meet_criteria_elem, meet_criteria_side, ss_id1, ss_name1, meet_criteria_df)
+        except ZeroDivisionError:
+            print("No sides meeting splitting criteria to put in first sideset, no first sideset created")
+
+        # If all of the sides meet the splitting criteria, don't create a second empty sideset
+        try:
+            self.add_sideset(not_met_elem, not_met_side, ss_id2, ss_name2, not_met_df)
+        except ZeroDivisionError:
+            print("All sides meet splitting criteria, no sides to put in second sideset, no second sideset created")
         
         #Delete old sideset if desired by user
         if delete:
            self.remove_sideset(old_ss)
 
-    # Creates 2 new sidesets from sides in old sideset based on x-coordinate values
-    #TODO Redo this function based on generic split_sideset function implementation
-    #And what is the best way to get and check all nodes in the sideset?
-    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ssid_2, delete, ss_name1="", ss_name2=""):
+    # Creates 2 new sidesets from sides in old sideset based on x-coordinate values.
+    # TODO: Function incomplete as is, need to figure out iteration over nodes in a sideset,
+    # consider importing element_faces and using iterate_element_faces method
+    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ssid_2, delete, ss_name1, ss_name2):
         # Set comparison that will be used
         if comparison == '<':
           compare = lambda coord : coord < x_value
@@ -370,15 +367,10 @@ class SSLedger:
         ss_num = self.find_sideset_num(old_ss)
         
         # Create new sideset that will contain sides meeting user-specified criteria
-        # dist_fact? create sideset before or after elems/sides found?
-        #self.add_sideset([], [], ss_id1, ss_name1, [])
+        #self.add_sideset([], [], ss_id1, ss_name1, [], [])
 
         # Create new sideset that will contain sides NOT meeting user-specified criteria
-        # dist_fact? create sideset before or after elems/sides found?
-        #self.add_sideset([], [], ss_id2, ss_name2, [])
-
-        # Get all sides in old sideset
-        # ???
+        #self.add_sideset([], [], ss_id2, ss_name2, [], [])
 
         # Either add sides to new sideset if all nodes in a given side meet x-coord criteria
         #if all_nodes:
@@ -406,7 +398,7 @@ class SSLedger:
         #       else:
         #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id2)
 
-        #Delete old sideset if desired by user
+        # Delete old sideset if desired by user
         # if delete:
         #    self.remove_sideset(old_ss)
 
