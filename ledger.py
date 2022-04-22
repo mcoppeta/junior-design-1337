@@ -141,6 +141,39 @@ class Ledger:
         self.sideset_ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
 
     # element methods
+    def num_elem(self):
+        return self.element_ledger.num_elem()
+
+    def num_elem_blocks(self):
+        return self.element_ledger.num_elem_blocks()
+
+    def num_elem_variable(self):
+        return self.element_ledger.num_elem_variable()
+
+    def get_elem_num_map(self):
+        return self.element_ledger.get_elem_num_map()
+
+    def get_eb_prop1(self):
+        return self.element_ledger.get_eb_prop1()
+
+    def get_connectX(self, id):
+        return self.element_ledger.get_connectX(id)
+
+    def get_num_elem_in_block(self, id):
+        return self.element_ledger.get_num_elem_in_block(id)
+
+    def get_num_nodes_per_el_block(self, id):
+        return self.element_ledger.get_num_nodes_per_el_block(id)
+
+    def get_elem_block_type(self, id):
+        return self.element_ledger.get_elem_block_type(id)
+
+    def get_elem_block_name(self, id):
+        return self.element_ledger.get_elem_block_name(id)
+
+    def get_elem_block_names(self):
+        return self.element_ledger.get_elem_block_names()
+
     def remove_element(self, elem_id):
         return self.element_ledger.remove_element(elem_id)
 

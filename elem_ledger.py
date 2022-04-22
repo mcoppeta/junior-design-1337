@@ -79,6 +79,50 @@ class ElemLedger:
             self.blocks.append(new_block)
         #print(self.blocks)
 
+    def num_elem(self):
+        elem_count = 0
+        for i in self.blocks:
+            elem_count += i.num_el_in_blk
+        return elem_count
+
+    def num_elem_blocks(self):
+        return len(self.blocks)
+
+    def num_elem_variable(self):
+        return self.num_elem_var
+
+    def get_elem_num_map(self):
+        return np.array(self.elem_num_map)
+
+    def get_eb_prop1(self):
+        return np.array(self.eb_prop1)
+
+    def get_connectX(self, id):
+        blk = self.find_element_block(id)
+        return blk.elements
+
+    def get_num_elem_in_block(self, id):
+        blk = self.find_element_block(id)
+        return blk.get_num_elements()
+
+    def get_num_nodes_per_el_block(self, id):
+        blk = self.find_element_block(id)
+        return blk.get_num_nodes_per_element()
+
+    def get_elem_block_type(self, id):
+        blk = self.find_element_block(id)
+        return blk.get_elem_type()
+
+    def get_elem_block_name(self, id):
+        blk = self.find_element_block(id)
+        return blk.get_blk_name()
+
+    def get_elem_block_names(self):
+        names = []
+        for i in self.blocks:
+            names.append(util.convert_string(i.blk_name + str('\0'), self.ex.max_allowed_name_length))
+        return np.array(names)
+
     # finds index of element in element number map
     def find_element_num(self, id):
         num = -1
@@ -207,13 +251,10 @@ class ElemLedger:
     def write_dimensions(self, data):
 
         # Creates dimension for number of elements
-        elem_count = 0
-        for i in self.blocks:
-            elem_count += i.num_el_in_blk
-        data.createDimension("num_elem", elem_count)
+        data.createDimension("num_elem", self.num_elem())
 
         # Create dimension for number of element blocks
-        data.createDimension("num_el_blk", len(self.blocks))
+        data.createDimension("num_el_blk", self.num_elem_blocks())
 
         for i in self.blocks:
             blk_num = i.blk_num
@@ -227,7 +268,7 @@ class ElemLedger:
             data.createDimension(nod_per_el_title, i.get_num_nodes_per_element())
 
         # Creates dimension for the number of elemental variables
-        data.createDimension("num_elem_var", self.num_elem_var)
+        data.createDimension("num_elem_var", self.num_elem_variable())
 
 
     # Writes out element variable data to the new dataset

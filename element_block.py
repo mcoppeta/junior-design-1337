@@ -30,6 +30,9 @@ class ElementBlock:
 	def get_blk_num(self):
 		return self.blk_num
 
+	def get_blk_name(self):
+		return self.blk_name
+
 	def get_connect_title(self):
 		return self.connect_title
 
