@@ -1,6 +1,9 @@
 """Contains common functions used in the Python Exodus Library."""
 
 import numpy as np
+from constants import LIB_VERSION_MINOR, LIB_VERSION_MAJOR, LIB_NAME
+from datetime import datetime
+from netCDF4 import stringtoarr
 
 
 def c_print(line):
@@ -48,3 +51,19 @@ def convert_string(s, length):
 
     out = np.ma.core.MaskedArray(arr, mask)
     return out
+
+
+def generate_qa_rec(length):
+    """
+    Returns a QA record ready to add to a file.
+
+    :param length: length of a string (do not add 1)
+    :return: qa record
+    """
+    rec = np.empty((4, length + 1), '|S1')
+    rec[0] = stringtoarr(LIB_NAME, length+1)
+    rec[1] = stringtoarr("%d.%d" % (LIB_VERSION_MAJOR, LIB_VERSION_MINOR), length+1)
+    t = datetime.now()
+    rec[2] = stringtoarr(t.strftime("%m/%d/%y"), length+1)
+    rec[3] = stringtoarr(t.strftime("%X"), length+1)
+    return rec
