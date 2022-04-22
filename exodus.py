@@ -1817,33 +1817,42 @@ class Exodus:
         return None
 
     def get_dimension(self, name):
+        """ returns value of dimension of given name """
         if name in self.data.dimensions:
             return self.data.dimensions[name].size
         else:
             raise RuntimeError("dimensions '{}' cannot be found!".format(name))
 
     def get_parameter(self, name):
+        """ returns parameter value of given name """
         if name in self.data.ncattrs():
             return self.data.getncattr(name)
         else:
             raise RuntimeError("parameter '{}' cannot be found!".format(name))
 
     def close(self):
+        """ close the exodus file """
         self.data.close()
 
     def print_dimensions(self):
+        """ print all dimension values """
         for dim in self.data.dimensions.values():
             print(dim)
 
     def print_dimension_names(self):
+        """ print all dimension names """
         for dim in self.data.dimensions:
             print(dim)
 
     def print_variables(self):
+        """ prints all variable values """
         for v in self.data.variables.values():
             print(v, "\n")
 
     def print_variable_names(self):
+        """
+            prints all variable names
+        """
         for v in self.data.variables:
             print(v)
 
@@ -1868,6 +1877,13 @@ class Exodus:
         nodeset[:] = node_ids
 
     def get_nodes_in_elblock(self, id):
+        """
+        Get all of the nodes in an element block
+        Args:
+            id: the element block ID
+        Returns:
+            IDs of the nodes in the element block
+        """
         if "node_num_map" in self.data.variables:
             raise Exception("Using node num map")
         nodeids = self.data["connect" + str(id)]
@@ -1904,10 +1920,12 @@ class Exodus:
 
     def diff_nodeset(self, id, other, id2=None):
         """
-        Prints the overlap and difference between two nodesets
-        :param id: the nodeset ID of the self Exodus object
-        :param other: the other Exodus object to compare to
-        :param id2: optional parameter specifying the nodeset ID of other Exodus object. Default to the first id.
+        Prints the differences between id and id2
+        Args:
+            id: the ID of the first node set
+            other: other exodus object that contains the other node set
+            id2: the ID of the second node set
+
         """
 
         if other is None:
@@ -1944,16 +1962,36 @@ class Exodus:
     ################################################################
 
     def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
+        """
+        Add a new node set to the exodus file
+        Args:
+            node_ids: the ids of the nodes included in the nodeset
+            nodeset_id: the id of the new node set
+            nodeset_name: the name of the new node set. Defaults to "NodeSet(N)"
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
 
     def remove_nodeset(self, identifier):
+        """
+        Remove an existing node set
+        Args:
+            identifier: can be an integer for node set id or a string for node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_nodeset(identifier)
 
     def merge_nodeset(self, new_id, ns1, ns2, delete=True):
+        """
+        Merge 2 existing node sets
+        Args:
+            new_id: the new node set id
+            ns1: the first node set being merged
+            ns2: the second node set being merged
+            delete: whether or not to delete the two initial node sets
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.merge_nodesets(new_id, ns1, ns2, delete)
@@ -2022,11 +2060,21 @@ class Exodus:
         self.ledger.skin_element_block(block_id, skin_id, skin_name)
 
     def skin(self, skin_id, skin_name):
+        """
+        Args:
+            skin_id: the id to skin
+            skin_name: the name of the skin
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to skin element into new sideset")
         self.ledger.skin(skin_id, skin_name)
         
     def write(self, path=None):
+        """
+
+        Args:
+            path: the path for the output file. Must be specified for append mode, must not be specified for write mode
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to write")
         elif self.mode == 'a' and path is None:
