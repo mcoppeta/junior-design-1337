@@ -469,7 +469,7 @@ def test_remove_duplicate_nodes(tmpdir):
 
 
 def test_basic_ns_append(tmpdir):
-    exofile = Exodus('sample-files/can.ex2', 'a', clobber=False)
+    exofile = Exodus('sample-files/can.ex2', 'a')
     exofile.add_nodeset([1, 2, 3, 4, 5], 10)
 
     with pytest.raises(AttributeError):
@@ -479,7 +479,7 @@ def test_basic_ns_append(tmpdir):
     exofile.close()
 
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'r')
-    original = Exodus('sample-files/can.ex2', 'r', clobber=False)
+    original = Exodus('sample-files/can.ex2', 'r')
 
     print("\n", exofile.data.dimensions['num_node_sets'])
 
