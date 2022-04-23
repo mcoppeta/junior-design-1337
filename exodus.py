@@ -38,7 +38,7 @@ class Exodus:
     _EXODUS_VERSION = 7.22
 
     # Should creating a new file (mode 'w') be a function on its own?
-    def __init__(self, path, mode, file_version='1.0', shared=False, format='EX_NETCDF4', word_size=4):
+    def __init__(self, path, mode, shared=False, format='EX_NETCDF4', word_size=4):
         # clobber and format and word_size only apply to mode w
         if mode not in ['r', 'w', 'a']:
             raise ValueError("mode must be 'w', 'r', or 'a', got '{}'".format(mode))
