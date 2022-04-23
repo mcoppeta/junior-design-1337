@@ -2863,19 +2863,20 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         return self.ledger.remove_element(elem_id)
 
-    def skin_element_block(self, block_id, skin_id, skin_name):
+    def skin_element_block(self, block_id, skin_id, skin_name, tri='shell'):
         """
         Skins a particular element block. Adds a corresponding sideset of the external faces
 
         :param block_id: ID of the block to be skinned
         :param skin_id: (user-defined) ID of the new sideset
         :param skin_name: (user-defined) name of the new sideset
+        :param tri: indicates if TRI prefix corresponds to tri 'tri' or trishell 'shell'
         """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to skin element into new sideset")
-        self.ledger.skin_element_block(block_id, skin_id, skin_name)
+        self.ledger.skin_element_block(block_id, skin_id, skin_name, tri)
 
-    def skin(self, skin_id, skin_name):
+    def skin(self, skin_id, skin_name, tri='shell'):
         """
         Skins the entire mesh (all element blocks).
         Adds a single corresponding sideset of the external faces
@@ -2883,10 +2884,11 @@ class Exodus:
         :param block_id: ID of the block to be skinned
         :param skin_id: (user-defined) ID of the new sideset
         :param skin_name: (user-defined) name of the new sideset
+        :param tri: indicates if TRI prefix corresponds to tri 'tri' or trishell 'shell'
         """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to skin element into new sideset")
-        self.ledger.skin(skin_id, skin_name)
+        self.ledger.skin(skin_id, skin_name, tri)
         
     def write(self, path=None):
         if self.mode != 'w' and self.mode != 'a':

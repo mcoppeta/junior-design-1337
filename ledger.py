@@ -180,8 +180,8 @@ class Ledger:
     def add_element(self, block_id, nodelist):
         return self.element_ledger.add_element(block_id, nodelist)
 
-    def skin_element_block(self, block_id, skin_id, skin_name):
-        unique_faces = self.element_ledger.skin_block(block_id)
+    def skin_element_block(self, block_id, skin_id, skin_name, tri='shell'):
+        unique_faces = self.element_ledger.skin_block(block_id, tri)
         el_list = []
         face_list = []
         df = []
@@ -191,8 +191,8 @@ class Ledger:
             face_list.append(f)
         self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name, df)
 
-    def skin(self, skin_id, skin_name):
-        el_list, face_list = self.element_ledger.skin()
+    def skin(self, skin_id, skin_name, tri='shell'):
+        el_list, face_list = self.element_ledger.skin(tri)
         df = []
         self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name)
 

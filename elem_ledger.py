@@ -214,7 +214,7 @@ class ElemLedger:
         return newID
 
     # Returns faces of skinned mesh of form [(intern id, face number)]
-    def skin_block(self, block_id):
+    def skin_block(self, block_id, tri='shell'):
         block = self.find_element_block(block_id)
 
         i = 1
@@ -223,7 +223,7 @@ class ElemLedger:
             shift += self.blocks[i - 1].num_el_in_blk
             i += 1
 
-        unique_faces = block.skin_block(shift)
+        unique_faces = block.skin_block(shift, tri)
 
         # we have the internal id's, need the elem_num_map id's instead
         converted_unique_faces = []
@@ -234,10 +234,10 @@ class ElemLedger:
 
         return converted_unique_faces
 
-    def skin(self):
+    def skin(self, tri='shell'):
         faces = []
         for i in range(len(self.blocks)):
-            faces += self.skin_block(self.eb_prop1[i])
+            faces += self.skin_block(self.eb_prop1[i], tri=tri)
 
         el_list = []
         face_list = []
