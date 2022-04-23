@@ -2842,22 +2842,48 @@ class Exodus:
     
 
     def add_element(self, block_id, nodelist):
+        """
+        Returns the id of the newly created element if successful
+
+        :param block_id: (user-defined) ID for new element
+        :param nodelist: list of node IDs that make up the new element
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         return self.ledger.add_element(block_id, nodelist)
 
 
     def remove_element(self, elem_id):
+        """
+        Returns the removed element (the list of nodes)
+
+        :param elem_id: ID of the element to be removed
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         return self.ledger.remove_element(elem_id)
 
     def skin_element_block(self, block_id, skin_id, skin_name):
+        """
+        Skins a particular element block. Adds a corresponding sideset of the external faces
+
+        :param block_id: ID of the block to be skinned
+        :param skin_id: (user-defined) ID of the new sideset
+        :param skin_name: (user-defined) name of the new sideset
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to skin element into new sideset")
         self.ledger.skin_element_block(block_id, skin_id, skin_name)
 
     def skin(self, skin_id, skin_name):
+        """
+        Skins the entire mesh (all element blocks).
+        Adds a single corresponding sideset of the external faces
+
+        :param block_id: ID of the block to be skinned
+        :param skin_id: (user-defined) ID of the new sideset
+        :param skin_name: (user-defined) name of the new sideset
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to skin element into new sideset")
         self.ledger.skin(skin_id, skin_name)
