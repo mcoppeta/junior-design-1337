@@ -4,6 +4,8 @@ from exodus import Exodus
 from netCDF4 import Dataset
 import util
 from iterate import SampleFiles
+from constants import *
+import re
 
 
 # Disables all warnings in this module
@@ -237,6 +239,30 @@ def test_write_exceptions(tmpdir):
     # Uncomment when Element Ledger bug fixes are pushed
     # exofile.write(str(tmpdir) + '\\newfile.exo')
     exofile.close()
+
+def test_new_qa_record(tmpdir):
+    exofile = Exodus('sample-files/can.ex2', 'a')
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'r')
+    original = Exodus('sample-files/can.ex2', 'r')
+
+    lastEntry = exofile.data.variables['qa_records'][-1]
+
+    lastTitle = util.lineparse(lastEntry[0])
+
+    lastVersion = util.lineparse(lastEntry[1])
+    expectedVersion = "%d.%d" % (LIB_VERSION_MAJOR, LIB_VERSION_MINOR)
+
+    lastDateForm = bool(re.match(r"[0-9][0-9]/[0-9][0-9]/[0-9][0-9]", util.lineparse(lastEntry[2])))
+    lastTimeForm = bool(re.match(r"[0-9][0-9]:[0-9][0-9]:[0-9][0-9]", util.lineparse(lastEntry[3])))
+
+    assert original.num_qa + 1 == exofile.num_qa
+    assert lastTitle == LIB_NAME
+    assert lastVersion == expectedVersion
+    assert lastDateForm
+    assert lastTimeForm
 
 
 #############################################################################
