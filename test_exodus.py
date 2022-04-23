@@ -746,40 +746,98 @@ def test_var_fail_cube1ts():
 #############################################################################
 
 def test_init_elem_ledger(tmpdir):
-    pass # See John's
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    assert exofile.ledger.element_ledger
+    exofile.close()
+    exofile = Exodus('sample-files/test_ledger.ex2', 'a')
+    assert exofile.ledger.element_ledger
+    exofile.close()
 
 def test_elem_write_retain(tmpdir):
-    pass
-    # open -> write
-    # verify written file has same properties as original
+    exofile = Exodus('sample-files/can.ex2', 'a')
+
+    with pytest.raises(AttributeError):
+        exofile.write()
+
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    written = Exodus(str(tmpdir) + '\\test.ex2', 'r')
+    original = Exodus('sample-files/can.ex2', 'r')
+
+    assert original.num_dim == written.num_dim
+    assert original.num_elem == written.num_elem
+    assert original.num_elem_blk == original.num_elem_blk
 
 def test_elem_properties(tmpdir):
-    pass
-    # open append
-    # do num_elem(), num_elem_blocks(), etc thru block names
+    exofile = Exodus('sample-files/can.ex2', 'a')
+
+    prop1 = exofile.ledger.get_eb_prop1()
+    assert np.array_equal(prop1, np.array([1,2]))
+
+    connect1 = exofile.ledger.get_connectX(1)
+    assert connect1.shape == (4800, 8)
+    connect1_1 = connect1[0]
+    expected = np.array([2, 43, 1724, 1683, 1, 42, 1723, 1682])
+    assert np.array_equal(connect1_1, expected)
+    connect1_4 = connect1[3]
+    expected = np.array([5, 46, 1727, 1686, 4, 45, 1726, 1685])
+    assert np.array_equal(connect1_4, expected)
+
+    connect2 = exofile.ledger.get_connectX(2)
+    assert connect2.shape == (2352, 8)
+    connect2_1 = connect2[0]
+    expected = np.array([6726, 6730, 6846, 6842, 6725, 6729, 6845, 6841])
+    assert np.array_equal(connect2_1, expected)
+    connect2_4 = connect2[3]
+    expected = np.array([6730, 6734, 6850, 6846, 6729, 6733, 6849, 6845])
+    assert np.array_equal(connect2_4, expected)
+
+    exofile.close()
 
 def test_remove_element(tmpdir):
-    pass
-    # open -> remove middle element -> write
-    # verify changes (num elems, elem num map, block size--, etc)
+    exofile = Exodus('sample-files/can.ex2', 'a')
+    exofile.remove_element(1)
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    written = Exodus(str(tmpdir) + '\\test.ex2', 'a')
+    original = Exodus('sample-files/can.ex2', 'a')
+
+    assert original.num_elem - 1 == written.num_elem
+    assert original.num_elem_blk == written.num_elem_blk
+
+    with pytest.raises(KeyError):
+        assert original.ledger.element_ledger.get_element_nodes(1) == written.ledger.element_ledger.get_element_nodes(1)
+
+    written.close()
+    original.close()
 
 def test_add_element(tmpdir):
-    pass
-    # open -> add element (see my tXX() attempt) -> write
-    # verify chagnes (same as above)
+    exofile = Exodus('sample-files/can.ex2', 'a')
+    nl = [1, 41, 6724, 6684, 42, 82, 6683, 6643]
+    exofile.add_element(1, nl)
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
 
-###
-#Add a bunch of tests for skinning by type
-
-def test_skin_cube(tmpdir):
-    pass
+    written = Exodus(str(tmpdir) + '\\test.ex2', 'a')
+    original = Exodus('sample-files/can.ex2', 'a')
+    assert original.num_elem + 1 == written.num_elem
 
 def test_skin_can(tmpdir):
-    pass
+    exofile = Exodus('sample-files/can.ex2', 'a')
+    exofile.skin(3312, "Mesh Skin")
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
 
-def test_skin_bake(tmpdir):
-    pass
+    written = Exodus(str(tmpdir) + '\\test.ex2', 'a')
+    original = Exodus('sample-files/can.ex2', 'a')
 
+    assert original.num_side_sets + 1 == written.num_side_sets
+
+    ss = written.get_side_set(3312)[:]
+    assert len(ss[0]) == 5584
+    assert len(ss[1]) == 5584
 
 
 
