@@ -739,10 +739,48 @@ def test_var_fail_cube1ts():
 
 
 
+#############################################################################
+#                                                                           #
+#                            Element Tests                                  #
+#                                                                           #
+#############################################################################
+
+def test_init_elem_ledger(tmpdir):
+    pass # See John's
+
+def test_elem_write_retain(tmpdir):
+    pass
+    # open -> write
+    # verify written file has same properties as original
+
+def test_elem_properties(tmpdir):
+    pass
+    # open append
+    # do num_elem(), num_elem_blocks(), etc thru block names
+
+def test_remove_element(tmpdir):
+    pass
+    # open -> remove middle element -> write
+    # verify changes (num elems, elem num map, block size--, etc)
+
+def test_add_element(tmpdir):
+    pass
+    # open -> add element (see my tXX() attempt) -> write
+    # verify chagnes (same as above)
+
+###
+#Add a bunch of tests for skinning by type
+
+def test_skin_cube(tmpdir):
+    pass
+
+def test_skin_can(tmpdir):
+    pass
+
+def test_skin_bake(tmpdir):
+    pass
 
 
-
-    
 
 
 # Below tests are based on what can be read according to current C Exodus API.
