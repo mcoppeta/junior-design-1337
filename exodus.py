@@ -1706,7 +1706,7 @@ class Exodus:
 
         if self.mode == 'w' or self.mode == 'a':
             num_node_entry = self.ledger.get_num_nodes_per_el_block(internal_id)
-	elif (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
+        elif (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
             num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
             num_node_entry = 0
@@ -1715,8 +1715,8 @@ class Exodus:
             try:
                 if self.mode == 'w' or self.mode == 'a':
                     result = self.ledger.get_connectX(internal_id)[start - 1:start + count - 1]
-		else:
-		    result = self.data.variables[VAR_CONNECT % internal_id][start - 1:start + count - 1]
+                else:
+                    result = self.data.variables[VAR_CONNECT % internal_id][start - 1:start + count - 1]
 
             except KeyError:
                 raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
@@ -1737,7 +1737,7 @@ class Exodus:
         """
         # TODO this will be way faster with caching
         try:
-	    if self.mode == 'w' or self.mode == 'a':
+            if self.mode == 'w' or self.mode == 'a':
                 num_entries = self.ledger.get_num_elem_in_block(internal_id)
             else:
                 num_entries = self.data.dimensions[DIM_NUM_EL_IN_BLK % internal_id].size
@@ -1745,7 +1745,7 @@ class Exodus:
             raise KeyError("Failed to retrieve number of elements in element block with id {} ('{}')"
                            .format(obj_id, DIM_NUM_EL_IN_BLK % internal_id))
         
-	if self.mode == 'w' or self.mode == 'a':
+        if self.mode == 'w' or self.mode == 'a':
             num_node_entry = self.ledger.get_num_nodes_per_el_block(internal_id)
         elif (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
             num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
@@ -2130,14 +2130,14 @@ class Exodus:
         """Returns an array containing the names of element blocks in this database."""
         if self.mode == 'w' or self.mode == 'a':
             return self.ledger.get_elem_block_names()
-	return self._get_set_block_names(ELEMBLOCK)
+        return self._get_set_block_names(ELEMBLOCK)
 
     def get_elem_block_name(self, obj_id):
         """Returns the name of the given element block."""
         if self.mode == 'w' or self.mode == 'a':
             return self.ledger.get_elem_block_name(obj_id)
-
-	internal_id = self._lookup_id(ELEMBLOCK, obj_id)
+        
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         names = self._get_set_block_names(ELEMBLOCK)
 
         if len(names) > 0:
