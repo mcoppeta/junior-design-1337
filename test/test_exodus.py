@@ -1,9 +1,9 @@
 import pytest
 import numpy as np
 from netCDF4 import Dataset
-from exodusutils import util
+
+import exodusutils._version
 from exodusutils.exodus import Exodus
-from exodusutils.iterate import SampleFiles
 from exodusutils import util
 from exodusutils.iterate import SampleFiles
 from exodusutils.constants import *
@@ -256,7 +256,7 @@ def test_new_qa_record(tmpdir):
     lastTitle = util.lineparse(lastEntry[0])
 
     lastVersion = util.lineparse(lastEntry[1])
-    expectedVersion = "%d.%d" % (LIB_VERSION_MAJOR, LIB_VERSION_MINOR)
+    expectedVersion = exodusutils._version.__version__
 
     lastDateForm = bool(re.match(r"[0-9][0-9]/[0-9][0-9]/[0-9][0-9]", util.lineparse(lastEntry[2])))
     lastTimeForm = bool(re.match(r"[0-9][0-9]:[0-9][0-9]:[0-9][0-9]", util.lineparse(lastEntry[3])))
