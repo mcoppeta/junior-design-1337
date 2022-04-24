@@ -763,6 +763,53 @@ def test_var_fail_cube1ts():
 #     exofile.write(str(tmpdir) + "/add_sideset_biplane.exo")
 #     exofile.close()
 
+# def test_remove_sides_from_sideset(tmpdir):
+#     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+#     exofile.remove_sides_from_sideset([7, 8], [6, 6], 1)
+#     exofile.write(str(tmpdir) + "/add_sides_to_sideset_cubewdata.exo")
+#     exofile.close()
+
+def test_read_after_remove(tmpdir):
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.remove_sideset(2)
+    elems, sides = exofile.get_side_set(7)
+    assert np.array_equal(elems, [7, 8, 3, 4])
+    assert np.array_equal(sides, [3, 3, 3, 3])
+    exofile.close()
+
+def test_read_after_add(tmpdir):
+    # Add sideset and check
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.add_sideset([3, 4, 7, 8], [4, 4, 4, 4], 1, "BasicNew", dist_fact=[1, 2, 2, 1])
+    elems, sides = exofile.get_side_set(1)
+    dfs = exofile.get_side_set_df(1)
+    assert np.array_equal(dfs, [1, 2, 2, 1])
+    assert np.array_equal(elems, [3, 4, 7, 8])
+    assert np.array_equal(sides, [4, 4, 4, 4])
+
+
+    # Add sides to sideset and check
+    exofile.add_sides_to_sideset([3, 4, 7, 8], [3, 3, 3, 3], 1)
+    elems, sides = exofile.get_side_set(1)
+    dfs = exofile.get_side_set_df(1)
+    assert np.array_equal(dfs, [1, 2, 2, 1, 1, 1, 1, 1])
+    assert np.array_equal(elems, [3, 4, 7, 8, 3, 4, 7, 8])
+    assert np.array_equal(sides, [4, 4, 4, 4, 3, 3, 3, 3])
+    exofile.close()
+
+def test_read_after_remove_sides(tmpdir):
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.remove_sides_from_sideset([7, 5], [6, 6], 2)
+    elems, sides = exofile.get_side_set(2)
+    dfs = exofile.get_side_set_df(2)
+    assert np.array_equal(elems, [6, 8])
+    assert np.array_equal(sides, [6, 6])
+    assert np.array_equal(dfs, [1, 1, 1, 1, 1, 1, 1, 1])
+    exofile.close()
+
+
+
+
 
 
 #############################################################################

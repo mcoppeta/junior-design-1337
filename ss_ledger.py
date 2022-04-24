@@ -1,8 +1,11 @@
 import numpy as np
 import util
+import warnings
 
 class SSLedger:
-
+    """
+    Initializes the sideset ledger. Loads in any metadata but waits to load in actual data for sideset until later. 
+    """
     def __init__(self, ex):
         self.ex = ex
 
@@ -29,6 +32,7 @@ class SSLedger:
         self.ss_var_names = [] # names for each of the sideset variables
         self.ss_vars = [] # variables for each sideset, each sideset can have multiple variables (will be 4d array)
         self.ss_var_tab = None # this is 2d array that holds the "status" of all sideset variables and is num_ss by num_ss_var
+        self.orig_internal_ids = []
 
 
         # Fill in lists with sideset data
@@ -38,6 +42,7 @@ class SSLedger:
                 self.ss_prop1.append(ex.data["ss_prop1"][i])
             else:
                 self.ss_prop1.append(i + 1) # if id does not exist, just make one up and add it
+            self.orig_internal_ids.append(i + 1)
             
             # load in status for each sideset
             if ("ss_status" in ex.data.variables):
@@ -59,7 +64,7 @@ class SSLedger:
             
             # load number of df for each sideset
             if ("num_df_ss" + str(i + 1) in ex.data.dimensions.keys()):
-                self.num_dist_fact.append(ex.get_side_set_params(self.ss_prop1[i])[1])
+                self.num_dist_fact.append(self.ex.data.dimensions["num_df_ss" + str(i + 1)].size)
             else:
                 self.num_dist_fact.append(0) # if num_df does not exist, just set to 0
 
@@ -77,7 +82,14 @@ class SSLedger:
             self.ss_dist_fact.append(None)  # this is place holder to be filled with real values later
             self.ss_elem.append(None) # this is place holder to be filled with real values later
             self.ss_sides.append(None) # this is place holder to be filled with real values later
-
+    """
+    Adds new sideset. Takes in element ids, side ids, id of the new sideset, and name of the new sideset. 
+    Can optionally specify distribution factor and variables. If no distribution factors are specified 
+    and they are required, placeholder 1s will be inserted. If no variables are specified and they are required, 
+    placeholder 0s will be inserted. If specifying distribution factors, they must be of size n * len(elem_ids), where
+    n is a positive integer. If specifying variables, they must be of dimensions 
+    [number of sideset variables, number of timesteps, number of sides in sideset].
+    """
     def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
 
         if (ss_id in self.ss_prop1):
@@ -98,6 +110,9 @@ class SSLedger:
         if (self.num_ss_var == 0 and variables != None and len(variables) > 0):
             raise Exception("Cannot add variables, this model does not have sideset variables")
         
+        if (len(side_ids) == 0 or len(elem_ids) == 0): # there are no ids, so just return
+            return
+        
         # Need to check variable array size
 
         # need to convert elem_ids to internal ids
@@ -112,7 +127,10 @@ class SSLedger:
         if (variables is None and self.num_ss_var > 0):
             # make array of all 0s
             # if there are sideset variables, then time_step must exist
-            variables = np.zeros([self.num_ss_var, self.ex.data.dimensions["time_step"].size,  len(side_ids)])
+            for i in range(self.num_ss_var):
+                if i == 0:
+                    variables = []
+                variables.append(np.zeros([self.ex.data.dimensions["time_step"].size,  len(side_ids)]))
 
         # if there are sideset variables, append the variables passed in 
         # or the blank array that was just made
@@ -142,9 +160,12 @@ class SSLedger:
         self.ss_sizes.append(len(elem_ids))
         self.ss_status.append(1)
         self.ss_names.append(ss_name)
+        self.orig_internal_ids.append(-1)
         
         self.num_ss += 1 
-
+    """
+    Removes an existing sideset. Must specify id of sideset for removal.
+    """
     #TODO Replaced start of this with find_sideset_num, we should check that this still works
     def remove_sideset(self, ss_id):
         ndx = self.find_sideset_num(ss_id)
@@ -161,10 +182,19 @@ class SSLedger:
         self.ss_vars.pop(ndx)
         # need to update sideset vars status in ss_var_tab
         # remove row that corresponds to sideset
-        self.ss_var_tab = np.delete(self.ss_var_tab, ndx)
+        self.ss_var_tab = np.delete(self.ss_var_tab, ndx, axis=0)
+        self.orig_internal_ids.pop(ndx)
         
         self.num_ss -= 1
 
+    """
+    Adds sides to already existing sideset. Must specify the element ids of sides to add, the side ids of sides to add
+    the id of the sideset being added to, and optionally the distribution factors and variables. If no distribution 
+    factors are specified, and they are required, they will be filled with 1s. If no variables are specified, 
+    and they are required, they will be filled with 0s. If specifying distribution factors, they must be of size n * len(elem_ids), 
+    where n is a positive integer. If specifying variables, they must be of dimensions 
+    [number of sideset variables, number of timesteps, number of sides being added].
+    """
     # variables array is of dim (num_var, time_step, num_sides)
     def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
         ndx = self.find_sideset_num(ss_id)
@@ -175,15 +205,15 @@ class SSLedger:
 
         # if not loaded in yet, need to load in 
         if (self.ss_elem[ndx] is None):
-            ss = self.ex.get_side_set(ss_id)
+            ss = self.get_side_set(ss_id)
             elems = ss[0]
             sides = ss[1]
             self.ss_elem[ndx] = np.array(elems)
             self.ss_sides[ndx] = np.array(sides)
-            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(ss_id))
+            self.ss_dist_fact[ndx] = np.array(self.get_side_set_df(ss_id))
             for i in range(self.num_ss_var):
                 if i == 0:
-                    self.ss_vars[ndx] = []
+                    self.ss_vars[ndx] = list()
                 self.ss_vars[ndx].append(self.ex.data["vals_sset_var" + str(i + 1) + "ss" + str(ndx + 1)])
 
         # need to convert elem_ids to internal ids
@@ -205,10 +235,12 @@ class SSLedger:
 
         # need to update sideset variables
         # add column of 0s to each 2d array corresponding to each variable
-        if (variables is None):
+        # make sure there exist variables before we start adding
+        if (variables is None and self.num_ss_var > 0):
             for i in range(self.num_ss_var):
-                self.ss_vars[ndx][i] = np.hstack((self.ss_vars[ndx][i], np.zeros([self.ex.data.dimensions["time_step"].size, len(elem_ids)])))
-        else:
+                new_array =  np.hstack((self.ss_vars[ndx][i], np.zeros([self.ex.data.dimensions["time_step"].size, len(elem_ids)])))
+                self.ss_vars[ndx][i] = new_array
+        elif(self.num_ss_var > 0):
             for i in range(self.num_ss_var):
                  self.ss_vars[ndx][i] = np.hstack((self.ss_vars[ndx][i], variables[i]))
 
@@ -216,21 +248,24 @@ class SSLedger:
         self.ss_sides[ndx] = np.append(self.ss_sides[ndx], side_ids)
         self.ss_sizes[ndx] += len(elem_ids)
 
-    
+    """
+    Removes sides from the specified sideset id. Takes in element ids and their corresponding side ids, as 
+    well as the id of the sideset to remove the sides from. 
+    """
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
         ndx = self.find_sideset_num(ss_id)
 
         # if not loaded in yet, need to load in 
         if (self.ss_elem[ndx] is None):
-            ss = self.ex.get_side_set(ss_id)
+            ss = self.get_side_set(ss_id)
             elems = ss[0]
             sides = ss[1]
             self.ss_elem[ndx] = np.array(elems)
             self.ss_sides[ndx] = np.array(sides)
-            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(ss_id))
+            self.ss_dist_fact[ndx] = np.array(self.get_side_set_df(ss_id))
             for i in range(self.num_ss_var):
                 if i == 0:
-                    self.ss_vars[ndx] = []
+                    self.ss_vars[ndx] = list()
                 self.ss_vars[ndx].append(self.ex.data["vals_sset_var" + str(i + 1) + "ss" + str(ndx + 1)])
 
         num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
@@ -274,46 +309,25 @@ class SSLedger:
         self.ss_dist_fact[ndx] = np.delete(self.ss_dist_fact[ndx], df_remove_ndx)
         self.num_dist_fact[ndx] -= len(df_remove_ndx)
     
-    # Create 2 new sidesets from old sideset based on user-specified function
-    # User function should return boolean and take in tuple of (element, side)
-    #TODO: Was getting an error (shown below) during write() at runtime when creating second sideset
-    # ss_ledger.py in write: "data.createDimension("num_side_ss" + str(i+1), self.ss_sizes[i])"
-    # (Some calls to netCDF4)
-    # "RuntimeError: NetCDF: NC_UNLIMITED size already in use"
+    # Create 2 new sidesets from old sideset based on user-specified function.
+    # User function should return boolean and take in tuple of (element, side).
+    # Function provided here as a model for users to add other split_sideset functions
+    # to library with more varied functionality
+    # TODO: known bug with bake.e sample file
+    # TODO: handle sideset variables
     def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2):
         # Get sideset that will be split
         ndx = self.find_sideset_num(old_ss)
 
         # if not loaded in yet, need to load in 
         if (self.ss_elem[ndx] is None):
-            ss = self.ex.get_side_set(old_ss)
+            ss = self.get_side_set(old_ss)
             elems = ss[0]
             sides = ss[1]
             self.ss_elem[ndx] = np.array(elems)
             self.ss_sides[ndx] = np.array(sides)
-            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(old_ss))
+            self.ss_dist_fact[ndx] = np.array(self.get_side_set_df(old_ss))
 
-        #Original approach below, switched to a different approach based on iteration in
-        #remove_sides_from_sideset, approach 1 could be a different way to do this function
-        #where sides are added individually to new sidesets during iteration but approach 1
-        #is not currently working as written
-
-        #START OF APPROACH 1
-        # Create new sideset that will contain sides meeting user-specified criteria
-        # self.add_sideset([], [], ss_id1, ss_name1, [])
-
-        # Create new sideset that will contain sides NOT meeting user-specified criteria
-        # self.add_sideset([], [], ss_id2, ss_name2, [])
-
-        #Iterate through sides in sideset and check if they match user-specified criteria
-        # for i in self.ss_sides[ndx]:
-        #   if function(i): #Side returns true, add to sideset 1 
-        #       self.add_sides_to_sideset([self.ss_elem[ndx][i]], [self.ss_sides[ndx][i]], [self.ss_dist_fact[ndx][i]], ss_id1)
-        #   else: #Side returns false, add to sideset 2
-        #       self.add_sides_to_sideset([self.ss_elem[ndx][i]], [self.ss_sides[ndx][i]], [self.ss_dist_fact[ndx][i]], ss_id2)
-        #END OF APPROACH 1
-
-        #START OF APPROACH 2 (based on iteration for remove sides)
         num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
 
         meet_criteria_elem = []
@@ -337,19 +351,31 @@ class SSLedger:
                 if (num_df_per_side != 0):
                     not_met_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
 
-        self.add_sideset(meet_criteria_elem, meet_criteria_side, ss_id1, ss_name1, meet_criteria_df)
-        #TODO Was getting error writing second sideset, not sure how it resolved so may come up again
-        self.add_sideset(not_met_elem, not_met_side, ss_id2, ss_name2, not_met_df)
-        #END OF APPROACH 2
+        # If sideset did not previously have df, set df to a default of 1 for the new sideset
+        if len(meet_criteria_df) == 0:
+            meet_criteria_df = [1] * len(meet_criteria_side)
+        if len(not_met_df) == 0:
+            not_met_df = [1] * len(not_met_side)
+
+        # If none of the sides meet the splitting criteria, don't create an empty sideset
+        try:
+            self.add_sideset(meet_criteria_elem, meet_criteria_side, ss_id1, ss_name1, meet_criteria_df)
+        except ZeroDivisionError:
+            print("No sides meeting splitting criteria to put in first sideset, no first sideset created")
+
+        # If all of the sides meet the splitting criteria, don't create a second empty sideset
+        try:
+            self.add_sideset(not_met_elem, not_met_side, ss_id2, ss_name2, not_met_df)
+        except ZeroDivisionError:
+            print("All sides meet splitting criteria, no sides to put in second sideset, no second sideset created")
         
         #Delete old sideset if desired by user
         if delete:
            self.remove_sideset(old_ss)
 
-    # Creates 2 new sidesets from sides in old sideset based on x-coordinate values
-    #TODO Redo this function based on generic split_sideset function implementation
-    #And what is the best way to get and check all nodes in the sideset?
-    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ssid_2, delete, ss_name1="", ss_name2=""):
+    # Creates 2 new sidesets from sides in old sideset based on x-coordinate values.
+    # TODO: Test function more thoroughly, most testing informal and only on 'cube_its_mod.e' sample file
+    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
         # Set comparison that will be used
         if comparison == '<':
           compare = lambda coord : coord < x_value
@@ -367,50 +393,432 @@ class SSLedger:
           raise Exception("Comparison not valid. Valid comparison inputs: '<', '>', '<=', '>=', '=', '!='")
 
         # Get sideset that will be split
-        ss_num = self.find_sideset_num(old_ss)
-        
-        # Create new sideset that will contain sides meeting user-specified criteria
-        # dist_fact? create sideset before or after elems/sides found?
-        #self.add_sideset([], [], ss_id1, ss_name1, [])
+        ndx = self.find_sideset_num(old_ss)
 
-        # Create new sideset that will contain sides NOT meeting user-specified criteria
-        # dist_fact? create sideset before or after elems/sides found?
-        #self.add_sideset([], [], ss_id2, ss_name2, [])
+        # if not loaded in yet, need to load in 
+        if (self.ss_elem[ndx] is None):
+            ss = self.ex.get_side_set(old_ss)
+            elems = ss[0]
+            sides = ss[1]
+            self.ss_elem[ndx] = np.array(elems)
+            self.ss_sides[ndx] = np.array(sides)
+            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(old_ss))
+            # for i in range(self.num_ss_var):
+            #     if i == 0:
+            #         self.ss_vars[ndx] = []
+            #     self.ss_vars[ndx].append(self.ex.data["vals_sset_var" + str(i + 1) + "ss" + str(ndx + 1)])
 
-        # Get all sides in old sideset
-        # ???
+        num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
+
+        meet_criteria_elem = []
+        meet_criteria_side = []
+        meet_criteria_df = []
+        not_met_elem = []
+        not_met_side = []
+        not_met_df = []
+
+        ss_nodes = self.ex.get_side_set_node_list(old_ss)
 
         # Either add sides to new sideset if all nodes in a given side meet x-coord criteria
-        #if all_nodes:
-        #   For each side in old sideset
-        #       flag = True
-        #       For each node in side
-        #           if not compare(current node x-coord):
-        #               flag = False
-        #               break
-        #       if flag:
-        #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id1)
-        #       else:
-        #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id2)
+        if all_nodes:
+            node_ndx = 0 # keep track of ID of current node in sideset
+            for i in range(len(ss_nodes[1])):
+                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                nodes_per_side = ss_nodes[1][i] # number of nodes in current side
+                flag = True # flag used to determine whether or not all nodes in the side meet criteria
+                for j in range(nodes_per_side):
+                    node_x_coord = self.ex.get_partial_coord_x(ss_nodes[0][node_ndx], 1) # x-coord of current node
+                    if flag and not compare(node_x_coord[0]): # if x-coord doesn't meet criteria
+                        flag = False # not all nodes on side meet criteria
+                        not_met_elem.append(side_tuple[0])
+                        not_met_side.append(side_tuple[1])
+                        adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                        if (num_df_per_side != 0):
+                            not_met_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+                    node_ndx += 1
+                if flag:
+                    meet_criteria_elem.append(side_tuple[0])
+                    meet_criteria_side.append(side_tuple[1])
+                    adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                    if (num_df_per_side != 0):
+                        meet_criteria_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
 
         # Or add sides to new sideset if at least one node in a given side meets x-coord criteria
-        #else:
-        #   For each side in old sideset
-        #       flag = False
-        #       For each node in side
-        #           if compare(current node x-coord):
-        #               flag = True
-        #               break
-        #       if flag:
-        #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id1)
-        #       else:
-        #           self.add_side_to_ss(elem id of curr side, curr side id, ss_id2)
+        else:
+            node_ndx = 0 # keep track of ID of current node in sideset
+            for i in range(len(ss_nodes[1])):
+                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                nodes_per_side = ss_nodes[1][i] # number of nodes in current side
+                flag = False # flag used to determine whether or not there is a node on side meeting criteria
+                for j in range(nodes_per_side):
+                    node_x_coord = self.ex.get_partial_coord_x(ss_nodes[0][node_ndx], 1) # x-coord of current node
+                    if not flag and compare(node_x_coord[0]): # if side not yet added and x-coord meets criteria
+                        flag = True # at least one node meets criteria
+                        meet_criteria_elem.append(side_tuple[0])
+                        meet_criteria_side.append(side_tuple[1])
+                        adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                        if (num_df_per_side != 0):
+                            meet_criteria_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+                    node_ndx += 1
+                if not flag:
+                    not_met_elem.append(side_tuple[0])
+                    not_met_side.append(side_tuple[1])
+                    adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                    if (num_df_per_side != 0):
+                        not_met_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
 
+        # If sideset did not previously have df, set df to a default of 1 for the new sideset
+        if len(meet_criteria_df) == 0:
+            meet_criteria_df = [1] * len(meet_criteria_side)
+        if len(not_met_df) == 0:
+            not_met_df = [1] * len(not_met_side)
+
+        # If none of the sides meet the splitting criteria, don't create an empty sideset
+        try:
+            self.add_sideset(meet_criteria_elem, meet_criteria_side, ss_id1, ss_name1, meet_criteria_df)
+        except ZeroDivisionError:
+            print("No sides meeting splitting criteria to put in first sideset, no first sideset created")
+
+        # If all of the sides meet the splitting criteria, don't create a second empty sideset
+        try:
+            self.add_sideset(not_met_elem, not_met_side, ss_id2, ss_name2, not_met_df)
+        except ZeroDivisionError:
+            print("All sides meet splitting criteria, no sides to put in second sideset, no second sideset created")
+        
         #Delete old sideset if desired by user
-        # if delete:
-        #    self.remove_sideset(old_ss)
+        if delete:
+           self.remove_sideset(old_ss)
 
-    # NEED TO DEAL WITH SIDESET VARS
+    # Creates 2 new sidesets from sides in old sideset based on y-coordinate values.
+    # TODO: Test function more thoroughly, most testing informal and only on 'cube_its_mod.e' sample file
+    def split_sideset_y_coords(self, old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
+        # Set comparison that will be used
+        if comparison == '<':
+          compare = lambda coord : coord < y_value
+        elif comparison == '>':
+          compare = lambda coord : coord > y_value
+        elif comparison == '<=':
+          compare = lambda coord : coord <= y_value
+        elif comparison == '>=':
+          compare = lambda coord : coord >= y_value
+        elif comparison == '=':
+          compare = lambda coord : coord == y_value
+        elif comparison == '!=':
+          compare = lambda coord : coord != y_value
+        else:
+          raise Exception("Comparison not valid. Valid comparison inputs: '<', '>', '<=', '>=', '=', '!='")
+
+        # Get sideset that will be split
+        ndx = self.find_sideset_num(old_ss)
+
+        # if not loaded in yet, need to load in 
+        if (self.ss_elem[ndx] is None):
+            ss = self.ex.get_side_set(old_ss)
+            elems = ss[0]
+            sides = ss[1]
+            self.ss_elem[ndx] = np.array(elems)
+            self.ss_sides[ndx] = np.array(sides)
+            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(old_ss))
+            # for i in range(self.num_ss_var):
+            #     if i == 0:
+            #         self.ss_vars[ndx] = []
+            #     self.ss_vars[ndx].append(self.ex.data["vals_sset_var" + str(i + 1) + "ss" + str(ndx + 1)])
+
+        num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
+
+        meet_criteria_elem = []
+        meet_criteria_side = []
+        meet_criteria_df = []
+        not_met_elem = []
+        not_met_side = []
+        not_met_df = []
+
+        ss_nodes = self.ex.get_side_set_node_list(old_ss)
+
+        # Either add sides to new sideset if all nodes in a given side meet y-coord criteria
+        if all_nodes:
+            node_ndx = 0 # keep track of ID of current node in sideset
+            for i in range(len(ss_nodes[1])):
+                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                nodes_per_side = ss_nodes[1][i] # number of nodes in current side
+                flag = True # flag used to determine whether or not all nodes in the side meet criteria
+                for j in range(nodes_per_side):
+                    node_y_coord = self.ex.get_partial_coord_y(ss_nodes[0][node_ndx], 1) # y-coord of current node
+                    if flag and not compare(node_y_coord[0]): # if y-coord doesn't meet criteria
+                        flag = False # not all nodes on side meet criteria
+                        not_met_elem.append(side_tuple[0])
+                        not_met_side.append(side_tuple[1])
+                        adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                        if (num_df_per_side != 0):
+                            not_met_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+                    node_ndx += 1
+                if flag:
+                    meet_criteria_elem.append(side_tuple[0])
+                    meet_criteria_side.append(side_tuple[1])
+                    adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                    if (num_df_per_side != 0):
+                        meet_criteria_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+
+        # Or add sides to new sideset if at least one node in a given side meets y-coord criteria
+        else:
+            node_ndx = 0 # keep track of ID of current node in sideset
+            for i in range(len(ss_nodes[1])):
+                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                nodes_per_side = ss_nodes[1][i] # number of nodes in current side
+                flag = False # flag used to determine whether or not there is a node on side meeting criteria
+                for j in range(nodes_per_side):
+                    node_y_coord = self.ex.get_partial_coord_y(ss_nodes[0][node_ndx], 1) # y-coord of current node
+                    if not flag and compare(node_y_coord[0]): # if side not yet added and y-coord meets criteria
+                        flag = True # at least one node meets criteria
+                        meet_criteria_elem.append(side_tuple[0])
+                        meet_criteria_side.append(side_tuple[1])
+                        adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                        if (num_df_per_side != 0):
+                            meet_criteria_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+                    node_ndx += 1
+                if not flag:
+                    not_met_elem.append(side_tuple[0])
+                    not_met_side.append(side_tuple[1])
+                    adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                    if (num_df_per_side != 0):
+                        not_met_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+
+        # If sideset did not previously have df, set df to a default of 1 for the new sideset
+        if len(meet_criteria_df) == 0:
+            meet_criteria_df = [1] * len(meet_criteria_side)
+        if len(not_met_df) == 0:
+            not_met_df = [1] * len(not_met_side)
+
+        # If none of the sides meet the splitting criteria, don't create an empty sideset
+        try:
+            self.add_sideset(meet_criteria_elem, meet_criteria_side, ss_id1, ss_name1, meet_criteria_df)
+        except ZeroDivisionError:
+            print("No sides meeting splitting criteria to put in first sideset, no first sideset created")
+
+        # If all of the sides meet the splitting criteria, don't create a second empty sideset
+        try:
+            self.add_sideset(not_met_elem, not_met_side, ss_id2, ss_name2, not_met_df)
+        except ZeroDivisionError:
+            print("All sides meet splitting criteria, no sides to put in second sideset, no second sideset created")
+        
+        #Delete old sideset if desired by user
+        if delete:
+           self.remove_sideset(old_ss)
+
+    # Creates 2 new sidesets from sides in old sideset based on z-coordinate values.
+    # TODO: Test function more thoroughly, most testing informal and only on 'cube_its_mod.e' sample file
+    def split_sideset_z_coords(self, old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
+        # Set comparison that will be used
+        if comparison == '<':
+          compare = lambda coord : coord < z_value
+        elif comparison == '>':
+          compare = lambda coord : coord > z_value
+        elif comparison == '<=':
+          compare = lambda coord : coord <= z_value
+        elif comparison == '>=':
+          compare = lambda coord : coord >= z_value
+        elif comparison == '=':
+          compare = lambda coord : coord == z_value
+        elif comparison == '!=':
+          compare = lambda coord : coord != z_value
+        else:
+          raise Exception("Comparison not valid. Valid comparison inputs: '<', '>', '<=', '>=', '=', '!='")
+
+        # Get sideset that will be split
+        ndx = self.find_sideset_num(old_ss)
+
+        # if not loaded in yet, need to load in 
+        if (self.ss_elem[ndx] is None):
+            ss = self.ex.get_side_set(old_ss)
+            elems = ss[0]
+            sides = ss[1]
+            self.ss_elem[ndx] = np.array(elems)
+            self.ss_sides[ndx] = np.array(sides)
+            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(old_ss))
+            # for i in range(self.num_ss_var):
+            #     if i == 0:
+            #         self.ss_vars[ndx] = []
+            #     self.ss_vars[ndx].append(self.ex.data["vals_sset_var" + str(i + 1) + "ss" + str(ndx + 1)])
+
+        num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
+
+        meet_criteria_elem = []
+        meet_criteria_side = []
+        meet_criteria_df = []
+        not_met_elem = []
+        not_met_side = []
+        not_met_df = []
+
+        ss_nodes = self.ex.get_side_set_node_list(old_ss)
+
+        # Either add sides to new sideset if all nodes in a given side meet z-coord criteria
+        if all_nodes:
+            node_ndx = 0 # keep track of ID of current node in sideset
+            for i in range(len(ss_nodes[1])):
+                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                nodes_per_side = ss_nodes[1][i] # number of nodes in current side
+                flag = True # flag used to determine whether or not all nodes in the side meet criteria
+                for j in range(nodes_per_side):
+                    node_z_coord = self.ex.get_partial_coord_z(ss_nodes[0][node_ndx], 1) # z-coord of current node
+                    if flag and not compare(node_z_coord[0]): # if z-coord doesn't meet criteria
+                        flag = False # not all nodes on side meet criteria
+                        not_met_elem.append(side_tuple[0])
+                        not_met_side.append(side_tuple[1])
+                        adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                        if (num_df_per_side != 0):
+                            not_met_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+                    node_ndx += 1
+                if flag:
+                    meet_criteria_elem.append(side_tuple[0])
+                    meet_criteria_side.append(side_tuple[1])
+                    adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                    if (num_df_per_side != 0):
+                        meet_criteria_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+
+        # Or add sides to new sideset if at least one node in a given side meets z-coord criteria
+        else:
+            node_ndx = 0 # keep track of ID of current node in sideset
+            for i in range(len(ss_nodes[1])):
+                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                nodes_per_side = ss_nodes[1][i] # number of nodes in current side
+                flag = False # flag used to determine whether or not there is a node on side meeting criteria
+                for j in range(nodes_per_side):
+                    node_z_coord = self.ex.get_partial_coord_z(ss_nodes[0][node_ndx], 1) # z-coord of current node
+                    if not flag and compare(node_z_coord[0]): # if side not yet added and z-coord meets criteria
+                        flag = True # at least one node meets criteria
+                        meet_criteria_elem.append(side_tuple[0])
+                        meet_criteria_side.append(side_tuple[1])
+                        adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                        if (num_df_per_side != 0):
+                            meet_criteria_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+                    node_ndx += 1
+                if not flag:
+                    not_met_elem.append(side_tuple[0])
+                    not_met_side.append(side_tuple[1])
+                    adjusted_i = i * num_df_per_side # adjust i to account for multiple df
+                    if (num_df_per_side != 0):
+                        not_met_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
+
+        # If sideset did not previously have df, set df to a default of 1 for the new sideset
+        if len(meet_criteria_df) == 0:
+            meet_criteria_df = [1] * len(meet_criteria_side)
+        if len(not_met_df) == 0:
+            not_met_df = [1] * len(not_met_side)
+
+        # If none of the sides meet the splitting criteria, don't create an empty sideset
+        try:
+            self.add_sideset(meet_criteria_elem, meet_criteria_side, ss_id1, ss_name1, meet_criteria_df)
+        except ZeroDivisionError:
+            print("No sides meeting splitting criteria to put in first sideset, no first sideset created")
+
+        # If all of the sides meet the splitting criteria, don't create a second empty sideset
+        try:
+            self.add_sideset(not_met_elem, not_met_side, ss_id2, ss_name2, not_met_df)
+        except ZeroDivisionError:
+            print("All sides meet splitting criteria, no sides to put in second sideset, no second sideset created")
+        
+        #Delete old sideset if desired by user
+        if delete:
+           self.remove_sideset(old_ss)
+
+    # return the number of sidesets
+    def num_side_sets(self):
+        return self.num_ss
+
+    # return id map for sideset
+    def get_side_set_id_map(self):
+        return self.ss_prop1
+
+    def get_side_set_names(self):
+        return self.ss_names
+
+    def get_side_set_name(self, ndx):
+        return self.ss_names[ndx]
+
+    # get portion of a sideset's elem and side id's
+    def _int_get_partial_side_set(self, obj_id, internal_id, start, count):
+        ndx = self.find_sideset_num(obj_id)
+        # if not loaded in yet, go to file if it exists
+        if (ndx == -1):
+            raise KeyError("Failed to retrieve elements of side set with id {} ('{}')".format(obj_id, 'elem_ss%d' % internal_id))
+
+        internal_id = self.orig_internal_ids[ndx]
+        
+        if (self.ss_elem[ndx] is None):
+            try:
+                elmset = self.ex.data.variables['elem_ss%d' % internal_id][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError(
+                    "Failed to retrieve elements of side set with id {} ('{}')".format(obj_id, 'elem_ss%d' % internal_id))
+        else:
+            try:
+                elmset = self.ss_elem[ndx][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError(
+                    "Failed to retrieve elements of side set with id {} ('{}')".format(obj_id, 'elem_ss%d' % internal_id))
+            
+        if (self.ss_sides[ndx] is None):
+            try:
+                sset = self.ex.data.variables['side_ss%d' % internal_id][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError(
+                    "Failed to retrieve sides of side set with id {} ('{}')".format(obj_id, 'side_ss%d' % internal_id))
+        else:
+            try:
+                sset = self.ss_sides[ndx][start - 1:start + count - 1]
+            except KeyError:
+                raise KeyError(
+                    "Failed to retrieve elements of side set with id {} ('{}')".format(obj_id, 'elem_ss%d' % internal_id))
+            
+
+        return elmset, sset
+
+    def _int_get_side_set_params(self, obj_id, internal_id):
+        ndx = self.find_sideset_num(obj_id)
+        if (ndx == -1):
+            raise KeyError("Failed to retrieve elements of side set with id {} ('{}')".format(obj_id, 'elem_ss%d' % internal_id))
+
+        num_entries = self.ss_sizes[ndx]
+        num_df = self.num_dist_fact[ndx]
+        return num_entries, num_df
+
+    def _int_get_partial_side_set_df(self, obj_id, internal_id, start, count):
+        ndx = self.find_sideset_num(obj_id)
+
+        internal_id = self.orig_internal_ids[ndx]
+
+        num_sets = self.num_side_sets
+        if num_sets == 0:
+            raise KeyError("No side sets are stored in this database!")
+        if start < 1:
+            raise ValueError("Start index must be greater than 0")
+        if count < 0:
+            raise ValueError("Count must be a positive integer")
+
+        if (self.num_dist_fact[ndx] == 0):
+            warnings.warn("This database does not contain dist factors for side set {}".format(obj_id))
+            set = []
+
+        if (self.num_dist_fact[ndx] > 0 and self.ss_dist_fact[ndx] is not None):
+            set = self.ss_dist_fact[ndx][start - 1:start + count - 1]
+
+        if (self.num_dist_fact[ndx] > 0 and self.ss_dist_fact[ndx] is None): # has to be an original sideset
+            set = self.ex.data.variables['dist_fact_ss%d' % internal_id][start - 1:start + count - 1]
+
+        return set
+    def get_side_set(self, obj_id):
+        ndx = self.find_sideset_num(obj_id)
+        internal_id = self.orig_internal_ids[ndx]
+        return self._int_get_partial_side_set(obj_id, internal_id, 1, self.ss_sizes[ndx])
+    def get_side_set_df(self, obj_id):
+        ndx = self.find_sideset_num(obj_id)
+        internal_id = self.orig_internal_ids[ndx]
+        return self._int_get_partial_side_set_df(obj_id, internal_id, 1, self.num_dist_fact[ndx])
+
+
+    """
+    Writes out all variables related to sidesets to a new file. 
+    """
     def write_variables(self, data):
 
         if (self.num_ss == 0):
@@ -453,17 +861,17 @@ class SSLedger:
             
             # if None, just copy over old data, otherwise copy over new stuff
             if (self.ss_elem[i] is None):
-                data["elem_ss" + str(i+1)][:] = self.ex.get_side_set(self.ss_prop1[i])[0][:]
+                data["elem_ss" + str(i+1)][:] = self.get_side_set(self.ss_prop1[i])[0][:]
             else:
                 data["elem_ss" + str(i+1)][:] = self.ss_elem[i][:]
 
             if (self.ss_sides[i] is None):
-                data["side_ss" + str(i+1)][:] = self.ex.get_side_set(self.ss_prop1[i])[1][:]
+                data["side_ss" + str(i+1)][:] = self.get_side_set(self.ss_prop1[i])[1][:]
             else:
                 data["side_ss" + str(i+1)][:] = self.ss_sides[i][:]
             
             if (self.ss_dist_fact[i] is None and self.num_dist_fact[i] > 0):
-                data["dist_fact_ss" + str(i+1)][:] = self.ex.get_side_set_df(self.ss_prop1[i])[:]
+                data["dist_fact_ss" + str(i+1)][:] = self.get_side_set_df(self.ss_prop1[i])[:]
             elif(self.num_dist_fact[i] > 0):
                 data["dist_fact_ss" + str(i+1)][:] = self.ss_dist_fact[i][:]
 
@@ -476,6 +884,9 @@ class SSLedger:
                 else:
                     data["vals_sset_var" + str(j + 1) + "ss" + str(i + 1)][:] = self.ss_vars[i][j]
 
+    """
+    Writes all dimensions related to sidesets to a new exodus file.
+    """
     def write_dimensions(self, data):
         if (self.num_ss == 0):
             # nothing to write so done
@@ -495,6 +906,9 @@ class SSLedger:
             
 
     # (Based on find_nodeset_num in ns_ledger)
+    """
+    Find the index in the sideset ledgers arrays for a given sideset id. 
+    """
     def find_sideset_num(self, ss_id):
         ndx = -1
         # search for sideset that corresponds with given ID
@@ -509,4 +923,3 @@ class SSLedger:
             raise IndexError("Cannot find sideset with ID " + str(ss_id))
 
         return ndx
-        
