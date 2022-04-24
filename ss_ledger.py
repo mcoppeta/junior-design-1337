@@ -683,7 +683,7 @@ class SSLedger:
                 nodes_per_side = ss_nodes[1][i] # number of nodes in current side
                 flag = False # flag used to determine whether or not there is a node on side meeting criteria
                 for j in range(nodes_per_side):
-                    node_z_coord = self.ex.get_partial_coord_y(ss_nodes[0][node_ndx], 1) # z-coord of current node
+                    node_z_coord = self.ex.get_partial_coord_z(ss_nodes[0][node_ndx], 1) # z-coord of current node
                     if not flag and compare(node_z_coord[0]): # if side not yet added and z-coord meets criteria
                         flag = True # at least one node meets criteria
                         meet_criteria_elem.append(side_tuple[0])
