@@ -4,6 +4,10 @@ from netCDF4 import Dataset
 from exodusutils import util
 from exodusutils.exodus import Exodus
 from exodusutils.iterate import SampleFiles
+from exodusutils import util
+from exodusutils.iterate import SampleFiles
+from exodusutils.constants import *
+import re
 
 
 # Disables all warnings in this module
@@ -238,6 +242,30 @@ def test_write_exceptions(tmpdir):
     # Uncomment when Element Ledger bug fixes are pushed
     # exofile.write(str(tmpdir) + '\\newfile.exo')
     exofile.close()
+
+def test_new_qa_record(tmpdir):
+    exofile = Exodus('sample-files/can.ex2', 'a')
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'r')
+    original = Exodus('sample-files/can.ex2', 'r')
+
+    lastEntry = exofile.data.variables['qa_records'][-1]
+
+    lastTitle = util.lineparse(lastEntry[0])
+
+    lastVersion = util.lineparse(lastEntry[1])
+    expectedVersion = "%d.%d" % (LIB_VERSION_MAJOR, LIB_VERSION_MINOR)
+
+    lastDateForm = bool(re.match(r"[0-9][0-9]/[0-9][0-9]/[0-9][0-9]", util.lineparse(lastEntry[2])))
+    lastTimeForm = bool(re.match(r"[0-9][0-9]:[0-9][0-9]:[0-9][0-9]", util.lineparse(lastEntry[3])))
+
+    assert original.num_qa + 1 == exofile.num_qa
+    assert lastTitle == LIB_NAME
+    assert lastVersion == expectedVersion
+    assert lastDateForm
+    assert lastTimeForm
 
 
 #############################################################################
@@ -738,12 +766,155 @@ def test_var_fail_cube1ts():
 #     exofile.write(str(tmpdir) + "/add_sideset_biplane.exo")
 #     exofile.close()
 
+# def test_remove_sides_from_sideset(tmpdir):
+#     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+#     exofile.remove_sides_from_sideset([7, 8], [6, 6], 1)
+#     exofile.write(str(tmpdir) + "/add_sides_to_sideset_cubewdata.exo")
+#     exofile.close()
+
+def test_read_after_remove(tmpdir):
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.remove_sideset(2)
+    elems, sides = exofile.get_side_set(7)
+    assert np.array_equal(elems, [7, 8, 3, 4])
+    assert np.array_equal(sides, [3, 3, 3, 3])
+    exofile.close()
+
+def test_read_after_add(tmpdir):
+    # Add sideset and check
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.add_sideset([3, 4, 7, 8], [4, 4, 4, 4], 1, "BasicNew", dist_fact=[1, 2, 2, 1])
+    elems, sides = exofile.get_side_set(1)
+    dfs = exofile.get_side_set_df(1)
+    assert np.array_equal(dfs, [1, 2, 2, 1])
+    assert np.array_equal(elems, [3, 4, 7, 8])
+    assert np.array_equal(sides, [4, 4, 4, 4])
+
+
+    # Add sides to sideset and check
+    exofile.add_sides_to_sideset([3, 4, 7, 8], [3, 3, 3, 3], 1)
+    elems, sides = exofile.get_side_set(1)
+    dfs = exofile.get_side_set_df(1)
+    assert np.array_equal(dfs, [1, 2, 2, 1, 1, 1, 1, 1])
+    assert np.array_equal(elems, [3, 4, 7, 8, 3, 4, 7, 8])
+    assert np.array_equal(sides, [4, 4, 4, 4, 3, 3, 3, 3])
+    exofile.close()
+
+def test_read_after_remove_sides(tmpdir):
+    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
+    exofile.remove_sides_from_sideset([7, 5], [6, 6], 2)
+    elems, sides = exofile.get_side_set(2)
+    dfs = exofile.get_side_set_df(2)
+    assert np.array_equal(elems, [6, 8])
+    assert np.array_equal(sides, [6, 6])
+    assert np.array_equal(dfs, [1, 1, 1, 1, 1, 1, 1, 1])
+    exofile.close()
 
 
 
 
 
-    
+
+#############################################################################
+#                                                                           #
+#                            Element Tests                                  #
+#                                                                           #
+#############################################################################
+
+def test_init_elem_ledger(tmpdir):
+    exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
+    assert exofile.ledger.element_ledger
+    exofile.close()
+    exofile = Exodus('sample-files/test_ledger.ex2', 'a')
+    assert exofile.ledger.element_ledger
+    exofile.close()
+
+def test_elem_write_retain(tmpdir):
+    exofile = Exodus('sample-files/can.ex2', 'a')
+
+    with pytest.raises(AttributeError):
+        exofile.write()
+
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    written = Exodus(str(tmpdir) + '\\test.ex2', 'r')
+    original = Exodus('sample-files/can.ex2', 'r')
+
+    assert original.num_dim == written.num_dim
+    assert original.num_elem == written.num_elem
+    assert original.num_elem_blk == original.num_elem_blk
+
+def test_elem_properties(tmpdir):
+    exofile = Exodus('sample-files/can.ex2', 'a')
+
+    prop1 = exofile.ledger.get_eb_prop1()
+    assert np.array_equal(prop1, np.array([1,2]))
+
+    connect1 = exofile.ledger.get_connectX(1)
+    assert connect1.shape == (4800, 8)
+    connect1_1 = connect1[0]
+    expected = np.array([2, 43, 1724, 1683, 1, 42, 1723, 1682])
+    assert np.array_equal(connect1_1, expected)
+    connect1_4 = connect1[3]
+    expected = np.array([5, 46, 1727, 1686, 4, 45, 1726, 1685])
+    assert np.array_equal(connect1_4, expected)
+
+    connect2 = exofile.ledger.get_connectX(2)
+    assert connect2.shape == (2352, 8)
+    connect2_1 = connect2[0]
+    expected = np.array([6726, 6730, 6846, 6842, 6725, 6729, 6845, 6841])
+    assert np.array_equal(connect2_1, expected)
+    connect2_4 = connect2[3]
+    expected = np.array([6730, 6734, 6850, 6846, 6729, 6733, 6849, 6845])
+    assert np.array_equal(connect2_4, expected)
+
+    exofile.close()
+
+def test_remove_element(tmpdir):
+    exofile = Exodus('sample-files/can.ex2', 'a')
+    exofile.remove_element(1)
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    written = Exodus(str(tmpdir) + '\\test.ex2', 'a')
+    original = Exodus('sample-files/can.ex2', 'a')
+
+    assert original.num_elem - 1 == written.num_elem
+    assert original.num_elem_blk == written.num_elem_blk
+
+    with pytest.raises(KeyError):
+        assert original.ledger.element_ledger.get_element_nodes(1) == written.ledger.element_ledger.get_element_nodes(1)
+
+    written.close()
+    original.close()
+
+def test_add_element(tmpdir):
+    exofile = Exodus('sample-files/can.ex2', 'a')
+    nl = [1, 41, 6724, 6684, 42, 82, 6683, 6643]
+    exofile.add_element(1, nl)
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    written = Exodus(str(tmpdir) + '\\test.ex2', 'a')
+    original = Exodus('sample-files/can.ex2', 'a')
+    assert original.num_elem + 1 == written.num_elem
+
+def test_skin_can(tmpdir):
+    exofile = Exodus('sample-files/can.ex2', 'a')
+    exofile.skin(3312, "Mesh Skin")
+    exofile.write(str(tmpdir) + '\\test.ex2')
+    exofile.close()
+
+    written = Exodus(str(tmpdir) + '\\test.ex2', 'a')
+    original = Exodus('sample-files/can.ex2', 'a')
+
+    assert original.num_side_sets + 1 == written.num_side_sets
+
+    ss = written.get_side_set(3312)[:]
+    assert len(ss[0]) == 5584
+    assert len(ss[1]) == 5584
+
 
 
 # Below tests are based on what can be read according to current C Exodus API.

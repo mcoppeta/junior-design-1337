@@ -1,7 +1,11 @@
+import datetime
 import netCDF4 as nc
+import numpy as np
 from .ns_ledger import NSLedger
 from .ss_ledger import SSLedger
 from .elem_ledger import ElemLedger
+from .constants import *
+from . import util
 
 
 class Ledger:
@@ -140,15 +144,81 @@ class Ledger:
     def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2):
         self.sideset_ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
 
+    def num_side_sets(self):
+        return self.sideset_ledger.num_side_sets()
+
+    # return id map for sideset
+    def get_side_set_id_map(self):
+        return self.sideset_ledger.get_side_set_id_map()
+
+    def get_side_set_names(self):
+        return self.sideset_ledger.get_side_set_names()
+
+    def get_side_set_name(self, ndx):
+        return self.sideset_ledger.get_side_set_name(ndx)
+
+    # get portion of a sideset's elem and side id's
+    def _int_get_partial_side_set(self, obj_id, internal_id, start, count):
+        return self.sideset_ledger._int_get_partial_side_set(obj_id, internal_id, start, count)
+
+    def _int_get_side_set_params(self, obj_id, internal_id):
+        return self.sideset_ledger._int_get_side_set_params(obj_id, internal_id)
+
+    def _int_get_partial_side_set_df(self, obj_id, internal_id, start, count):
+        return self.sideset_ledger._int_get_partial_side_set_df(obj_id, internal_id, start, count)
+
+    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
+        self.sideset_ledger.split_sideset_x_coords(old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+
+    def split_sideset_y_coords(self, old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
+        self.sideset_ledger.split_sideset_y_coords(old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+
+    def split_sideset_z_coords(self, old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
+        self.sideset_ledger.split_sideset_z_coords(old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+
+
     # element methods
+    def num_elem(self):
+        return self.element_ledger.num_elem()
+
+    def num_elem_blocks(self):
+        return self.element_ledger.num_elem_blocks()
+
+    def num_elem_variable(self):
+        return self.element_ledger.num_elem_variable()
+
+    def get_elem_num_map(self):
+        return self.element_ledger.get_elem_num_map()
+
+    def get_eb_prop1(self):
+        return self.element_ledger.get_eb_prop1()
+
+    def get_connectX(self, id):
+        return self.element_ledger.get_connectX(id)
+
+    def get_num_elem_in_block(self, id):
+        return self.element_ledger.get_num_elem_in_block(id)
+
+    def get_num_nodes_per_el_block(self, id):
+        return self.element_ledger.get_num_nodes_per_el_block(id)
+
+    def get_elem_block_type(self, id):
+        return self.element_ledger.get_elem_block_type(id)
+
+    def get_elem_block_name(self, id):
+        return self.element_ledger.get_elem_block_name(id)
+
+    def get_elem_block_names(self):
+        return self.element_ledger.get_elem_block_names()
+
     def remove_element(self, elem_id):
         return self.element_ledger.remove_element(elem_id)
 
     def add_element(self, block_id, nodelist):
         return self.element_ledger.add_element(block_id, nodelist)
 
-    def skin_element_block(self, block_id, skin_id, skin_name):
-        unique_faces = self.element_ledger.skin_block(block_id)
+    def skin_element_block(self, block_id, skin_id, skin_name, tri='shell'):
+        unique_faces = self.element_ledger.skin_block(block_id, tri)
         el_list = []
         face_list = []
         df = []
@@ -158,10 +228,10 @@ class Ledger:
             face_list.append(f)
         self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name, df)
 
-    def skin(self, skin_id, skin_name):
-        el_list, face_list = self.element_ledger.skin()
+    def skin(self, skin_id, skin_name, tri='shell'):
+        el_list, face_list = self.element_ledger.skin(tri)
         df = []
-        self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name, df)
+        self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name)
 
 
     def write(self, path):
@@ -177,6 +247,19 @@ class Ledger:
             self.a_write(path)
 
     def w_write(self):
+        if 'len_name' not in self.ex.data.dimensions:
+            self.ex.data.createDimension('len_name', self._MAX_NAME_LENGTH + 1)
+        if 'four' not in self.ex.data.dimensions:
+            self.ex.data.createDimension('four', 4)
+
+        # QA records
+        num_qa_rec = 1
+        self.ex.data.createDimension('num_qa_rec', num_qa_rec)
+        var = self.ex.data.createVariable('qa_records', '|S1', (DIM_NUM_QA, DIM_FOUR, DIM_STRING_LENGTH))
+        qa = np.empty((num_qa_rec, 4, self.ex.max_allowed_name_length + 1), '|S1')  # add 1 for null terminator
+        qa[0] = util.generate_qa_rec(self.ex.max_string_length)
+        var[:] = qa
+
         self.nodeset_ledger.write_dimensions(self.ex.data)
         self.nodeset_ledger.write_variables(self.ex.data)
         self.sideset_ledger.write_dimensions(self.ex.data)
@@ -203,6 +286,10 @@ class Ledger:
             # ignore dimensions that will be written by elem ledger
             if dimension == "num_elem" or dimension == "num_el_blk" or dimension[:13] == "num_el_in_blk" \
                     or dimension[:14] == "num_nod_per_el" or dimension == "num_elem_var":
+                continue
+
+            # ignore for updating QA records
+            if dimension == 'num_qa_rec':
                 continue
 
             out.createDimension(dimension, old.dimensions[dimension].size)
@@ -239,6 +326,9 @@ class Ledger:
                     or var == "name_elem_var" or var[:13] == "vals_elem_var" or var == "elem_var_tab":
                 continue
 
+            if var == 'qa_records':
+                continue
+
             var_data = old[var]
 
             # variable creation data
@@ -248,6 +338,16 @@ class Ledger:
             out.createVariable(varname, datatype, dimensions)
             out[varname].setncatts(old[varname].__dict__)
             out[varname][:] = old[var][:]
+
+        
+        # QA records
+        num_qa_rec = self.ex.num_qa + 1
+        out.createDimension(DIM_NUM_QA, num_qa_rec)
+        out.createVariable(VAR_QA, '|S1', (DIM_NUM_QA, DIM_FOUR, DIM_STRING_LENGTH))
+        qa = np.empty((num_qa_rec, 4, self.ex.max_string_length + 1), '|S1')  # add 1 for null terminator
+        qa[0:self.ex.num_qa] = old.variables[VAR_QA][:]
+        qa[-1] = util.generate_qa_rec(self.ex.max_string_length)
+        out['qa_records'][:] = qa
 
         self.nodeset_ledger.write_variables(out)
         self.sideset_ledger.write_variables(out)

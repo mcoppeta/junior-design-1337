@@ -361,6 +361,9 @@ class Exodus:
     @property
     def num_elem(self):
         """Number of elements stored in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_elem()
+
         try:
             result = self.data.dimensions[DIM_NUM_ELEM].size
         except KeyError:
@@ -370,6 +373,9 @@ class Exodus:
     @property
     def num_elem_blk(self):
         """Number of element blocks stored in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_elem_blocks()
+
         try:
             result = self.data.dimensions[DIM_NUM_EB].size
         except KeyError:
@@ -391,6 +397,8 @@ class Exodus:
     @property
     def num_side_sets(self):
         """Number of side sets stored in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_side_sets()
         try:
             result = self.data.dimensions[DIM_NUM_SS].size
         except KeyError:
@@ -439,6 +447,9 @@ class Exodus:
     @property
     def num_elem_block_var(self):
         """Number of elemental variables."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_elem_variable()
+
         try:
             return self.data.dimensions[DIM_NUM_ELEM_VAR].size
         except KeyError:
@@ -557,6 +568,9 @@ class Exodus:
         Subset starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
         # Start is 1 based (>0).  start + count - 1 <= number of nodes
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_elem_num_map()[start - 1:start + count - 1]
+
         num_elem = self.num_elem
         if num_elem == 0:
             raise KeyError("Cannot retrieve a element id map if there are no elements!")
@@ -596,6 +610,8 @@ class Exodus:
 
     def get_side_set_id_map(self):
         """Returns the id map for side sets (ss_prop1)."""
+        if self.mode == 'w' or self.mode == 'a':
+            self.ledger.get_side_set_id_map()
         try:
             table = self.data.variables[VAR_SS_ID_MAP][:]
         except KeyError:
@@ -604,6 +620,9 @@ class Exodus:
 
     def get_elem_block_id_map(self):
         """Returns the id map for element blocks (eb_prop1)."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_eb_prop1()[:]
+
         try:
             table = self.data.variables[VAR_EB_ID_MAP][:]
         except KeyError:
@@ -623,7 +642,10 @@ class Exodus:
         if obj_type == NODESET:
             table = self.get_node_set_id_map()
         elif obj_type == SIDESET:
-            table = self.get_side_set_id_map()
+            if (self.mode == 'w' or self.mode == 'a'):
+                table = self.ledger.get_side_set_id_map()
+            else:
+                table = self.get_side_set_id_map()
         elif obj_type == ELEMBLOCK:
             table = self.get_elem_block_id_map()
         else:
@@ -1231,6 +1253,9 @@ class Exodus:
         :param count: number of elements
         :return: tuple containing the selected part of the side set of format: (elements, corresponding sides)
         """
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger._int_get_partial_side_set(obj_id, internal_id, start, count)
+        
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No side sets are stored in this database!")
@@ -1262,6 +1287,9 @@ class Exodus:
         :param count: number of elements
         :return: array containing the selected part of the side set distribution factors list
         """
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger._int_get_partial_side_set_df(obj_id, internal_id, start, count)
+        
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No side sets are stored in this database!")
@@ -1286,6 +1314,9 @@ class Exodus:
         :param internal_id: INTERNAL (1-based) id
         :return: (number of elements, number of distribution factors)
         """
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger._int_get_side_set_params(obj_id, internal_id)
+        
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No side sets are stored in this database!")
@@ -1710,13 +1741,21 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        if (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
+
+        if self.mode == 'w' or self.mode == 'a':
+            num_node_entry = self.ledger.get_num_nodes_per_el_block(internal_id)
+        elif (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
             num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
             num_node_entry = 0
+
         if num_node_entry > 0:
             try:
-                result = self.data.variables[VAR_CONNECT % internal_id][start - 1:start + count - 1]
+                if self.mode == 'w' or self.mode == 'a':
+                    result = self.ledger.get_connectX(internal_id)[start - 1:start + count - 1]
+                else:
+                    result = self.data.variables[VAR_CONNECT % internal_id][start - 1:start + count - 1]
+
             except KeyError:
                 raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
                                .format(obj_id, VAR_CONNECT % internal_id))
@@ -1736,15 +1775,24 @@ class Exodus:
         """
         # TODO this will be way faster with caching
         try:
-            num_entries = self.data.dimensions[DIM_NUM_EL_IN_BLK % internal_id].size
+            if self.mode == 'w' or self.mode == 'a':
+                num_entries = self.ledger.get_num_elem_in_block(internal_id)
+            else:
+                num_entries = self.data.dimensions[DIM_NUM_EL_IN_BLK % internal_id].size
         except KeyError:
             raise KeyError("Failed to retrieve number of elements in element block with id {} ('{}')"
                            .format(obj_id, DIM_NUM_EL_IN_BLK % internal_id))
-        if (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
+        
+        if self.mode == 'w' or self.mode == 'a':
+            num_node_entry = self.ledger.get_num_nodes_per_el_block(internal_id)
+        elif (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
             num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
             num_node_entry = 0
+
         try:
+            if self.mode == 'w' or self.mode == 'a':
+                topology = self.ledger.get_elem_block_type(internal_id)
             if num_node_entry > 0:
                 connect = self.data.variables[VAR_CONNECT % internal_id]
                 topology = connect.getncattr(ATTR_ELEM_TYPE)
@@ -1753,6 +1801,8 @@ class Exodus:
         except KeyError:
             raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
                            .format(obj_id, VAR_CONNECT % internal_id))
+        
+	# TODO: Add case for append mode if attributes added
         if (DIM_NUM_ATT_IN_BLK % internal_id) in self.data.dimensions:
             num_att_blk = self.data.dimensions[DIM_NUM_ATT_IN_BLK % internal_id].size
         else:
@@ -2116,12 +2166,18 @@ class Exodus:
 
     def get_elem_block_names(self):
         """Returns an array containing the names of element blocks in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_elem_block_names()
         return self._get_set_block_names(ELEMBLOCK)
 
     def get_elem_block_name(self, obj_id):
         """Returns the name of the given element block."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_elem_block_name(obj_id)
+        
         internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         names = self._get_set_block_names(ELEMBLOCK)
+
         if len(names) > 0:
             return names[internal_id - 1]
         else:
@@ -2151,6 +2207,8 @@ class Exodus:
 
     def get_side_set_name(self, obj_id):
         """Returns the name of the given side set."""
+        if self.mode == 'a' or self.mode == 'w':
+            return self.ledger.get_side_set_name(obj_id)
         internal_id = self._lookup_id(SIDESET, obj_id)
         names = self._get_set_block_names(SIDESET)
         if len(names) > 0:
@@ -2663,6 +2721,9 @@ class Exodus:
 
     # TODO remove?
     def get_nodes_in_elblock(self, id):
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_connectX(id)
+
         if "node_num_map" in self.data.variables:
             raise Exception("Using node num map")
         nodeids = self.data["connect" + str(id)]
@@ -2779,10 +2840,23 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_nodes_from_nodeset(node_ids, identifier)
 
+    """
+    Adds new sideset. Takes in element ids, side ids, id of the new sideset, and name of the new sideset. 
+    Can optionally specify distribution factor and variables. If no distribution factors are specified 
+    and they are required, placeholder 1s will be inserted. If no variables are specified and they are required, 
+    placeholder 0s will be inserted. If specifying distribution factors, they must be of size n * len(elem_ids), where
+    n is a positive integer. If specifying variables, they must be of dimensions 
+    [number of sideset variables, number of timesteps, number of sides in sideset].
+    """
+
     def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact, variables)
+
+    """
+    Removes an existing sideset. Must specify id of sideset for removal.
+    """
 
     def remove_sideset(self, ss_id):
         if self.mode != 'w' and self.mode != 'a':
@@ -2790,10 +2864,24 @@ class Exodus:
         self.ledger.remove_sideset(ss_id)
 
 
+    """
+    Adds sides to already existing sideset. Must specify the element ids of sides to add, the side ids of sides to add
+    the id of the sideset being added to, and optionally the distribution factors and variables. If no distribution 
+    factors are specified, and they are required, they will be filled with 1s. If no variables are specified, 
+    and they are required, they will be filled with 0s. If specifying distribution factors, they must be of size n * len(elem_ids), 
+    where n is a positive integer. If specifying variables, they must be of dimensions 
+    [number of sideset variables, number of timesteps, number of sides being added].
+    """
+
     def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_sides_to_sideset(elem_ids, side_ids, ss_id, dist_facts, variables)
+
+    """
+    Removes sides from the specified sideset id. Takes in element ids and their corresponding side ids, as 
+    well as the id of the sideset to remove the sides from. 
+    """
 
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
         if self.mode != 'w' and self.mode != 'a':
@@ -2804,28 +2892,70 @@ class Exodus:
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to split sideset")
         self.ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
-    
 
+    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to split sideset based on x-coord")
+        self.ledger.split_sideset_x_coords(old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+    
+    def split_sideset_y_coords(self, old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to split sideset based on y-coord")
+        self.ledger.split_sideset_y_coords(old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+
+    def split_sideset_z_coords(self, old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to split sideset based on z-coord")
+        self.ledger.split_sideset_z_coords(old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+    
     def add_element(self, block_id, nodelist):
+        """
+        Returns the id of the newly created element if successful
+
+        :param block_id: (user-defined) ID for new element
+        :param nodelist: list of node IDs that make up the new element
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         return self.ledger.add_element(block_id, nodelist)
 
 
     def remove_element(self, elem_id):
+        """
+        Returns the removed element (the list of nodes)
+
+        :param elem_id: ID of the element to be removed
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         return self.ledger.remove_element(elem_id)
 
-    def skin_element_block(self, block_id, skin_id, skin_name):
-        if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to skin element into new sideset")
-        self.ledger.skin_element_block(block_id, skin_id, skin_name)
+    def skin_element_block(self, block_id, skin_id, skin_name, tri='shell'):
+        """
+        Skins a particular element block. Adds a corresponding sideset of the external faces
 
-    def skin(self, skin_id, skin_name):
+        :param block_id: ID of the block to be skinned
+        :param skin_id: (user-defined) ID of the new sideset
+        :param skin_name: (user-defined) name of the new sideset
+        :param tri: indicates if TRI prefix corresponds to tri 'tri' or trishell 'shell'
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to skin element into new sideset")
-        self.ledger.skin(skin_id, skin_name)
+        self.ledger.skin_element_block(block_id, skin_id, skin_name, tri)
+
+    def skin(self, skin_id, skin_name, tri='shell'):
+        """
+        Skins the entire mesh (all element blocks).
+        Adds a single corresponding sideset of the external faces
+
+        :param block_id: ID of the block to be skinned
+        :param skin_id: (user-defined) ID of the new sideset
+        :param skin_name: (user-defined) name of the new sideset
+        :param tri: indicates if TRI prefix corresponds to tri 'tri' or trishell 'shell'
+        """
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to skin element into new sideset")
+        self.ledger.skin(skin_id, skin_name, tri)
         
     def write(self, path=None):
         if self.mode != 'w' and self.mode != 'a':
