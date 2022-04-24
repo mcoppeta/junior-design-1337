@@ -1802,7 +1802,7 @@ class Exodus:
             raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
                            .format(obj_id, VAR_CONNECT % internal_id))
         
-	# TODO: Add case for append mode if attributes added
+    # TODO: Add case for append mode if attributes added
         if (DIM_NUM_ATT_IN_BLK % internal_id) in self.data.dimensions:
             num_att_blk = self.data.dimensions[DIM_NUM_ATT_IN_BLK % internal_id].size
         else:
@@ -2805,37 +2805,74 @@ class Exodus:
     #                                                              #
     ################################################################
 
-    def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
+    def add_nodeset(self, node_ids, node_set_id, node_set_name=""):
+        """ Add node set to exodus file
+        Args:
+            node_ids: the node IDs that will be in the new node set
+            node_set_id: the id of the new node set
+            node_set_name: the name of the new node set. Defaults to NodeSetN
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add node set")
-        self.ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
+        self.ledger.add_nodeset(node_ids, node_set_id, node_set_name)
 
     def remove_nodeset(self, identifier):
+        """ Remove node set from exodus file
+        Args:
+            identifier: the node set to remove. Can be node set ID or node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to remove node set")
         self.ledger.remove_nodeset(identifier)
 
-    def merge_nodeset(self, new_id, ns1, ns2, delete=True):
+    def merge_nodeset(self, new_id: int, ns1: int, ns2: int, delete: bool = True):
+        """ Merge 2 node sets
+        Args:
+            new_id: the ID of the new node set
+            ns1: the ID of the first node set
+            ns2: the ID of the second node set
+            delete: whether or not to delete the original node sets. Defaults to True
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to merge node sets")
         self.ledger.merge_nodesets(new_id, ns1, ns2, delete)
 
-    def add_node_to_nodeset(self, node_id, identifier):
+    def add_node_to_nodeset(self, node_id: int, identifier):
+        """ add a node to an existing node set
+        Args:
+            node_id: the node to add to the existing node set
+            identifier: the node set being added to. Can be node set ID or node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add node to node set")
         self.ledger.add_node_to_nodeset(node_id, identifier)
 
     def add_nodes_to_nodeset(self, node_ids, identifier):
+        """ Add multiple nodes to an existing node set
+        Args:
+            node_ids: an array of nodes to add to the existing node set
+            identifier: the node set being added to. Can be node set ID or node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodes to node set")
         self.ledger.add_nodes_to_nodeset(node_ids, identifier)
 
-    def remove_node_from_nodeset(self, node_id, identifier):
+    def remove_node_from_nodeset(self, node_id: int, identifier):
+        """ Remove given nodes from a specified node set
+        Args:
+            node_ids: the ids of the nodes to remove from the given node set
+            identifier: Specifies the node set from which nodes are being removed. Can be node set ID or node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to remove node from node set")
         self.ledger.remove_node_from_nodeset(node_id, identifier)
 
     def remove_nodes_from_nodeset(self, node_ids, identifier):
+        """ Remove given nodes from a specified node set
+        Args:
+            node_ids: the ids of the nodes to remove from the given node set
+            identifier: Specifies the node set from which nodes are being removed. Can be node set ID or node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to remove nodes from node set")
         self.ledger.remove_nodes_from_nodeset(node_ids, identifier)
@@ -3000,6 +3037,7 @@ class Exodus:
         self.ledger.skin(skin_id, skin_name, tri)
         
     def write(self, path=None):
+        """ Write out the exodus object to a file. New path must be specified while in write mode """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to write")
         elif self.mode == 'a' and path is None:
