@@ -2840,50 +2840,69 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to remove nodes from node set")
         self.ledger.remove_nodes_from_nodeset(node_ids, identifier)
 
-    """
-    Adds new sideset. Takes in element ids, side ids, id of the new sideset, and name of the new sideset. 
-    Can optionally specify distribution factor and variables. If no distribution factors are specified 
-    and they are required, placeholder 1s will be inserted. If no variables are specified and they are required, 
-    placeholder 0s will be inserted. If specifying distribution factors, they must be of size n * len(elem_ids), where
-    n is a positive integer. If specifying variables, they must be of dimensions 
-    [number of sideset variables, number of timesteps, number of sides in sideset].
-    """
 
     def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
+        """
+        Adds new sideset. Takes in element ids, side ids, id of the new sideset, and name of the new sideset. 
+        Can optionally specify distribution factor and variables. If no distribution factors are specified 
+        and they are required, placeholder 1s will be inserted. If no variables are specified and they are required, 
+        placeholder 0s will be inserted.
+
+        :param elem_ids: The element IDs of the sides
+        :param side_ids: The side numbers
+        :param ss_id: The ID of the new sideset
+        :param ss_name: The name of the new sideset
+        :param dist_fact: OPTIONAL, if specified needs to be of length n * len(elem_ids)
+        :param variables: OPTIONAL, if specified needs to be of shape [num sideset variables, num timesteps, num sides in sideset]
+        """
+
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add side set")
         self.ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact, variables)
 
-    """
-    Removes an existing sideset. Must specify id of sideset for removal.
-    """
 
     def remove_sideset(self, ss_id):
+        """
+        Removes an existing sideset. Must specify id of sideset for removal.
+
+        :param ss_id: ID of the sideset to remove
+        """
+
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to remove side set")
         self.ledger.remove_sideset(ss_id)
 
 
-    """
-    Adds sides to already existing sideset. Must specify the element ids of sides to add, the side ids of sides to add
-    the id of the sideset being added to, and optionally the distribution factors and variables. If no distribution 
-    factors are specified, and they are required, they will be filled with 1s. If no variables are specified, 
-    and they are required, they will be filled with 0s. If specifying distribution factors, they must be of size n * len(elem_ids), 
-    where n is a positive integer. If specifying variables, they must be of dimensions 
-    [number of sideset variables, number of timesteps, number of sides being added].
-    """
-
     def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
+        
+        """
+        Adds sides to already existing sideset. Must specify the element ids of sides to add, the side ids of sides to add
+        the id of the sideset being added to, and optionally the distribution factors and variables. If no distribution 
+        factors are specified, and they are required, they will be filled with 1s. If no variables are specified, 
+        and they are required, they will be filled with 0s.
+
+        :param elem_ids: The element IDs of the sides
+        :param side_ids: The side numbers
+        :param ss_id: The ID of the new sideset
+        :param ss_name: The name of the new sideset
+        :param dist_fact: OPTIONAL, if specified needs to be of length n * len(elem_ids), where n is the current number of distribution factors
+        per side for this sideset
+        :param variables: OPTIONAL, if specified needs to be of shape [num sideset variables, num timesteps, num sides being added]
+        """ 
+
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add sides to side set")
         self.ledger.add_sides_to_sideset(elem_ids, side_ids, ss_id, dist_facts, variables)
 
-    """
-    Removes sides from the specified sideset id. Takes in element ids and their corresponding side ids, as 
-    well as the id of the sideset to remove the sides from. 
-    """
 
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
+        """
+        Removes sides from the sideset with the specified ss_id. 
+
+        :param elem_ids: The element IDs of the sides to remove
+        :param side_ids: The side numbers of the sides to remove
+        :param ss_id: The ID of the sideset to remove sides from
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to remove sides from side set")
         self.ledger.remove_sides_from_sideset(elem_ids, side_ids, ss_id)
