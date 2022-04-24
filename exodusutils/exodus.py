@@ -1,5 +1,6 @@
 """
-# Heading
+This module contains the `Exodus` class that is used to open Exodus II files. The `Exodus` class contains many functions
+for reading from and writing to the associated Exodus II file as well as determining the difference between two files.
 """
 
 import builtins
@@ -2618,7 +2619,16 @@ class Exodus:
 
     # endregion
 
-    @property
+    def close(self):
+        """Close the Exodus II file."""
+        self.data.close()
+
+    ########################################################################
+    #                                                                      #
+    #                Data Processing Helper Utilities                      #
+    #                                                                      #
+    ########################################################################
+
     def time_steps(self):
         """Returns list of the time steps, 0-indexed"""
         return [*range(self.num_time_steps)]
@@ -2630,10 +2640,7 @@ class Exodus:
                 return index
         return None
 
-    def close(self):
-        """Close the Exodus II file."""
-        self.data.close()
-
+    # TODO remove?
     def set_nodeset(self, node_set_id, node_ids):
         ndx = node_set_id - 1
         if "ns_prop1" in self.data.variables:
@@ -2654,6 +2661,7 @@ class Exodus:
             return
         nodeset[:] = node_ids
 
+    # TODO remove?
     def get_nodes_in_elblock(self, id):
         if "node_num_map" in self.data.variables:
             raise Exception("Using node num map")
@@ -2661,6 +2669,12 @@ class Exodus:
         # flatten it into 1d
         nodeids = nodeids[:].flatten()
         return nodeids
+
+    ########################################################################
+    #                                                                      #
+    #                           Diff Functions                             #
+    #                                                                      #
+    ########################################################################
 
     def diff(self, other):
         # # Nodesets
