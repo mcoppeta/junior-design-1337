@@ -28,17 +28,17 @@ class Ledger:
         """ Returns the number of nodesets present in the file"""
         return self.nodeset_ledger.num_node_sets()
 
-    def get_node_set(self, nodeset_id):
-        """Returns an array of the nodes contained in the node set with given ID."""
-        return self.nodeset_ledger.get_node_set(nodeset_id)
+    def get_node_set(self, identifier):
+        """Returns an array of the nodes contained in the node set with given identifier"""
+        return self.nodeset_ledger.get_node_set(identifier)
 
-    def get_partial_node_set(self, nodeset_id, start, count):
+    def get_partial_node_set(self, identifier, start, count):
         """
-        Returns a partial array of the nodes contained in the node set with given ID.
+        Returns a partial array of the nodes contained in the node set with given identifier
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
-        return self.nodeset_ledger.get_partial_node_set(nodeset_id, start, count)
+        return self.nodeset_ledger.get_partial_node_set(identifier, start, count)
 
     def get_node_set_name(self, nodeset_id):
         """
@@ -69,13 +69,13 @@ class Ledger:
         """
         self.nodeset_ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
 
-    def remove_nodeset(self, nodeset_id):
+    def remove_nodeset(self, identifier):
         """
         Removes given nodeset from the Exodus file
-        :param nodeset_id: the id of the nodeset being removed
+        :param identifier: the identifier of the nodeset being removed
         :return: None
         """
-        self.nodeset_ledger.remove_nodeset(nodeset_id)
+        self.nodeset_ledger.remove_nodeset(identifier)
 
     def merge_nodesets(self, new_id, ns1, ns2, delete=True):
         """
@@ -88,41 +88,41 @@ class Ledger:
         """
         self.nodeset_ledger.merge_nodesets(new_id, ns1, ns2, delete)
 
-    def add_node_to_nodeset(self, node_id, nodeset_id):
+    def add_node_to_nodeset(self, node_id, identifier):
         """
         Add one node to the specified nodeset
         :param node_id: the node being added to the nodeset
         :param nodeset_id: the nodeset the node will be added to
         :return: None
         """
-        self.nodeset_ledger.add_node_to_nodeset(node_id, nodeset_id)
+        self.nodeset_ledger.add_node_to_nodeset(node_id, identifier)
 
-    def add_nodes_to_nodeset(self, node_ids, nodeset_id):
+    def add_nodes_to_nodeset(self, node_ids, identifier):
         """
         Add many nodes to the specified nodeset
         :param node_ids: the nodes being added to the nodeset (List-like)
         :param nodeset_id: the nodeset being added to
         :return: None
         """
-        self.nodeset_ledger.add_nodes_to_nodeset(node_ids, nodeset_id)
+        self.nodeset_ledger.add_nodes_to_nodeset(node_ids, identifier)
 
-    def remove_node_from_nodeset(self, node_id, nodeset_id):
+    def remove_node_from_nodeset(self, node_id, identifier):
         """
         Remove single node from a specified nodeset
         :param node_id: the node being removed from the nodeset
         :param nodeset_id: the nodeset being removed from
         :return: None
         """
-        self.nodeset_ledger.remove_node_from_nodeset(node_id, nodeset_id)
+        self.nodeset_ledger.remove_node_from_nodeset(node_id, identifier)
 
-    def remove_nodes_from_nodeset(self, node_ids, nodeset_id):
+    def remove_nodes_from_nodeset(self, node_ids, identifier):
         """
         Remove many nodes from a specified nodeset
         :param node_ids: the nodes being removed from the nodeset (List-like)
         :param nodeset_id: the nodeset being removed from
         :return: None
         """
-        self.nodeset_ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
+        self.nodeset_ledger.remove_nodes_from_nodeset(node_ids, identifier)
 
     # sideset methods
     def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
@@ -163,6 +163,16 @@ class Ledger:
     def _int_get_partial_side_set_df(self, obj_id, internal_id, start, count):
         return self.sideset_ledger._int_get_partial_side_set_df(obj_id, internal_id, start, count)
 
+    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
+        self.sideset_ledger.split_sideset_x_coords(old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+
+    def split_sideset_y_coords(self, old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
+        self.sideset_ledger.split_sideset_y_coords(old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+
+    def split_sideset_z_coords(self, old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
+        self.sideset_ledger.split_sideset_z_coords(old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+
+
     # element methods
     def remove_element(self, elem_id):
         return self.element_ledger.remove_element(elem_id)
@@ -179,6 +189,11 @@ class Ledger:
             e, f = i
             el_list.append(e)
             face_list.append(f)
+        self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name, df)
+
+    def skin(self, skin_id, skin_name):
+        el_list, face_list = self.element_ledger.skin()
+        df = []
         self.sideset_ledger.add_sideset(el_list, face_list, skin_id, skin_name, df)
 
 
@@ -199,10 +214,11 @@ class Ledger:
         self.nodeset_ledger.write_variables(self.ex.data)
         self.sideset_ledger.write_dimensions(self.ex.data)
         self.sideset_ledger.write_variables(self.ex.data)
-        self.element_ledger.write(self.ex.data)
+        self.element_ledger.write_dimensions(self.ex.data)
+        self.element_ledger.write_variables(self.ex.data)
 
     def a_write(self, path):
-        out = nc.Dataset(path, "w", True, format="NETCDF4")
+        out = nc.Dataset(path, "w", clobber=False, format="NETCDF4")
         old = self.ex.data
 
         out.setncatts(old.__dict__)
@@ -235,6 +251,7 @@ class Ledger:
 
         self.nodeset_ledger.write_dimensions(out)
         self.sideset_ledger.write_dimensions(out)
+        self.element_ledger.write_dimensions(out)
 
         # copy variables
         for var in old.variables:
@@ -267,5 +284,5 @@ class Ledger:
 
         self.nodeset_ledger.write_variables(out)
         self.sideset_ledger.write_variables(out)
-        self.element_ledger.write(out)
+        self.element_ledger.write_variables(out)
         out.close()

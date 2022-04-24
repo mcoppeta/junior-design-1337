@@ -1,8 +1,27 @@
+import builtins
 import warnings
 import netCDF4 as nc
 import numpy
+from typing import Tuple
 from ledger import Ledger
 import util
+from constants import *
+from dataclasses import dataclass
+
+
+@dataclass
+class ElemBlockParam:
+    """Stores data used to create a side set node count list."""
+    # Adapted from exodusII_int.h on SEACAS
+    elem_type_str: str
+    elem_blk_id: numpy.int64
+    num_elem_in_blk: numpy.int64
+    num_nodes_per_elem: int
+    num_sides: int
+    num_nodes_per_side: numpy.ndarray
+    num_attr: int
+    elem_ctr: numpy.int64
+    elem_type_val: ElementTopography
 
 
 class Exodus:
@@ -19,7 +38,7 @@ class Exodus:
     _EXODUS_VERSION = 7.22
 
     # Should creating a new file (mode 'w') be a function on its own?
-    def __init__(self, path, mode, shared=False, clobber=False, format='EX_NETCDF4', word_size=4):
+    def __init__(self, path, mode, shared=False, format='EX_NETCDF4', word_size=4):
         # clobber and format and word_size only apply to mode w
         if mode not in ['r', 'w', 'a']:
             raise ValueError("mode must be 'w', 'r', or 'a', got '{}'".format(mode))
@@ -27,31 +46,38 @@ class Exodus:
             raise ValueError("invalid file format: '{}'".format(format))
         if word_size not in [4, 8]:
             raise ValueError("word_size must be 4 or 8 bytes, {} is not supported".format(word_size))
-        # if path.split(".")[-1] not in ['e', 'ex2']:
-        #     raise ValueError("file must be an exodus file with extension .e or .ex2")
         nc_format = Exodus._FORMAT_MAP[format]
+
+        self.mode = mode
+        self.path = path
+
+        # file should never actually be opened in append mode
+        # if append mode is specified, open file in read mode and write out changes to separate file
+        if mode == 'a':
+            mode = 'r'
+
         # Sets shared mode if the user asked for it. I have no idea what this does :)
         if shared:
             smode = mode + 's'
         else:
             smode = mode
         try:
-            self.data = nc.Dataset(path, smode, clobber, format=nc_format)
+            self.data = nc.Dataset(path, smode, clobber=False, format=nc_format)
         except FileNotFoundError:
             raise FileNotFoundError("file '{}' does not exist".format(path)) from None
         except PermissionError:
             raise PermissionError("You do not have access to '{}'".format(path)) from None
         # TODO this can actually hide some errors which is bad. This check should be done explicitly
         except OSError:
-            raise OSError("file '{}' exists, but clobber is set to False".format(path)) from None
+            raise OSError("file '{}' already exists".format(path)) from None
 
-        self.mode = mode
-        self.path = path
-        self.clobber = clobber
 
-        if mode == 'w' or mode == 'a':
+
+        if self.mode == 'w':
             # This is important according to ex_open.c
             self.data.set_fill_off()
+
+        if self.mode == 'a' or self.mode == 'w':
             self.ledger = Ledger(self)
 
         # save path variable for future use
@@ -155,7 +181,7 @@ class Exodus:
     def title(self):
         """The database title."""
         try:
-            return self.data.getncattr('title')
+            return self.data.getncattr(ATT_TITLE)
         except AttributeError:
             AttributeError("Database title could not be found")
 
@@ -163,9 +189,9 @@ class Exodus:
     def max_allowed_name_length(self):
         """The maximum allowed length for variable/dimension/attribute names in this database."""
         max_name_len = Exodus._MAX_NAME_LENGTH
-        if 'len_name' in self.data.dimensions:
+        if DIM_NAME_LENGTH in self.data.dimensions:
             # Subtract 1 because in C an extra null character is added for C reasons
-            max_name_len = self.data.dimensions['len_name'].size - 1
+            max_name_len = self.data.dimensions[DIM_NAME_LENGTH].size - 1
         return max_name_len
 
     @property
@@ -173,20 +199,40 @@ class Exodus:
         """The maximum used length for variable/dimension/attribute names in this database."""
         # 32 is the default size consistent with other databases
         max_used_name_len = 32
-        if 'maximum_name_length' in self.data.ncattrs():
+        if ATT_MAX_NAME_LENGTH in self.data.ncattrs():
             # The length does not include the added null character from C
-            max_used_name_len = self.data.getncattr('maximum_name_length')
+            max_used_name_len = self.data.getncattr(ATT_MAX_NAME_LENGTH)
         return max_used_name_len
+
+    @property
+    def max_string_length(self):
+        """Maximum QA record string length."""
+        # See ex_put_qa.c @ line 119. This record is created and used when adding QA records
+        max_str_len = Exodus._MAX_STR_LENGTH
+        if DIM_STRING_LENGTH in self.data.dimensions:
+            # Subtract 1 because in C an extra character is added for C reasons
+            max_str_len = self.data.dimensions[DIM_STRING_LENGTH].size - 1
+        return max_str_len
+
+    @property
+    def max_line_length(self):
+        """Maximum info record line length."""
+        # See ex_put_info.c @ line 121. This record is created and used when adding info records
+        max_line_len = Exodus._MAX_LINE_LENGTH
+        if DIM_LINE_LENGTH in self.data.dimensions:
+            # Subtract 1 because in C an extra character is added for C reasons
+            max_line_len = self.data.dimensions[DIM_LINE_LENGTH].size - 1
+        return max_line_len
 
     @property
     def api_version(self):
         """The Exodus API version this database was built with."""
         try:
-            result = self.data.getncattr('api_version')
+            result = self.data.getncattr(ATT_API_VER)
         except AttributeError:
             # Try the old way of spelling it
             try:
-                result = self.data.getncattr('api version')
+                result = self.data.getncattr(ATT_API_VER_OLD)
             except AttributeError:
                 raise AttributeError("Exodus API version could not be found")
         return result
@@ -195,157 +241,9 @@ class Exodus:
     def version(self):
         """The Exodus version this database uses."""
         try:
-            return self.data.getncattr('version')
+            return self.data.getncattr(ATT_VERSION)
         except AttributeError:
             raise AttributeError("Exodus database version could not be found")
-
-    @property
-    def num_qa(self):
-        """Number of QA records."""
-        try:
-            result = self.data.dimensions['num_qa_rec'].size
-        except KeyError:
-            result = 0
-        return result
-
-    @property
-    def num_info(self):
-        """Number of info records."""
-        try:
-            result = self.data.dimensions['num_info'].size
-        except KeyError:
-            result = 0
-        return result
-
-    @property
-    def num_dim(self):
-        """Number of dimensions (coordinate axes) used in the model."""
-        try:
-            return self.data.dimensions['num_dim'].size
-        except KeyError:
-            raise KeyError("Database dimensionality could not be found")
-
-    @property
-    def num_nodes(self):
-        """Number of nodes stored in this database."""
-        try:
-            result = self.data.dimensions['num_nodes'].size
-        except KeyError:
-            # This and following functions don't actually error in C, they return 0. I assume there's a good reason.
-            result = 0
-        return result
-
-    @property
-    def num_elem(self):
-        """Number of elements stored in this database."""
-        try:
-            result = self.data.dimensions['num_elem'].size
-        except KeyError:
-            result = 0
-        return result
-
-    @property
-    def num_elem_blk(self):
-        """Number of element blocks stored in this database."""
-        try:
-            result = self.data.dimensions['num_el_blk'].size
-        except KeyError:
-            result = 0
-        return result
-
-    @property
-    def num_node_sets(self):
-        """Number of node sets stored in this database."""
-        if self.mode == 'w' or self.mode == 'a':
-            return self.ledger.num_node_sets()
-
-        try:
-            result = self.data.dimensions['num_node_sets'].size
-        except KeyError:
-            result = 0
-        return result
-
-    @property
-    def num_side_sets(self):
-        """Number of side sets stored in this database."""
-        if self.mode == 'w' or self.mode == 'a':
-            return self.ledger.num_side_sets()
-        try:
-            result = self.data.dimensions['num_side_sets'].size
-        except KeyError:
-            result = 0
-        return result
-
-    @property
-    def num_time_steps(self):
-        """Number of time steps stored in this database."""
-        try:
-            return self.data.dimensions['time_step'].size
-        except KeyError:
-            raise KeyError("Number of database time steps could not be found")
-
-    # TODO Similar to above, all of the _PROP functions (ctrl+f ex_get_num_props)
-
-    # Are these two functions below for order maps?
-    # These may not be supported by our library anyway.
-
-    # Same as C
-    @property
-    def num_elem_map(self):
-        try:
-            result = self.data.dimensions['num_elem_maps'].size
-        except KeyError:
-            result = 0
-        return result
-
-    # Same as C
-    @property
-    def num_node_map(self):
-        try:
-            result = self.data.dimensions['num_node_maps'].size
-        except KeyError:
-            result = 0
-        return result
-
-    @property
-    def num_global_var(self):
-        """Number of global variables."""
-        try:
-            return self.data.dimensions['num_glo_var'].size
-        except KeyError:
-            raise KeyError("Number of global variables could not be found")
-
-    @property
-    def num_node_var(self):
-        """Number of nodal variables."""
-        try:
-            return self.data.dimensions['num_nod_var'].size
-        except KeyError:
-            raise KeyError("Number of nodal variables could not be found")
-
-    @property
-    def num_elem_block_var(self):
-        """Number of elemental variables."""
-        try:
-            return self.data.dimensions['num_elem_var'].size
-        except KeyError:
-            raise KeyError("Number of element block variables could not be found")
-
-    @property
-    def num_node_set_var(self):
-        """Number of node set variables."""
-        try:
-            return self.data.dimensions['num_nset_var'].size
-        except KeyError:
-            raise KeyError("Number of node set variables could not be found")
-
-    @property
-    def num_side_set_var(self):
-        """Number of side set variables."""
-        try:
-            return self.data.dimensions['num_sset_var'].size
-        except KeyError:
-            raise KeyError("Number of side set variables could not be found")
 
     @property
     def large_model(self):
@@ -361,10 +259,9 @@ class Exodus:
         # "Basically, the difference is whether the coordinates and nodal variables are stored in a blob (xyz components
         # together) or as a variable per component per nodal_variable."
         # This is important for coordinate getter functions
-        if 'file_size' in self.data.ncattrs():
-            return self.data.getncattr('file_size')
+        if ATT_FILE_SIZE in self.data.ncattrs():
+            return self.data.getncattr(ATT_FILE_SIZE)
         else:
-            # return 1 if self.data.data_model == 'NETCDF3_64BIT_OFFSET' else 0
             return 0
             # No warning is raised because older files just don't have this
 
@@ -378,8 +275,8 @@ class Exodus:
         :return: 1 if 64-bit integers are supported, 0 otherwise
         """
         # Determines whether the file uses int64s
-        if 'int64_status' in self.data.ncattrs():
-            return self.data.getncattr('int64_status')
+        if ATT_64BIT_INT in self.data.ncattrs():
+            return self.data.getncattr(ATT_64BIT_INT)
         else:
             return 1 if self.data.data_model == 'NETCDF3_64BIT_DATA' else 0
             # No warning is raised because older files just don't have this
@@ -394,38 +291,154 @@ class Exodus:
         :return: floating point word size
         """
         try:
-            result = self.data.getncattr('floating_point_word_size')
+            result = self.data.getncattr(ATT_WORD_SIZE)
         except AttributeError:
             try:
-                result = self.data.getncattr('floating point word size')
+                result = self.data.getncattr(ATT_WORD_SIZE_OLD)
             except AttributeError:
                 # This should NEVER happen, but here to be safe
                 raise AttributeError("Exodus database floating point word size could not be found")
         return result
 
-    # Below are accessors for some data records that the C library doesn't seem to have
-    # max_string/max_line_length are probably only useful on writing qa/info records. We can keep these for now but
-    # delete them later once we determine they're actually useless
-
-    # NOT IN C
     @property
-    def max_string_length(self):
-        # See ex_put_qa.c @ line 119. This record is created and used when adding QA records
-        max_str_len = Exodus._MAX_STR_LENGTH
-        if 'len_string' in self.data.dimensions:
-            # Subtract 1 because in C an extra character is added for C reasons
-            max_str_len = self.data.dimensions['len_string'].size - 1
-        return max_str_len
+    def num_qa(self):
+        """Number of QA records."""
+        try:
+            result = self.data.dimensions[DIM_NUM_QA].size
+        except KeyError:
+            result = 0
+        return result
 
-    # NOT IN C
     @property
-    def max_line_length(self):
-        # See ex_put_info.c @ line 121. This record is created and used when adding info records
-        max_line_len = Exodus._MAX_LINE_LENGTH
-        if 'len_line' in self.data.dimensions:
-            # Subtract 1 because in C an extra character is added for C reasons
-            max_line_len = self.data.dimensions['len_line'].size - 1
-        return max_line_len
+    def num_info(self):
+        """Number of info records."""
+        try:
+            result = self.data.dimensions[DIM_NUM_INFO].size
+        except KeyError:
+            result = 0
+        return result
+
+    @property
+    def num_dim(self):
+        """Number of dimensions (coordinate axes) used in the model."""
+        try:
+            return self.data.dimensions[DIM_NUM_DIM].size
+        except KeyError:
+            raise KeyError("Database dimensionality could not be found")
+
+    @property
+    def num_nodes(self):
+        """Number of nodes stored in this database."""
+        try:
+            result = self.data.dimensions[DIM_NUM_NODES].size
+        except KeyError:
+            # This and following functions don't actually error in C, they return 0. I assume there's a good reason.
+            result = 0
+        return result
+
+    @property
+    def num_elem(self):
+        """Number of elements stored in this database."""
+        try:
+            result = self.data.dimensions[DIM_NUM_ELEM].size
+        except KeyError:
+            result = 0
+        return result
+
+    @property
+    def num_elem_blk(self):
+        """Number of element blocks stored in this database."""
+        try:
+            result = self.data.dimensions[DIM_NUM_EB].size
+        except KeyError:
+            result = 0
+        return result
+
+    @property
+    def num_node_sets(self):
+        """Number of node sets stored in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_node_sets()
+
+        try:
+            result = self.data.dimensions[DIM_NUM_NS].size
+        except KeyError:
+            result = 0
+        return result
+
+    @property
+    def num_side_sets(self):
+        """Number of side sets stored in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_side_sets()
+        try:
+            result = self.data.dimensions[DIM_NUM_SS].size
+        except KeyError:
+            result = 0
+        return result
+
+    @property
+    def num_time_steps(self):
+        """Number of time steps stored in this database."""
+        try:
+            return self.data.dimensions[DIM_NUM_TIME_STEP].size
+        except KeyError:
+            raise KeyError("Number of database time steps could not be found")
+
+    @property
+    def num_elem_block_prop(self):
+        """Number of element block properties in this database."""
+        return self._get_num_object_properties(VAR_EB_PROP)
+
+    @property
+    def num_node_set_prop(self):
+        """Number of node set properties in this database."""
+        return self._get_num_object_properties(VAR_NS_PROP)
+
+    @property
+    def num_side_set_prop(self):
+        """Number of side set properties in this database."""
+        return self._get_num_object_properties(VAR_SS_PROP)
+
+    @property
+    def num_global_var(self):
+        """Number of global variables."""
+        try:
+            return self.data.dimensions[DIM_NUM_GLO_VAR].size
+        except KeyError:
+            return 0
+
+    @property
+    def num_node_var(self):
+        """Number of nodal variables."""
+        try:
+            return self.data.dimensions[DIM_NUM_NOD_VAR].size
+        except KeyError:
+            return 0
+
+    @property
+    def num_elem_block_var(self):
+        """Number of elemental variables."""
+        try:
+            return self.data.dimensions[DIM_NUM_ELEM_VAR].size
+        except KeyError:
+            return 0
+
+    @property
+    def num_node_set_var(self):
+        """Number of node set variables."""
+        try:
+            return self.data.dimensions[DIM_NUM_NS_VAR].size
+        except KeyError:
+            return 0
+
+    @property
+    def num_side_set_var(self):
+        """Number of side set variables."""
+        try:
+            return self.data.dimensions[DIM_NUM_SS_VAR].size
+        except KeyError:
+            return 0
 
     # endregion
 
@@ -438,32 +451,51 @@ class Exodus:
     ##############
 
     def get_elem_order_map(self):
-        """Returns the element order map for this database."""
+        """Returns the optional element order map for this database."""
         num_elem = self.num_elem
         if num_elem == 0:
             warnings.warn("Cannot retrieve an element order map if there are no elements!")
             return
-        if 'elem_map' not in self.data.variables:
+        if VAR_ELEM_ORDER_MAP not in self.data.variables:
             # Return a default array from 1 to the number of elements
             warnings.warn("There is no element order map in this database!")
             return numpy.arange(1, num_elem + 1, dtype=self.int)
-        return self.data.variables['elem_map'][:]
+        return self.data.variables[VAR_ELEM_ORDER_MAP][:]
+
+    # OK so we have two types of maps on the database: ID maps & ORDER maps (also called NUMBER maps).
+    # ID maps used to be called number maps and number maps used to be called order maps, which is super confusing.
+    # This library supports the classic element order map (as defined in Exodus II API documentation), but does not
+    # support the new 'number maps' that the SEACAS C library has support for.
 
     ###########
     # ID maps #
     ###########
 
-    # Nodes and elements have IDs and internal values
-    # As a programmer, when I call methods I pass in the internal value, which
-    # is some contiguous number. Usually I identify stuff with their IDs though.
-    # Internally, the method I call understands the internal value.
-    # Say I have 1 element in my file with ID 100. The ID is 100, the internal
-    # value is 1. In the connectivity array, '1' refers to this element. As a
-    # backend person, I need to subtract 1 to index on this internal value.
+    # Below is an explanation of entity IDs in lieu of a proper one in any official documentation.
+    # Nodes and elements have two IDs: an internal ID used by Exodus and all Exodus libraries, and a user-defined ID
+    # used by analysts interacting with the database. To translate user-defined IDs to internal IDs, Exodus files store
+    # an optional node ID map and element ID map. If they are not defined, user-defined IDs = internal IDs. This map
+    # stores the user-defined ID for an entity at the index internal ID-1. We subtract 1 from the internal ID because
+    # internal IDs are 1-based, meaning they start counting up from 1, not 0!
+    # When working with element connectivity lists, we have to manually calculate the internal ID of each element since
+    # connectivity lists do not store element IDs, only their constituent nodes.
+    # The general formula to get the internal ID of the element at index i of element block n is as follows:
+    # offset = sum(num_elem_in_block(1), num_elem_in_block(2), ..., num_elem_in_block(n - 1);
+    # internal_id = offset + i + 1;
+    # Example: EB1 has 7 elements, EB2 has 10 elements. The internal ID of the 4th element in EB2 is 7 + 3 + 1
+
     def get_node_id_map(self):
         """Return the node ID map for this database."""
         num_nodes = self.num_nodes
         return self.get_partial_node_id_map(1, num_nodes)
+
+    def get_reverse_node_id_dict(self):
+        """Returns a dictionary with user-defined IDs as the keys and internal IDs as the values."""
+        nim = self.get_node_id_map()
+        u2i_map = {}
+        for i in range(self.num_nodes):
+            u2i_map[nim[i]] = i + 1
+        return u2i_map
 
     def get_partial_node_id_map(self, start, count):
         """
@@ -479,16 +511,24 @@ class Exodus:
             raise ValueError("start index must be greater than 0")
         if start + count - 1 > num_nodes:
             raise ValueError("start index + node count is larger than the total number of nodes")
-        if 'node_num_map' not in self.data.variables:
+        if VAR_NODE_ID_MAP not in self.data.variables:
             # Return a default array from start to start + count exclusive
             warnings.warn("There is no node id map in this database!")
             return numpy.arange(start, start + count, dtype=self.int)
-        return self.data.variables['node_num_map'][start - 1:start + count - 1]
+        return self.data.variables[VAR_NODE_ID_MAP][start - 1:start + count - 1]
 
     def get_elem_id_map(self):
         """Return the element ID map for this database."""
         num_elem = self.num_elem
         return self.get_partial_elem_id_map(1, num_elem)
+
+    def get_reverse_elem_id_dict(self):
+        """Returns a dictionary with user-defined IDs as the keys and internal IDs as the values."""
+        eim = self.get_elem_id_map()
+        u2i_map = {}
+        for i in range(self.num_elem):
+            u2i_map[eim[i]] = i + 1
+        return u2i_map
 
     def get_partial_elem_id_map(self, start, count):
         """
@@ -504,11 +544,24 @@ class Exodus:
             raise ValueError("start index must be greater than 0")
         if start + count - 1 > num_elem:
             raise ValueError("start index + element count is larger than the total number of elements")
-        if 'elem_num_map' not in self.data.variables:
+        if VAR_ELEM_ID_MAP not in self.data.variables:
             # Return a default array from start to start + count exclusive
             warnings.warn("There is no element id map in this database!")
             return numpy.arange(start, start + count, dtype=self.int)
-        return self.data.variables['elem_num_map'][start - 1:start + count - 1]
+        return self.data.variables[VAR_ELEM_ID_MAP][start - 1:start + count - 1]
+
+    def get_elem_id_map_for_block(self, obj_id):
+        """Reads the element ID map for the element block with specified ID."""
+        if self.num_elem_blk == 0:
+            raise KeyError("There are no element blocks in this database!")
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
+        num_elem, _, _, _ = self._int_get_elem_block_params(obj_id, internal_id)
+        offset = 0
+        emap = self.get_elem_id_map()
+        for i in range(1, internal_id):
+            n, _, _, _ = self._int_get_elem_block_params(emap[i - 1], i)
+            offset += n
+        return self.get_partial_elem_id_map(offset + 1, num_elem)
 
     def get_node_set_id_map(self):
         """Returns the id map for node sets (ns_prop1)."""
@@ -516,7 +569,7 @@ class Exodus:
             return self.ledger.get_node_set_id_map()
 
         try:
-            table = self.data.variables['ns_prop1'][:]
+            table = self.data.variables[VAR_NS_ID_MAP][:]
         except KeyError:
             raise KeyError("Node set id map is missing from this database!".format(type))
         return table
@@ -526,7 +579,7 @@ class Exodus:
         if self.mode == 'w' or self.mode == 'a':
             self.ledger.get_side_set_id_map()
         try:
-            table = self.data.variables['ss_prop1'][:]
+            table = self.data.variables[VAR_SS_ID_MAP][:]
         except KeyError:
             raise KeyError("Side set id map is missing from this database!".format(type))
         return table
@@ -534,29 +587,29 @@ class Exodus:
     def get_elem_block_id_map(self):
         """Returns the id map for element blocks (eb_prop1)."""
         try:
-            table = self.data.variables['eb_prop1'][:]
+            table = self.data.variables[VAR_EB_ID_MAP][:]
         except KeyError:
             raise KeyError("Element block id map is missing from this database!".format(type))
         return table
 
-    def _lookup_id(self, obj_type, num):
+    def _lookup_id(self, obj_type: ObjectType, num):
         """
         Returns the internal ID of a set or block of the given type and user-defined ID.
 
         FOR INTERNAL USE ONLY!
 
-        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_type: type of object this id refers to
         :param num: user-defined ID (aka number) of the set/block
         :return: internal ID
         """
-        if obj_type == 'nodeset':
+        if obj_type == NODESET:
             table = self.get_node_set_id_map()
-        elif obj_type == 'sideset':
+        elif obj_type == SIDESET:
             if (self.mode == 'w' or self.mode == 'a'):
                 table = self.ledger.get_side_set_id_map()
             else:
                 table = self.get_side_set_id_map()
-        elif obj_type == 'elblock':
+        elif obj_type == ELEMBLOCK:
             table = self.get_elem_block_id_map()
         else:
             raise ValueError("{} is not a valid set/block type!".format(obj_type))
@@ -571,6 +624,33 @@ class Exodus:
         return internal_id
         # The C library also does some crazy stuff with what might be the ns_status array
 
+    def get_node_set_number(self, obj_id):
+        """
+        Returns the internal ID (1-based) of the node set with the user-defined ID.
+
+        Note that this function is O(n) complexity for n number of node sets. While useful for quick tests, you should
+        create an ID lookup table yourself if you plan to convert IDs often.
+        """
+        return self._lookup_id(NODESET, obj_id)
+
+    def get_side_set_number(self, obj_id):
+        """
+        Returns the internal ID (1-based) of the side set with the user-defined ID.
+
+        Note that this function is O(n) complexity for n number of node sets. While useful for quick tests, you should
+        create an ID lookup table yourself if you plan to convert IDs often.
+        """
+        return self._lookup_id(SIDESET, obj_id)
+
+    def get_elem_block_number(self, obj_id):
+        """
+        Returns the internal ID (1-based) of the elem block with the user-defined ID.
+
+        Note that this function is O(n) complexity for n number of node sets. While useful for quick tests, you should
+        create an ID lookup table yourself if you plan to convert IDs often.
+        """
+        return self._lookup_id(ELEMBLOCK, obj_id)
+
     ############################
     # Variables and time steps #
     ############################
@@ -578,7 +658,7 @@ class Exodus:
     def get_all_times(self):
         """Returns an array of all time values from all time steps from this database."""
         try:
-            result = self.data.variables['time_whole'][:]
+            result = self.data.variables[VAR_TIME_WHOLE][:]
         except KeyError:
             raise KeyError("Could not retrieve time steps from database!")
         return result
@@ -593,13 +673,8 @@ class Exodus:
         if num_steps <= 0:
             raise ValueError("There are no time steps in this database!")
         if time_step <= 0 or time_step > num_steps:
-            raise ValueError("Time step out of range. Got {}"
-                             .format(time_step))
-        try:
-            result = self.data.variables['time_whole'][time_step - 1]
-        except KeyError:
-            raise KeyError("Could not retrieve time steps from database!")
-        return result
+            raise ValueError("Time step out of range. Got {}".format(time_step))
+        return self.get_all_times()[time_step - 1]
 
     def get_nodal_var_at_time(self, time_step, var_index):
         """
@@ -643,14 +718,14 @@ class Exodus:
             # All vars stored in one variable
             try:
                 # Do not subtract 1 from end (inclusive)
-                result = self.data.variables['vals_nod_var'][
+                result = self.data.variables[VAR_VALS_NOD_VAR_SMALL][
                          start_time_step - 1:end_time_step, var_index - 1, start_index - 1:start_index + count - 1]
             except KeyError:
                 raise KeyError("Could not find the nodal variables in this database!")
         else:
             # Each var to its own variable
             try:
-                result = self.data.variables['vals_nod_var%d' % var_index][start_time_step - 1:end_time_step, :]
+                result = self.data.variables[VAR_VALS_NOD_VAR_LARGE % var_index][start_time_step - 1:end_time_step, :]
             except KeyError:
                 raise KeyError("Could not find nodal variable {} in this database!".format(var_index))
         return result
@@ -678,7 +753,7 @@ class Exodus:
             raise ValueError("End time step out of range. Got {}".format(end_time_step))
         try:
             # Do not subtract 1 from end (inclusive)
-            result = self.data.variables['vals_glo_var'][start_time_step - 1:end_time_step, :]
+            result = self.data.variables[VAR_VALS_GLO_VAR][start_time_step - 1:end_time_step, :]
         except KeyError:
             raise KeyError("Could not find global variables in this database!")
         return result
@@ -707,19 +782,20 @@ class Exodus:
         if var_index <= 0 or var_index > self.num_global_var:
             raise ValueError("Variable index out of range. Got {}".format(var_index))
         try:
-            result = self.data.variables['vals_glo_var'][start_time_step - 1:end_time_step, var_index - 1]
+            result = self.data.variables[VAR_VALS_GLO_VAR][start_time_step - 1:end_time_step, var_index - 1]
         except KeyError:
             raise KeyError("Could not find global variables in this database!")
         return result
 
-    def _int_get_partial_object_var_across_times(self, obj_type, internal_id, start_time_step, end_time_step, var_index,
+    def _int_get_partial_object_var_across_times(self, obj_type: ObjectType, internal_id, start_time_step,
+                                                 end_time_step, var_index,
                                                  start_index, count):
         """
         Returns partial values of an element block variable between specified time steps (inclusive).
 
         FOR INTERNAL USE ONLY!
 
-        :param obj_type: 'elem', 'nodeset', or 'sideset'
+        :param obj_type: type of object this id refers to
         :param internal_id: INTERNAL (1-based) id
         :param start_time_step: start time (inclusive)
         :param end_time_step:  end time (inclusive)
@@ -737,14 +813,14 @@ class Exodus:
         if end_time_step <= 0 or end_time_step < start_time_step or end_time_step > num_steps:
             raise ValueError("End time step out of range. Got {}".format(end_time_step))
 
-        if obj_type == 'elem':
-            varname = 'vals_elem_var%deb%d'
+        if obj_type == ELEMBLOCK:
+            varname = VAR_VALS_ELEM_VAR
             numvar = self.num_elem_block_var
-        elif obj_type == 'nodeset':
-            varname = 'vals_nset_var%dns%d'
+        elif obj_type == NODESET:
+            varname = VAR_VALS_NS_VAR
             numvar = self.num_node_set_var
-        elif obj_type == 'sideset':
-            varname = 'vals_sset_var%dss%d'
+        elif obj_type == SIDESET:
+            varname = VAR_VALS_SS_VAR
             numvar = self.num_side_set_var
         else:
             raise ValueError("Invalid variable type {}!".format(obj_type))
@@ -778,9 +854,9 @@ class Exodus:
         """
         # This method cannot simply call its partial version because we cannot know the number of elements to read
         #  without looking up the id first. This extra id lookup call is slow, so we get around it with a helper method.
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         size = self._int_get_elem_block_params(obj_id, internal_id)[0]
-        return self._int_get_partial_object_var_across_times('elem', internal_id, start_time_step, end_time_step,
+        return self._int_get_partial_object_var_across_times(ELEMBLOCK, internal_id, start_time_step, end_time_step,
                                                              var_index, 1, size)
 
     def get_partial_elem_block_var_across_times(self, obj_id, start_time_step, end_time_step, var_index, start_index,
@@ -791,8 +867,8 @@ class Exodus:
         Time steps, variable index, ID and start index are all 1-based. First time step is at 1, last at num_time_steps.
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
-        return self._int_get_partial_object_var_across_times('elem', internal_id, start_time_step, end_time_step,
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
+        return self._int_get_partial_object_var_across_times(ELEMBLOCK, internal_id, start_time_step, end_time_step,
                                                              var_index, start_index, count)
 
     def get_node_set_var_at_time(self, obj_id, time_step, var_index):
@@ -809,9 +885,9 @@ class Exodus:
 
         Time steps, variable index, and ID are all 1-based. First time step is at 1, last at num_time_steps.
         """
-        internal_id = self._lookup_id('nodeset', obj_id)
+        internal_id = self._lookup_id(NODESET, obj_id)
         size = self._int_get_node_set_params(obj_id, internal_id)[0]
-        return self._int_get_partial_object_var_across_times('nodeset', internal_id, start_time_step, end_time_step,
+        return self._int_get_partial_object_var_across_times(NODESET, internal_id, start_time_step, end_time_step,
                                                              var_index, 1, size)
 
     def get_partial_node_set_var_across_times(self, obj_id, start_time_step, end_time_step, var_index, start_index,
@@ -822,8 +898,8 @@ class Exodus:
         Time steps, variable index, ID and start index are all 1-based. First time step is at 1, last at num_time_steps.
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('nodeset', obj_id)
-        return self._int_get_partial_object_var_across_times('nodeset', internal_id, start_time_step, end_time_step,
+        internal_id = self._lookup_id(NODESET, obj_id)
+        return self._int_get_partial_object_var_across_times(NODESET, internal_id, start_time_step, end_time_step,
                                                              var_index, start_index, count)
 
     def get_side_set_var_at_time(self, obj_id, time_step, var_index):
@@ -840,9 +916,9 @@ class Exodus:
 
         Time steps, variable index, and ID are all 1-based. First time step is at 1, last at num_time_steps.
         """
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         size = self._int_get_side_set_params(obj_id, internal_id)[0]
-        return self._int_get_partial_object_var_across_times('sideset', internal_id, start_time_step, end_time_step,
+        return self._int_get_partial_object_var_across_times(SIDESET, internal_id, start_time_step, end_time_step,
                                                              var_index, 1, size)
 
     def get_partial_side_set_var_across_times(self, obj_id, start_time_step, end_time_step, var_index, start_index,
@@ -853,61 +929,131 @@ class Exodus:
         Time steps, variable index, ID and start index are all 1-based. First time step is at 1, last at num_time_steps.
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('sideset', obj_id)
-        return self._int_get_partial_object_var_across_times('sideset', internal_id, start_time_step, end_time_step,
+        internal_id = self._lookup_id(SIDESET, obj_id)
+        return self._int_get_partial_object_var_across_times(SIDESET, internal_id, start_time_step, end_time_step,
                                                              var_index, start_index, count)
 
-    def _get_var_names(self, obj_type):
+    def _get_truth_table(self, obj_type: ObjectType):
+        """
+        Returns the truth table for variables of a given object type.
+
+        FOR INTERNAL USE ONLY!
+
+        :param obj_type: type of object
+        :return: truth table
+        """
+        if obj_type == ELEMBLOCK:
+            tabname = VAR_ELEM_TAB
+            valname = VAR_VALS_ELEM_VAR
+            num_entity = self.num_elem_blk
+            num_var = self.num_elem_block_var
+        elif obj_type == NODESET:
+            tabname = VAR_NS_TAB
+            valname = VAR_VALS_NS_VAR
+            num_entity = self.num_node_sets
+            num_var = self.num_node_set_var
+        elif obj_type == SIDESET:
+            tabname = VAR_SS_TAB
+            valname = VAR_VALS_SS_VAR
+            num_entity = self.num_side_sets
+            num_var = self.num_side_set_var
+        else:
+            raise ValueError("Invalid object type {}!".format(obj_type))
+        if tabname in self.data.variables:
+            result = self.data.variables[tabname][:]
+        else:
+            # we have to figure it out for ourselves
+            result = numpy.zeros((num_entity, num_var), dtype=self.int)
+            for e in range(num_entity):
+                for v in range(num_var):
+                    if valname % (v + 1, e + 1) in self.data.variables:
+                        result[e, v] = 1
+        return result
+
+    def get_elem_block_truth_table(self):
+        """Returns the variable truth table for element blocks."""
+        return self._get_truth_table(ELEMBLOCK)
+
+    def get_node_set_truth_table(self):
+        """Returns the variable truth table for node sets."""
+        return self._get_truth_table(NODESET)
+
+    def get_side_set_truth_table(self):
+        """Returns the variable truth table for side sets."""
+        return self._get_truth_table(SIDESET)
+
+    def _get_var_names(self, var_type: VariableType):
         """
         Returns a list of variable names for objects of a given type.
 
-        :param obj_type: 'global', 'nodal', 'elem', 'nodeset', or 'sideset'
+        :param var_type: the type of variable
         :return: a list of variable names
         """
-        if obj_type == 'global':
-            varname = 'name_glo_var'
-        elif obj_type == 'nodal':
-            varname = 'name_nod_var'
-        elif obj_type == 'elem':
-            varname = 'name_elem_var'
-        elif obj_type == 'nodeset':
-            varname = 'name_nset_var'
-        elif obj_type == 'sideset':
-            varname = 'name_sset_var'
+        if var_type == GLOBAL_VAR:
+            varname = VAR_NAME_GLO_VAR
+        elif var_type == NODAL_VAR:
+            varname = VAR_NAME_NOD_VAR
+        elif var_type == ELEMENTAL_VAR:
+            varname = VAR_NAME_ELEM_VAR
+        elif var_type == NODESET_VAR:
+            varname = VAR_NAME_NS_VAR
+        elif var_type == SIDESET_VAR:
+            varname = VAR_NAME_SS_VAR
         else:
-            raise ValueError("Invalid variable type {}!".format(obj_type))
+            raise ValueError("Invalid variable type {}!".format(var_type))
         try:
             names = self.data.variables[varname][:]
         except KeyError:
-            raise KeyError("No {} variable names stored in database!".format(obj_type))
+            raise KeyError("No {} variable names stored in database!".format(var_type))
         result = numpy.empty([len(names)], self._MAX_NAME_LENGTH_T)
         for i in range(len(names)):
             result[i] = util.lineparse(names[i])
         return result
 
+    def has_var_names(self, var_type: VariableType):
+        """
+        .Test if this Exodus file has variable names for a variable type.
+
+        :param var_type: GLOBAL_VAR, NODAL_VAR, ELEMENTAL_VAR, NODESET_VAR, or SIDESET_VAR from `constants`
+        :return: True if this variable type has names defined, false otherwise
+        """
+        if var_type == GLOBAL_VAR:
+            varname = VAR_NAME_GLO_VAR
+        elif var_type == NODAL_VAR:
+            varname = VAR_NAME_NOD_VAR
+        elif var_type == ELEMENTAL_VAR:
+            varname = VAR_NAME_ELEM_VAR
+        elif var_type == NODESET_VAR:
+            varname = VAR_NAME_NS_VAR
+        elif var_type == SIDESET_VAR:
+            varname = VAR_NAME_SS_VAR
+        else:
+            raise ValueError("Invalid variable type {}!".format(var_type))
+        return varname in self.data.variables
+
     def get_global_var_names(self):
         """Returns a list of all global variable names. Index of the variable is the index of the name + 1."""
-        return self._get_var_names('global')
+        return self._get_var_names(GLOBAL_VAR)
 
     def get_nodal_var_names(self):
         """Returns a list of all nodal variable names. Index of the variable is the index of the name + 1."""
-        return self._get_var_names('nodal')
+        return self._get_var_names(NODAL_VAR)
 
     def get_elem_var_names(self):
         """Returns a list of all element variable names. Index of the variable is the index of the name + 1."""
-        return self._get_var_names('elem')
+        return self._get_var_names(ELEMENTAL_VAR)
 
     def get_node_set_var_names(self):
         """Returns a list of all node set variable names. Index of the variable is the index of the name + 1."""
-        return self._get_var_names('nodeset')
+        return self._get_var_names(NODESET_VAR)
 
     def get_side_set_var_names(self):
         """Returns a list of all node set variable names. Index of the variable is the index of the name + 1."""
-        return self._get_var_names('sideset')
+        return self._get_var_names(SIDESET_VAR)
 
-    def _get_var_name(self, obj_type, index):
+    def _get_var_name(self, var_type, index):
         """Returns variable name of variable with given index of given object type."""
-        names = self._get_var_names(obj_type)
+        names = self._get_var_names(var_type)
         try:
             name = names[index - 1]
         except IndexError:
@@ -916,23 +1062,23 @@ class Exodus:
 
     def get_global_var_name(self, index):
         """Returns the name of the global variable with the given index."""
-        return self._get_var_name('global', index)
+        return self._get_var_name(GLOBAL_VAR, index)
 
     def get_nodal_var_name(self, index):
         """Returns the name of the nodal variable with the given index."""
-        return self._get_var_name('nodal', index)
+        return self._get_var_name(NODAL_VAR, index)
 
     def get_elem_var_name(self, index):
         """Returns the name of the element variable with the given index."""
-        return self._get_var_name('elem', index)
+        return self._get_var_name(ELEMENTAL_VAR, index)
 
     def get_node_set_var_name(self, index):
         """Returns the name of the node set variable with the given index."""
-        return self._get_var_name('nodeset', index)
+        return self._get_var_name(NODESET_VAR, index)
 
     def get_side_set_var_name(self, index):
         """Returns the name of the side set variable with the given index."""
-        return self._get_var_name('sideset', index)
+        return self._get_var_name(SIDESET_VAR, index)
 
     ######################
     # Node and side sets #
@@ -958,9 +1104,9 @@ class Exodus:
         if count < 0:
             raise ValueError("Count must be a positive integer")
         try:
-            set = self.data.variables['node_ns%d' % internal_id][start - 1:start + count - 1]
+            set = self.data.variables[VAR_NODE_NS % internal_id][start - 1:start + count - 1]
         except KeyError:
-            raise KeyError("Failed to retrieve node set with id {} ('{}')".format(obj_id, 'node_ns%d' % internal_id))
+            raise KeyError("Failed to retrieve node set with id {} ('{}')".format(obj_id, VAR_NODE_NS % internal_id))
         return set
 
     def _int_get_partial_node_set_df(self, obj_id, internal_id, start, count):
@@ -983,7 +1129,7 @@ class Exodus:
         if count < 0:
             raise ValueError("Count must be a positive integer")
         if ('dist_fact_ns%d' % internal_id) in self.data.variables:
-            set = self.data.variables['dist_fact_ns%d' % internal_id][start - 1:start + count - 1]
+            set = self.data.variables[VAR_DF_NS % internal_id][start - 1:start + count - 1]
         else:
             warnings.warn("This database does not contain dist factors for node set {}".format(obj_id))
             set = []
@@ -1003,40 +1149,40 @@ class Exodus:
         if num_sets == 0:
             raise KeyError("No node sets are stored in this database!")
         try:
-            num_entries = self.data.dimensions['num_nod_ns%d' % internal_id].size
+            num_entries = self.data.dimensions[DIM_NUM_NODE_NS % internal_id].size
         except KeyError:
             raise KeyError("Failed to retrieve number of entries in node set with id {} ('{}')"
-                           .format(obj_id, 'num_nod_ns%d' % internal_id))
-        if ('dist_fact_ns%d' % internal_id) in self.data.variables:
+                           .format(obj_id, DIM_NUM_NODE_NS % internal_id))
+        if (VAR_DF_NS % internal_id) in self.data.variables:
             num_df = num_entries
         else:
             num_df = 0
         return num_entries, num_df
 
-    def get_node_set(self, obj_id):
+    def get_node_set(self, identifier):
         """Returns an array of the nodes contained in the node set with given ID."""
         if self.mode == 'w' or self.mode == 'a':
-            return self.ledger.get_node_set(obj_id)
+            return self.ledger.get_node_set(identifier)
 
-        internal_id = self._lookup_id('nodeset', obj_id)
-        size = self._int_get_node_set_params(obj_id, internal_id)[0]
-        return self._int_get_partial_node_set(obj_id, internal_id, 1, size)
+        internal_id = self._lookup_id(NODESET, identifier)
+        size = self._int_get_node_set_params(identifier, internal_id)[0]
+        return self._int_get_partial_node_set(identifier, internal_id, 1, size)
 
-    def get_partial_node_set(self, obj_id, start, count):
+    def get_partial_node_set(self, identifier, start, count):
         """
         Returns a partial array of the nodes contained in the node set with given ID.
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
         if self.mode == 'w' or self.mode == 'a':
-            return self.ledger.get_partial_node_set(id, start, count)
+            return self.ledger.get_partial_node_set(identifier, start, count)
 
-        internal_id = self._lookup_id('nodeset', obj_id)
-        return self._int_get_partial_node_set(obj_id, internal_id, start, count)
+        internal_id = self._lookup_id(NODESET, identifier)
+        return self._int_get_partial_node_set(identifier, internal_id, start, count)
 
     def get_node_set_df(self, obj_id):
         """Returns an array containing the distribution factors in the node set with given ID."""
-        internal_id = self._lookup_id('nodeset', obj_id)
+        internal_id = self._lookup_id(NODESET, obj_id)
         size = self._int_get_node_set_params(obj_id, internal_id)[1]
         return self._int_get_partial_node_set_df(obj_id, internal_id, 1, size)
 
@@ -1046,7 +1192,7 @@ class Exodus:
 
         Array starts at node number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('nodeset', obj_id)
+        internal_id = self._lookup_id(NODESET, obj_id)
         return self._int_get_partial_node_set_df(obj_id, internal_id, start, count)
 
     def get_node_set_params(self, obj_id):
@@ -1055,7 +1201,7 @@ class Exodus:
 
         Returned tuple is of format (number of nodes, number of distribution factors).
         """
-        internal_id = self._lookup_id('nodeset', obj_id)
+        internal_id = self._lookup_id(NODESET, obj_id)
         return self._int_get_node_set_params(obj_id, internal_id)
 
     def _int_get_partial_side_set(self, obj_id, internal_id, start, count):
@@ -1081,15 +1227,15 @@ class Exodus:
         if count < 0:
             raise ValueError("Count must be a positive integer")
         try:
-            elmset = self.data.variables['elem_ss%d' % internal_id][start - 1:start + count - 1]
+            elmset = self.data.variables[VAR_ELEM_SS % internal_id][start - 1:start + count - 1]
         except KeyError:
             raise KeyError(
-                "Failed to retrieve elements of side set with id {} ('{}')".format(obj_id, 'elem_ss%d' % internal_id))
+                "Failed to retrieve elements of side set with id {} ('{}')".format(obj_id, VAR_ELEM_SS % internal_id))
         try:
-            sset = self.data.variables['side_ss%d' % internal_id][start - 1:start + count - 1]
+            sset = self.data.variables[VAR_SIDE_SS % internal_id][start - 1:start + count - 1]
         except KeyError:
             raise KeyError(
-                "Failed to retrieve sides of side set with id {} ('{}')".format(obj_id, 'side_ss%d' % internal_id))
+                "Failed to retrieve sides of side set with id {} ('{}')".format(obj_id, VAR_SIDE_SS % internal_id))
         return elmset, sset
 
     def _int_get_partial_side_set_df(self, obj_id, internal_id, start, count):
@@ -1114,8 +1260,8 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        if ('dist_fact_ss%d' % internal_id) in self.data.variables:
-            set = self.data.variables['dist_fact_ss%d' % internal_id][start - 1:start + count - 1]
+        if (VAR_DF_SS % internal_id) in self.data.variables:
+            set = self.data.variables[VAR_DF_SS % internal_id][start - 1:start + count - 1]
         else:
             warnings.warn("This database does not contain dist factors for side set {}".format(obj_id))
             set = []
@@ -1138,12 +1284,12 @@ class Exodus:
         if num_sets == 0:
             raise KeyError("No side sets are stored in this database!")
         try:
-            num_entries = self.data.dimensions['num_side_ss%d' % internal_id].size
+            num_entries = self.data.dimensions[DIM_NUM_SIDE_SS % internal_id].size
         except KeyError:
             raise KeyError("Failed to retrieve number of entries in side set with id {} ('{}')"
-                           .format(obj_id, 'num_side_ss%d' % internal_id))
-        if 'num_df_ss%d' % internal_id in self.data.dimensions:
-            num_df = self.data.dimensions['num_df_ss%d' % internal_id].size
+                           .format(obj_id, DIM_NUM_SIDE_SS % internal_id))
+        if DIM_NUM_DF_SS % internal_id in self.data.dimensions:
+            num_df = self.data.dimensions[DIM_NUM_DF_SS % internal_id].size
         else:
             num_df = 0
         return num_entries, num_df
@@ -1154,9 +1300,355 @@ class Exodus:
 
         Returned tuple is of format (elements in side set, sides in side set).
         """
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         size = self._int_get_side_set_params(obj_id, internal_id)[0]
         return self._int_get_partial_side_set(obj_id, internal_id, 1, size)
+
+    def get_side_set_node_count_list(self, obj_id):
+        """Returns array of number of nodes per side/face."""
+        # Adapted from ex_get_side_set_node_count.c
+        internal_id = self._lookup_id(SIDESET, obj_id)
+        num_eb = self.num_elem_blk
+        ndim = self.num_dim
+        num_ss_elem, _ = self._int_get_side_set_params(obj_id, internal_id)
+        elem_list, side_list = self.get_side_set(obj_id)
+        ss_elem_idx = numpy.argsort(elem_list)
+        eb_id_map = self.get_elem_block_id_map()
+        eb_params = []
+        elem_ctr = 0
+        for i in range(num_eb):
+            id = eb_id_map[i]
+            eb_params.append(self._int_get_elem_block_param_object(id, ndim))
+            elem_ctr += eb_params[i].num_elem_in_blk
+            eb_params[i].elem_ctr = elem_ctr
+        node_count_list = numpy.empty(num_ss_elem, self.int)
+        j = 0  # current elem block
+        for ii in range(num_ss_elem):
+            i = ss_elem_idx[ii]
+            elem = elem_list[i]
+            side = side_list[i] - 1  # 0 based side
+            while j < num_eb:
+                if elem <= eb_params[j].elem_ctr:
+                    break
+                else:
+                    j += 1
+            if j >= num_eb:
+                raise ValueError("Invalid element number %d in side set %d!" % (elem, obj_id))
+            if side >= eb_params[j].num_sides:
+                raise ValueError("Invalid side number %d for element type %s in side set %d!" %
+                                 (side, eb_params[j].elem_type_str, obj_id))
+            node_count_list[i] = eb_params[j].num_nodes_per_side[side]
+        return node_count_list
+
+    def get_side_set_node_list(self, obj_id):
+        """
+        Returns array of nodes for this side set and the node count list.
+
+        :return: (node list, node count list)
+        """
+        # Adapted from ex_get_side_set_node_list.c.
+        # I really really really hope this doesn't have errors in it
+        internal_id = self._lookup_id(SIDESET, obj_id)
+        num_eb = self.num_elem_blk
+        num_elem = self.num_elem
+        ndim = self.num_dim
+        num_ss_elem, num_ss_df = self._int_get_side_set_params(obj_id, internal_id)
+        elem_list, side_list = self.get_side_set(obj_id)
+        ss_elem_idx = numpy.argsort(elem_list)
+        eb_id_map = self.get_elem_block_id_map()
+        eb_params = []
+        elem_ctr = 0
+        for i in range(num_eb):
+            id = eb_id_map[i]
+            eb_params.append(self._int_get_elem_block_param_object(id, ndim))
+            elem_ctr += eb_params[i].num_elem_in_blk
+            eb_params[i].elem_ctr = elem_ctr
+        ss_param_idx = numpy.empty(num_ss_elem, int)  # ss element to eb param index
+        ss_elem_node_idx = numpy.empty(num_ss_elem, int)  # ss element to node list index
+        node_count_list = numpy.empty(num_ss_elem, self.int)
+        node_ctr = 0
+        j = 0  # current elem block
+        for ii in range(num_ss_elem):
+            i = ss_elem_idx[ii]
+            elem = elem_list[i]
+            side = side_list[i]
+            while j < num_eb:
+                if eb_params[j].elem_type_val != NULL:
+                    if elem <= eb_params[j].elem_ctr:
+                        break
+                    else:
+                        j += 1
+            if j >= num_eb:
+                raise ValueError("Invalid element number %d in side set %d!" % (elem, obj_id))
+            if side >= eb_params[j].num_sides:
+                raise ValueError("Invalid side number %d for element type %s in side set %d!" %
+                                 (side, eb_params[j].elem_type_str, obj_id))
+            ss_param_idx[i] = j
+            ss_elem_node_idx[i] = eb_params[j].num_nodes_per_side[side - 1]
+            node_ctr += eb_params[j].num_nodes_per_side[side - 1]
+
+        if num_ss_df > 0 and num_ss_df != num_ss_elem:
+            if node_ctr != num_ss_df:
+                warnings.warn("Side set %d dist fact count (%d) does not match node list length (%d)! This may indicate"
+                              " a corrupt database." % (obj_id, num_ss_df, node_ctr))
+
+        for i in range(num_ss_elem):
+            node_count_list[i] = ss_elem_node_idx[i]
+
+        sum = 0
+        for i in range(num_ss_elem):
+            cnt = ss_elem_node_idx[i]
+            ss_elem_node_idx[i] = sum
+            sum += cnt
+
+        node_list = numpy.empty(node_ctr, self.int)
+
+        elem_ctr = 0
+        connect = None
+        for j in range(num_ss_elem):
+            elem_idx = ss_elem_idx[j]
+            elem = elem_list[elem_idx]
+            side = side_list[elem_idx]
+            param_idx = ss_param_idx[elem_idx]
+
+            if elem > elem_ctr:
+                # We're doing this the C way because copying code from SEACAS saves development time
+                connect = numpy.ndarray.flatten(self.get_elem_block_connectivity(eb_params[param_idx].elem_blk_id))
+                elem_ctr = eb_params[param_idx].elem_ctr
+
+            if connect is None:
+                raise ValueError("connect is None in get_side_set_node_list. This is likely the result of an abnormal"
+                                 " Exodus file.")
+
+            elem_num = elem - 1
+            elem_num_pos = elem_num - (eb_params[param_idx].elem_ctr - eb_params[param_idx].num_elem_in_blk)
+
+            num_nodes_per_elem = eb_params[param_idx].num_nodes_per_elem
+            connect_offset = num_nodes_per_elem * elem_num_pos
+            side_num = side - 1
+            node_pos = ss_elem_node_idx[elem_idx]
+
+            if eb_params[param_idx].elem_type_val == CIRCLE or eb_params[param_idx].elem_type_val == SPHERE:
+                node_list[node_pos] = connect[connect_offset]
+            elif eb_params[param_idx].elem_type_val == TRUSS:
+                node_list[node_pos] = connect[connect_offset + side_num]
+            elif eb_params[param_idx].elem_type_val == BEAM:
+                for i in range(num_nodes_per_elem):
+                    node_list[node_pos + i] = connect[connect_offset + i]
+            elif eb_params[param_idx].elem_type_val == TRIANGLE:
+                if ndim == 2:
+                    if side_num + 1 < 1 or side_num + 1 > 3:
+                        raise ValueError("Invalid triangle side number %d!" % (side_num + 1))
+                    node_list[node_pos] = connect[connect_offset + tri_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + tri_table[side_num][1] - 1]
+                    if num_nodes_per_elem > 3:
+                        node_list[node_pos + 2] = connect[connect_offset + tri_table[side_num][2] - 1]
+                elif ndim == 3:
+                    if side_num + 1 < 1 or side_num + 1 > 5:
+                        raise ValueError("Invalid triangle side number %d!" % (side_num + 1))
+                    node_list[node_pos] = connect[connect_offset + tri3_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + tri3_table[side_num][1] - 1]
+                    if side_num + 1 <= 2:
+                        if num_nodes_per_elem == 3:
+                            node_list[node_pos + 2] = connect[connect_offset + tri3_table[side_num][2] - 1]
+                        elif num_nodes_per_elem == 4:
+                            node_list[node_pos + 2] = connect[connect_offset + tri3_table[side_num][2] - 1]
+                            # This looks wrong, but it's what the C library does...
+                            node_list[node_pos + 2] = connect[connect_offset + 4 - 1]
+                        elif num_nodes_per_elem == 6:
+                            node_list[node_pos + 2] = connect[connect_offset + tri3_table[side_num][2] - 1]
+                            node_list[node_pos + 3] = connect[connect_offset + tri3_table[side_num][3] - 1]
+                            node_list[node_pos + 4] = connect[connect_offset + tri3_table[side_num][4] - 1]
+                            node_list[node_pos + 5] = connect[connect_offset + tri3_table[side_num][5] - 1]
+                        elif num_nodes_per_elem == 7:
+                            node_list[node_pos + 2] = connect[connect_offset + tri3_table[side_num][2] - 1]
+                            node_list[node_pos + 3] = connect[connect_offset + tri3_table[side_num][3] - 1]
+                            node_list[node_pos + 4] = connect[connect_offset + tri3_table[side_num][4] - 1]
+                            node_list[node_pos + 5] = connect[connect_offset + tri3_table[side_num][5] - 1]
+                            node_list[node_pos + 6] = connect[connect_offset + tri3_table[side_num][6] - 1]
+                        else:
+                            raise ValueError("%d is an unsupported number of nodes for triangle elements!" %
+                                             num_nodes_per_elem)
+                    else:
+                        if num_nodes_per_elem > 3:
+                            node_list[node_pos + 2] = connect[connect_offset + tri3_table[side_num][2] - 1]
+            elif eb_params[param_idx].elem_type_val == QUAD:
+                if side_num + 1 < 1 or side_num + 1 > 4:
+                    raise ValueError("Invalid quad side number %d!" % (side_num + 1))
+                node_list[node_pos + 0] = connect[connect_offset + quad_table[side_num][0] - 1]
+                node_list[node_pos + 1] = connect[connect_offset + quad_table[side_num][1] - 1]
+                if num_nodes_per_elem > 5:
+                    node_list[node_pos + 2] = connect[connect_offset + quad_table[side_num][2] - 1]
+            elif eb_params[param_idx].elem_type_val == SHELL:
+                if side_num + 1 < 1 or side_num + 1 > 6:
+                    raise ValueError("Invalid shell side number %d!" % (side_num + 1))
+                node_list[node_pos + 0] = connect[connect_offset + shell_table[side_num][0] - 1]
+                node_list[node_pos + 1] = connect[connect_offset + shell_table[side_num][1] - 1]
+                if num_nodes_per_elem > 2:
+                    if side_num + 1 <= 2:
+                        node_list[node_pos + 2] = connect[connect_offset + shell_table[side_num][2] - 1]
+                        node_list[node_pos + 3] = connect[connect_offset + shell_table[side_num][3] - 1]
+                if num_nodes_per_elem == 8:
+                    if side_num + 1 <= 2:
+                        node_list[node_pos + 4] = connect[connect_offset + shell_table[side_num][4] - 1]
+                        node_list[node_pos + 5] = connect[connect_offset + shell_table[side_num][5] - 1]
+                        node_list[node_pos + 6] = connect[connect_offset + shell_table[side_num][6] - 1]
+                        node_list[node_pos + 7] = connect[connect_offset + shell_table[side_num][7] - 1]
+                    else:
+                        node_list[node_pos + 2] = connect[connect_offset + shell_table[side_num][2] - 1]
+                if num_nodes_per_elem == 9:
+                    if side_num + 1 <= 2:
+                        node_list[node_pos + 4] = connect[connect_offset + shell_table[side_num][4] - 1]
+                        node_list[node_pos + 5] = connect[connect_offset + shell_table[side_num][5] - 1]
+                        node_list[node_pos + 6] = connect[connect_offset + shell_table[side_num][6] - 1]
+                        node_list[node_pos + 7] = connect[connect_offset + shell_table[side_num][7] - 1]
+                        node_list[node_pos + 8] = connect[connect_offset + shell_table[side_num][8] - 1]
+                    else:
+                        node_list[node_pos + 2] = connect[connect_offset + shell_table[side_num][2] - 1]
+            elif eb_params[param_idx].elem_type_val == TETRA:
+                if side_num + 1 < 1 or side_num + 1 > 4:
+                    raise ValueError("Invalid tetra side number %d!" % (side_num + 1))
+                node_list[node_pos + 0] = connect[connect_offset + tetra_table[side_num][0] - 1]
+                node_list[node_pos + 1] = connect[connect_offset + tetra_table[side_num][1] - 1]
+                node_list[node_pos + 2] = connect[connect_offset + tetra_table[side_num][2] - 1]
+                if num_nodes_per_elem == 8:
+                    node_list[node_pos + 3] = connect[connect_offset + tetra_table[side_num][3] - 1]
+                elif num_nodes_per_elem > 8:
+                    node_list[node_pos + 3] = connect[connect_offset + tetra_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + tetra_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + tetra_table[side_num][5] - 1]
+            elif eb_params[param_idx].elem_type_val == WEDGE:
+                if side_num + 1 < 1 or side_num + 1 > 5:
+                    raise ValueError("Invalid wedge side number %d!" % (side_num + 1))
+                if num_nodes_per_elem == 6 or num_nodes_per_elem == 7:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge6_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge6_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge6_table[side_num][2] - 1]
+                    if side_num == 3 or side_num == 4:
+                        pass
+                    else:
+                        node_list[node_pos + 3] = connect[connect_offset + wedge6_table[side_num][3] - 1]
+                elif num_nodes_per_elem == 15 or num_nodes_per_elem == 16:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge15_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge15_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge15_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + wedge15_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + wedge15_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + wedge15_table[side_num][5] - 1]
+                    if side_num == 3 or side_num == 4:
+                        pass
+                    else:
+                        node_list[node_pos + 6] = connect[connect_offset + wedge15_table[side_num][6] - 1]
+                        node_list[node_pos + 7] = connect[connect_offset + wedge15_table[side_num][7] - 1]
+                elif num_nodes_per_elem == 12:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge12_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge12_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge12_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + wedge12_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + wedge12_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + wedge12_table[side_num][5] - 1]
+                elif num_nodes_per_elem == 20:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge20_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge20_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge20_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + wedge20_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + wedge20_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + wedge20_table[side_num][5] - 1]
+                    node_list[node_pos + 6] = connect[connect_offset + wedge20_table[side_num][6] - 1]
+                    if side_num == 3 or side_num == 4:
+                        pass
+                    else:
+                        node_list[node_pos + 7] = connect[connect_offset + wedge20_table[side_num][7] - 1]
+                        node_list[node_pos + 8] = connect[connect_offset + wedge20_table[side_num][8] - 1]
+                elif num_nodes_per_elem == 21:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge21_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge21_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge21_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + wedge21_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + wedge21_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + wedge21_table[side_num][5] - 1]
+                    node_list[node_pos + 6] = connect[connect_offset + wedge21_table[side_num][6] - 1]
+                    if side_num == 3 or side_num == 4:
+                        pass
+                    else:
+                        node_list[node_pos + 7] = connect[connect_offset + wedge21_table[side_num][7] - 1]
+                        node_list[node_pos + 8] = connect[connect_offset + wedge21_table[side_num][8] - 1]
+                elif num_nodes_per_elem == 18:
+                    node_list[node_pos + 0] = connect[connect_offset + wedge18_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + wedge18_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + wedge18_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + wedge18_table[side_num][3] - 1]
+                    node_list[node_pos + 4] = connect[connect_offset + wedge18_table[side_num][4] - 1]
+                    node_list[node_pos + 5] = connect[connect_offset + wedge18_table[side_num][5] - 1]
+                    if side_num == 3 or side_num == 4:
+                        pass
+                    else:
+                        node_list[node_pos + 6] = connect[connect_offset + wedge18_table[side_num][6] - 1]
+                        node_list[node_pos + 7] = connect[connect_offset + wedge18_table[side_num][7] - 1]
+                        node_list[node_pos + 8] = connect[connect_offset + wedge18_table[side_num][8] - 1]
+            elif eb_params[param_idx].elem_type_val == PYRAMID:
+                if side_num + 1 < 1 or side_num + 1 > 5:
+                    raise ValueError("Invalid pyramid side number %d!" % (side_num + 1))
+                node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][0] - 1]
+                node_pos += 1
+                node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][1] - 1]
+                node_pos += 1
+                node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][2] - 1]
+                node_pos += 1
+                if pyramid_table[side_num][3] == 0:
+                    pass  # this one even confuses the C library
+                else:
+                    node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][3] - 1]
+                    node_pos += 1
+                if num_nodes_per_elem > 5:
+                    node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][4] - 1]
+                    node_pos += 1
+                    node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][5] - 1]
+                    node_pos += 1
+                    node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][6] - 1]
+                    node_pos += 1
+                    if side_num == 4:
+                        node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][7] - 1]
+                        node_pos += 1
+                        if num_nodes_per_elem >= 14:
+                            node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][8] - 1]
+                            node_pos += 1
+                    else:
+                        if num_nodes_per_elem >= 18:
+                            node_list[node_pos] = connect[connect_offset + pyramid_table[side_num][8] - 1]
+                            node_pos += 1
+            elif eb_params[param_idx].elem_type_val == HEX:
+                if side_num + 1 < 1 or side_num + 1 > 6:
+                    raise ValueError("Invalid hex side number %d!" % (side_num + 1))
+                if num_nodes_per_elem == 16:
+                    node_list[node_pos + 0] = connect[connect_offset + hex16_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + hex16_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + hex16_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + hex16_table[side_num][3] - 1]
+                    # I have no idea whats going on with these next two statements
+                    node_list[node_pos + 3] = connect[connect_offset + hex16_table[side_num][4] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + hex16_table[side_num][5] - 1]
+                    if side_num + 1 == 5 or side_num + 1 == 6:
+                        # Also no idea about these ones
+                        node_list[node_pos] = connect[connect_offset + hex16_table[side_num][6] - 1]
+                        node_pos += 1
+                        node_list[node_pos] = connect[connect_offset + hex16_table[side_num][7] - 1]
+                        node_pos += 1
+                else:
+                    node_list[node_pos + 0] = connect[connect_offset + hex_table[side_num][0] - 1]
+                    node_list[node_pos + 1] = connect[connect_offset + hex_table[side_num][1] - 1]
+                    node_list[node_pos + 2] = connect[connect_offset + hex_table[side_num][2] - 1]
+                    node_list[node_pos + 3] = connect[connect_offset + hex_table[side_num][3] - 1]
+                    if num_nodes_per_elem > 12:
+                        node_list[node_pos + 4] = connect[connect_offset + hex_table[side_num][4] - 1]
+                        node_list[node_pos + 5] = connect[connect_offset + hex_table[side_num][5] - 1]
+                        node_list[node_pos + 6] = connect[connect_offset + hex_table[side_num][6] - 1]
+                        node_list[node_pos + 7] = connect[connect_offset + hex_table[side_num][7] - 1]
+                    if num_nodes_per_elem == 27:
+                        node_list[node_pos + 8] = connect[connect_offset + hex_table[side_num][8] - 1]
+            else:
+                raise ValueError("%s is an unsupported element type." % eb_params[param_idx].elem_type_str)
+        return node_list, node_count_list
 
     def get_partial_side_set(self, obj_id, start, count):
         """
@@ -1165,12 +1657,12 @@ class Exodus:
         Arrays start at element number ``start`` (1-based) and contains ``count`` elements.
         Returned tuple is of format (elements in side set, sides in side set).
         """
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         return self._int_get_partial_side_set(obj_id, internal_id, start, count)
 
     def get_side_set_df(self, obj_id):
         """Returns an array containing the distribution factors in the side set with given ID."""
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         size = self._int_get_side_set_params(obj_id, internal_id)[1]
         return self._int_get_partial_side_set_df(obj_id, internal_id, 1, size)
 
@@ -1180,7 +1672,7 @@ class Exodus:
 
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         return self._int_get_partial_side_set_df(obj_id, internal_id, start, count)
 
     def get_side_set_params(self, obj_id):
@@ -1189,7 +1681,7 @@ class Exodus:
 
         Returned tuple is of format (number of elements, number of distribution factors).
         """
-        internal_id = self._lookup_id('sideset', obj_id)
+        internal_id = self._lookup_id(SIDESET, obj_id)
         return self._int_get_side_set_params(obj_id, internal_id)
 
     ##################
@@ -1212,16 +1704,16 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
-            num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
+        if (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
+            num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
             num_node_entry = 0
         if num_node_entry > 0:
             try:
-                result = self.data.variables['connect%d' % internal_id][start - 1:start + count - 1]
+                result = self.data.variables[VAR_CONNECT % internal_id][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
-                               .format(obj_id, 'connect%d' % internal_id))
+                               .format(obj_id, VAR_CONNECT % internal_id))
         else:
             result = []
         return result
@@ -1238,32 +1730,32 @@ class Exodus:
         """
         # TODO this will be way faster with caching
         try:
-            num_entries = self.data.dimensions['num_el_in_blk%d' % internal_id].size
+            num_entries = self.data.dimensions[DIM_NUM_EL_IN_BLK % internal_id].size
         except KeyError:
             raise KeyError("Failed to retrieve number of elements in element block with id {} ('{}')"
-                           .format(obj_id, 'num_el_in_blk%d' % internal_id))
-        if ('num_nod_per_el%d' % internal_id) in self.data.dimensions:
-            num_node_entry = self.data.dimensions['num_nod_per_el%d' % internal_id].size
+                           .format(obj_id, DIM_NUM_EL_IN_BLK % internal_id))
+        if (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
+            num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
             num_node_entry = 0
         try:
             if num_node_entry > 0:
-                connect = self.data.variables['connect%d' % internal_id]
-                topology = connect.getncattr('elem_type')
+                connect = self.data.variables[VAR_CONNECT % internal_id]
+                topology = connect.getncattr(ATTR_ELEM_TYPE)
             else:
                 topology = None
         except KeyError:
             raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
-                           .format(obj_id, 'connect%d' % internal_id))
-        if ('num_att_in_blk%d' % internal_id) in self.data.dimensions:
-            num_att_blk = self.data.dimensions['num_att_in_blk%d' % internal_id].size
+                           .format(obj_id, VAR_CONNECT % internal_id))
+        if (DIM_NUM_ATT_IN_BLK % internal_id) in self.data.dimensions:
+            num_att_blk = self.data.dimensions[DIM_NUM_ATT_IN_BLK % internal_id].size
         else:
             num_att_blk = 0
         return num_entries, num_node_entry, topology, num_att_blk
 
     def get_elem_block_connectivity(self, obj_id):
         """Returns the connectivity list for the element block with given ID."""
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         size = self._int_get_elem_block_params(obj_id, internal_id)[0]
         return self._int_get_partial_elem_block_connectivity(obj_id, internal_id, 1, size)
 
@@ -1271,44 +1763,342 @@ class Exodus:
         """
         Returns a partial connectivity list for the element block with given ID.
 
-        Array starts at node number ``start`` (1-based) and contains ``count`` elements.
+        Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_partial_elem_block_connectivity(obj_id, internal_id, start, count)
 
-    def get_elem_block_params(self, obj_id):
+    def get_elem_block_params(self, obj_id) -> Tuple[builtins.int, builtins.int, str, builtins.int]:
         """
         Returns a tuple containing the parameters for the element block with given ID.
 
         Returned tuple is of format (number of elements, nodes per element, topology, number of attributes).
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_elem_block_params(obj_id, internal_id)
+
+    def _int_get_elem_block_param_object(self, obj_id, ndim) -> ElemBlockParam:
+        """Returns parameters used to describe an elem block."""
+        # Adapted from ex_int_get_block_param.c
+        # Used to get side set node count list
+        num_el, nod_el, topo, num_att = self.get_elem_block_params(obj_id)
+        topo = topo.upper()
+        num_nod_side = numpy.zeros(6, builtins.int)
+        if topo[:3] == CIRCLE[:3]:
+            el_type = CIRCLE
+            num_sides = 1
+            num_nod_side[0] = 1
+        elif topo[:3] == SPHERE[:3]:
+            el_type = SPHERE
+            num_sides = 1
+            num_nod_side[0] = 1
+        elif topo[:3] == QUAD[:3]:
+            el_type = QUAD
+            num_sides = 4
+            if nod_el == 4 or nod_el == 5:
+                num_nod_side[0] = 2
+                num_nod_side[1] = 2
+                num_nod_side[2] = 2
+                num_nod_side[3] = 2
+            elif nod_el == 9 or nod_el == 8:
+                num_nod_side[0] = 3
+                num_nod_side[1] = 3
+                num_nod_side[2] = 3
+                num_nod_side[3] = 3
+            elif nod_el == 12 or nod_el == 16:
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+                num_nod_side[2] = 4
+                num_nod_side[3] = 4
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == TRIANGLE[:3]:
+            el_type = TRIANGLE
+            if ndim == 2:
+                num_sides = 3
+                if nod_el == 3 or nod_el == 4:
+                    num_nod_side[0] = 2
+                    num_nod_side[1] = 2
+                    num_nod_side[2] = 2
+                elif nod_el == 6 or nod_el == 7:
+                    num_nod_side[0] = 3
+                    num_nod_side[1] = 3
+                    num_nod_side[2] = 3
+                elif nod_el == 9 or nod_el == 13:
+                    num_nod_side[0] = 4
+                    num_nod_side[1] = 4
+                    num_nod_side[2] = 4
+                else:
+                    raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+            elif ndim == 3:
+                num_sides = 5
+                if nod_el == 3 or nod_el == 4:
+                    num_nod_side[0] = nod_el
+                    num_nod_side[1] = nod_el
+                    num_nod_side[2] = 2
+                    num_nod_side[3] = 2
+                    num_nod_side[4] = 2
+                elif nod_el == 6 or nod_el == 7:
+                    num_nod_side[0] = nod_el
+                    num_nod_side[1] = nod_el
+                    num_nod_side[2] = 3
+                    num_nod_side[3] = 3
+                    num_nod_side[4] = 3
+                elif nod_el == 9 or nod_el == 13:
+                    num_nod_side[0] = nod_el
+                    num_nod_side[1] = nod_el
+                    num_nod_side[2] = 4
+                    num_nod_side[3] = 4
+                    num_nod_side[4] = 4
+                else:
+                    raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == SHELL[:3]:
+            el_type = SHELL
+            if nod_el == 2:
+                num_sides = 2
+                num_nod_side[0] = 2
+                num_nod_side[1] = 2
+            elif nod_el == 4:
+                num_sides = 6
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+                num_nod_side[2] = 2
+                num_nod_side[3] = 2
+                num_nod_side[4] = 2
+                num_nod_side[5] = 2
+            elif nod_el == 8 or nod_el == 9:
+                num_sides = 6
+                num_nod_side[0] = nod_el
+                num_nod_side[1] = nod_el
+                num_nod_side[2] = 3
+                num_nod_side[3] = 3
+                num_nod_side[4] = 3
+                num_nod_side[5] = 3
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == HEX[:3]:
+            el_type = HEX
+            num_sides = 6
+            if nod_el == 8 or nod_el == 9:
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+                num_nod_side[2] = 4
+                num_nod_side[3] = 4
+                num_nod_side[4] = 4
+                num_nod_side[5] = 4
+            elif nod_el == 12:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+                num_nod_side[4] = 4
+                num_nod_side[5] = 4
+            elif nod_el == 16:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+                num_nod_side[4] = 8
+                num_nod_side[5] = 8
+            elif nod_el == 20:
+                num_nod_side[0] = 8
+                num_nod_side[1] = 8
+                num_nod_side[2] = 8
+                num_nod_side[3] = 8
+                num_nod_side[4] = 8
+                num_nod_side[5] = 8
+            elif nod_el == 27:
+                num_nod_side[0] = 9
+                num_nod_side[1] = 9
+                num_nod_side[2] = 9
+                num_nod_side[3] = 9
+                num_nod_side[4] = 9
+                num_nod_side[5] = 9
+            elif nod_el == 32:
+                num_nod_side[0] = 12
+                num_nod_side[1] = 12
+                num_nod_side[2] = 12
+                num_nod_side[3] = 12
+                num_nod_side[4] = 12
+                num_nod_side[5] = 12
+            elif nod_el == 64:
+                num_nod_side[0] = 16
+                num_nod_side[1] = 16
+                num_nod_side[2] = 16
+                num_nod_side[3] = 16
+                num_nod_side[4] = 16
+                num_nod_side[5] = 16
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == TETRA[:3]:
+            el_type = TETRA
+            num_sides = 4
+            if nod_el == 4 or nod_el == 5:
+                num_nod_side[0] = 3
+                num_nod_side[1] = 3
+                num_nod_side[2] = 3
+                num_nod_side[3] = 3
+            elif nod_el == 8:
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+                num_nod_side[2] = 4
+                num_nod_side[3] = 4
+            elif nod_el == 10 or nod_el == 11:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+            elif nod_el == 14 or nod_el == 15:
+                num_nod_side[0] = 7
+                num_nod_side[1] = 7
+                num_nod_side[2] = 7
+                num_nod_side[3] = 7
+            elif nod_el == 16:
+                num_nod_side[0] = 9
+                num_nod_side[1] = 9
+                num_nod_side[2] = 9
+                num_nod_side[3] = 9
+            elif nod_el == 40:
+                num_nod_side[0] = 13
+                num_nod_side[1] = 13
+                num_nod_side[2] = 13
+                num_nod_side[3] = 13
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == WEDGE[:3]:
+            el_type = WEDGE
+            num_sides = 5
+            if nod_el == 6:
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+                num_nod_side[2] = 4
+                num_nod_side[3] = 3
+                num_nod_side[4] = 3
+            elif nod_el == 12:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+                num_nod_side[4] = 6
+            elif nod_el == 15 or nod_el == 16:
+                num_nod_side[0] = 8
+                num_nod_side[1] = 8
+                num_nod_side[2] = 8
+                num_nod_side[3] = 6
+                num_nod_side[4] = 6
+            elif nod_el == 18:
+                num_nod_side[0] = 9
+                num_nod_side[1] = 9
+                num_nod_side[2] = 9
+                num_nod_side[3] = 6
+                num_nod_side[4] = 6
+            elif nod_el == 20 or nod_el == 21:
+                num_nod_side[0] = 9
+                num_nod_side[1] = 9
+                num_nod_side[2] = 9
+                num_nod_side[3] = 7
+                num_nod_side[4] = 7
+            elif nod_el == 24:
+                num_nod_side[0] = 12
+                num_nod_side[1] = 12
+                num_nod_side[2] = 12
+                num_nod_side[3] = 9
+                num_nod_side[4] = 9
+            elif nod_el == 52:
+                num_nod_side[0] = 16
+                num_nod_side[1] = 16
+                num_nod_side[2] = 16
+                num_nod_side[3] = 13
+                num_nod_side[4] = 13
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == PYRAMID[:3]:
+            el_type = PYRAMID
+            num_sides = 5
+            if nod_el == 5:
+                num_nod_side[0] = 3
+                num_nod_side[1] = 3
+                num_nod_side[2] = 3
+                num_nod_side[3] = 3
+                num_nod_side[4] = 4
+            elif nod_el == 13:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+                num_nod_side[4] = 8
+            elif nod_el == 14:
+                num_nod_side[0] = 6
+                num_nod_side[1] = 6
+                num_nod_side[2] = 6
+                num_nod_side[3] = 6
+                num_nod_side[4] = 9
+            elif nod_el == 18 or nod_el == 19:
+                num_nod_side[0] = 7
+                num_nod_side[1] = 7
+                num_nod_side[2] = 7
+                num_nod_side[3] = 7
+                num_nod_side[4] = 9
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == BEAM[:3]:
+            el_type = BEAM
+            num_sides = 2
+            if nod_el == 2:
+                num_nod_side[0] = 2
+                num_nod_side[1] = 2
+            elif nod_el == 3:
+                num_nod_side[0] = 3
+                num_nod_side[1] = 3
+            elif nod_el == 4:
+                num_nod_side[0] = 4
+                num_nod_side[1] = 4
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        elif topo[:3] == TRUSS[:3] or topo[:3] == BAR[:3] or topo[:3] == EDGE[:3]:
+            el_type = TRUSS
+            num_sides = 2
+            if nod_el == 2 or nod_el == 3:
+                num_nod_side[0] = 1
+                num_nod_side[1] = 1
+            else:
+                raise ValueError("Element of type %s with %d nodes is invalid!" % (topo, nod_el))
+        # Special case for null elements
+        elif topo[:3] == NULL[:3]:
+            el_type = NULL
+            num_sides = 0
+            num_nod_side[0] = 0
+            num_el = 0
+        else:
+            el_type = UNKNOWN
+            num_sides = 0
+            num_nod_side[0] = 0
+        return ElemBlockParam(topo, obj_id, num_el, nod_el, num_sides, num_nod_side, num_att, 0, el_type)
 
     #########
     # Names #
     #########
 
-    def _get_set_block_names(self, obj_type):
+    def _get_set_block_names(self, obj_type: ObjectType):
         """
         Returns a list of names for objects of a given type.
-        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_type: type of object
         :return: a list of names
         """
         names = []
-        if obj_type == 'nodeset':
+        if obj_type == NODESET:
             try:
-                names = self.data.variables['ns_names']
+                names = self.data.variables[VAR_NS_NAMES]
             except KeyError:
                 warnings.warn("This database does not contain node set names.")
-        elif obj_type == 'sideset':
+        elif obj_type == SIDESET:
             try:
-                names = self.data.variables['ss_names']
+                names = self.data.variables[VAR_SS_NAMES]
             except KeyError:
                 warnings.warn("This database does not contain side set names.")
-        elif obj_type == 'elblock':
+        elif obj_type == ELEMBLOCK:
             try:
-                names = self.data.variables['eb_names']
+                names = self.data.variables[VAR_EB_NAMES]
             except KeyError:
                 warnings.warn("This database does not contain element block names.")
         else:
@@ -1320,12 +2110,12 @@ class Exodus:
 
     def get_elem_block_names(self):
         """Returns an array containing the names of element blocks in this database."""
-        return self._get_set_block_names('elblock')
+        return self._get_set_block_names(ELEMBLOCK)
 
     def get_elem_block_name(self, obj_id):
         """Returns the name of the given element block."""
-        internal_id = self._lookup_id('elblock', obj_id)
-        names = self._get_set_block_names('elblock')
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
+        names = self._get_set_block_names(ELEMBLOCK)
         if len(names) > 0:
             return names[internal_id - 1]
         else:
@@ -1335,15 +2125,15 @@ class Exodus:
         """Returns an array containing the names of node sets in this database."""
         if self.mode == 'a' or self.mode == 'w':
             return self.ledger.get_node_set_names()
-        return self._get_set_block_names('nodeset')
+        return self._get_set_block_names(NODESET)
 
-    def get_node_set_name(self, obj_id):
+    def get_node_set_name(self, identifier):
         """Returns the name of the given node set."""
         if self.mode == 'a' or self.mode == 'w':
-            return self.ledger.get_node_set_name(obj_id)
+            return self.ledger.get_node_set_name(identifier)
 
-        internal_id = self._lookup_id('nodeset', obj_id)
-        names = self._get_set_block_names('nodeset')
+        internal_id = self._lookup_id(NODESET, identifier)
+        names = self._get_set_block_names(NODESET)
         if len(names) > 0:
             return names[internal_id - 1]
         else:
@@ -1351,17 +2141,14 @@ class Exodus:
 
     def get_side_set_names(self):
         """Returns an array containing the names of side sets in this database."""
-        if self.mode == 'w' or self.mode == 'a':
-            return self.ledger.get_side_set_names()
-        return self._get_set_block_names('sideset')
+        return self._get_set_block_names(SIDESET)
 
     def get_side_set_name(self, obj_id):
         """Returns the name of the given side set."""
         if self.mode == 'a' or self.mode == 'w':
             return self.ledger.get_side_set_name(obj_id)
-    
-        internal_id = self._lookup_id('sideset', obj_id)
-        names = self._get_set_block_names('sideset')
+        internal_id = self._lookup_id(SIDESET, obj_id)
+        names = self._get_set_block_names(SIDESET)
         if len(names) > 0:
             return names[internal_id - 1]
         else:
@@ -1378,8 +2165,8 @@ class Exodus:
         FOR INTERNAL USE ONLY!
         """
         # Some databases don't have attributes
-        if ('num_att_in_blk%d' % internal_id) in self.data.dimensions:
-            num = self.data.dimensions['num_att_in_blk%d' % internal_id].size
+        if (DIM_NUM_ATT_IN_BLK % internal_id) in self.data.dimensions:
+            num = self.data.dimensions[DIM_NUM_ATT_IN_BLK % internal_id].size
         else:
             # No need to warn. If there are no attributes, the number is 0...
             num = 0
@@ -1403,7 +2190,7 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        varname = 'attrib%d' % internal_id
+        varname = VAR_ELEM_ATTRIB % internal_id
         if varname in self.data.variables:
             result = self.data.variables[varname][start - 1:start + count - 1, :]
         else:
@@ -1434,7 +2221,7 @@ class Exodus:
         if num_attrib > 0:  # faster to check this than if the variable exists like in the function above this one
             if attrib_index < 1 or attrib_index > num_attrib:
                 raise ValueError("Attribute index out of range. Got {}".format(attrib_index))
-            result = self.data.variables['attrib%d' % internal_id][start - 1:start + count - 1, attrib_index - 1]
+            result = self.data.variables[VAR_ELEM_ATTRIB % internal_id][start - 1:start + count - 1, attrib_index - 1]
         else:
             result = []
             warnings.warn("Element block {} has no attributes.".format(obj_id))
@@ -1447,7 +2234,7 @@ class Exodus:
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         Returns an empty array if the element block doesn't have attributes.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_partial_one_elem_attrib(obj_id, internal_id, attrib_index, start, count)
 
     def get_one_elem_attrib(self, obj_id, attrib_index):
@@ -1456,7 +2243,7 @@ class Exodus:
 
         Returns an empty array if the element block doesn't have attributes.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         size = self._int_get_elem_block_params(obj_id, internal_id)[0]
         return self._int_get_partial_one_elem_attrib(obj_id, internal_id, attrib_index, 1, size)
 
@@ -1466,7 +2253,7 @@ class Exodus:
 
         Returns an empty array if the element block doesn't have attributes.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         size = self._int_get_elem_block_params(obj_id, internal_id)[0]
         return self._int_get_partial_elem_attrib(obj_id, internal_id, 1, size)
 
@@ -1477,7 +2264,7 @@ class Exodus:
         Array starts at element number ``start`` (1-based) and contains ``count`` elements.
         Returns an empty array if the element block doesn't have attributes.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_partial_elem_attrib(obj_id, internal_id, start, count)
 
     def get_elem_attrib_names(self, obj_id):
@@ -1486,13 +2273,13 @@ class Exodus:
 
         Returns an empty array if the element block doesn't have attributes or attribute names.
         """
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         num_attrib = self._int_get_num_elem_attrib(internal_id)
         result = []
         if num_attrib == 0:
             warnings.warn("Element block {} has no attributes.".format(obj_id))
         else:
-            varname = 'attrib_name%d' % internal_id
+            varname = VAR_ELEM_ATTRIB_NAME % internal_id
             # Older datasets don't have attribute names
             if varname in self.data.variables:
                 names = self.data.variables[varname][:]
@@ -1503,15 +2290,15 @@ class Exodus:
 
     def get_num_elem_attrib(self, obj_id):
         """Returns the number of attributes in the element block with given ID."""
-        internal_id = self._lookup_id('elblock', obj_id)
+        internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_num_elem_attrib(internal_id)
 
     #####################
     # Object properties #
     #####################
 
-    # We need to know the number of properties in advance for _get_object_property_names.
-    # Since this function is here, we might as well use it elsewhere too.
+    # This method contains a general algorithm for counting the number of properties an object has.
+    # This is used by the num_*_prop properties which are in turn used by _get_object_property_names
     def _get_num_object_properties(self, varname):
         """
         Returns the number of properties an object has.
@@ -1528,11 +2315,11 @@ class Exodus:
                 break
         return n
 
-    def _get_object_property(self, obj_type, obj_id, name):
+    def _get_object_property(self, obj_type: ObjectType, obj_id, name):
         """
         Returns the value of a specific object's property.
 
-        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_type: type of object this id refers to
         :param obj_id: EXTERNAL (user-defined) id
         :param name: name of the property
         :return: value of the property for the specified object
@@ -1547,30 +2334,30 @@ class Exodus:
 
     def get_node_set_property(self, obj_id, name):
         """Returns the value of the specified property for the node set with the given ID."""
-        return self._get_object_property('nodeset', obj_id, name)
+        return self._get_object_property(NODESET, obj_id, name)
 
     def get_side_set_property(self, obj_id, name):
         """Returns the value of the specified property for the side set with the given ID."""
-        return self._get_object_property('sideset', obj_id, name)
+        return self._get_object_property(SIDESET, obj_id, name)
 
     def get_elem_block_property(self, obj_id, name):
         """Returns the value of the specified property for the element block with the given ID."""
-        return self._get_object_property('elblock', obj_id, name)
+        return self._get_object_property(ELEMBLOCK, obj_id, name)
 
-    def _get_object_property_array(self, obj_type, name):
+    def _get_object_property_array(self, obj_type: ObjectType, name):
         """
         Returns a list containing all the values of a particular property for objects of a given type.
 
-        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_type: type of object this id refers to
         :param name: name of the property
         :return: array containing values of the property for objects of the given type
         """
-        if obj_type == 'nodeset':
-            varname = 'ns_prop%d'
-        elif obj_type == 'sideset':
-            varname = 'ss_prop%d'
-        elif obj_type == 'elblock':
-            varname = 'eb_prop%d'
+        if obj_type == NODESET:
+            varname = VAR_NS_PROP
+        elif obj_type == SIDESET:
+            varname = VAR_SS_PROP
+        elif obj_type == ELEMBLOCK:
+            varname = VAR_EB_PROP
         else:
             raise ValueError("Invalid variable type {}!".format(obj_type))
         prop = []
@@ -1579,7 +2366,7 @@ class Exodus:
         n = 1
         while True:
             if varname % n in self.data.variables:
-                propname = self.data.variables[varname % n].getncattr('name')
+                propname = self.data.variables[varname % n].getncattr(ATTR_NAME)
                 if propname == name:
                     # we've found our property
                     prop = self.data.variables[varname % n][:]
@@ -1596,48 +2383,51 @@ class Exodus:
 
     def get_node_set_property_array(self, name):
         """Returns a list containing the values of the specified property for all node sets."""
-        return self._get_object_property_array('nodeset', name)
+        return self._get_object_property_array(NODESET, name)
 
     def get_side_set_property_array(self, name):
         """Returns a list containing the values of the specified property for all side sets."""
-        return self._get_object_property_array('sideset', name)
+        return self._get_object_property_array(SIDESET, name)
 
     def get_elem_block_property_array(self, name):
         """Returns a list containing the values of the specified property for all element blocks."""
-        return self._get_object_property_array('elblock', name)
+        return self._get_object_property_array(ELEMBLOCK, name)
 
-    def _get_object_property_names(self, obj_type):
+    def _get_object_property_names(self, obj_type: ObjectType):
         """
         Returns a list containing the names of properties defined for objects of a given type.
 
-        :param obj_type: 'nodeset', 'sideset', or 'elblock'
+        :param obj_type: type of object
         :return: array of property names
         """
-        if obj_type == 'nodeset':
-            varname = 'ns_prop%d'
-        elif obj_type == 'sideset':
-            varname = 'ss_prop%d'
-        elif obj_type == 'elblock':
-            varname = 'eb_prop%d'
+        if obj_type == NODESET:
+            varname = VAR_NS_PROP
+            num_props = self.num_node_set_prop
+        elif obj_type == SIDESET:
+            varname = VAR_SS_PROP
+            num_props = self.num_side_set_prop
+        elif obj_type == ELEMBLOCK:
+            varname = VAR_EB_PROP
+            num_props = self.num_elem_block_prop
         else:
             raise ValueError("Invalid variable type {}!".format(obj_type))
-        num_props = self._get_num_object_properties(varname)
+        # num_props = self._get_num_object_properties(varname)
         result = numpy.empty([num_props], self._MAX_NAME_LENGTH_T)
         for n in range(num_props):
-            result[n] = self.data.variables[varname % (n + 1)].getncattr('name')
+            result[n] = self.data.variables[varname % (n + 1)].getncattr(ATTR_NAME)
         return result
 
     def get_node_set_property_names(self):
         """Returns a list of node set property names."""
-        return self._get_object_property_names('nodeset')
+        return self._get_object_property_names(NODESET)
 
     def get_side_set_property_names(self):
         """Returns a list of side set property names."""
-        return self._get_object_property_names('sideset')
+        return self._get_object_property_names(SIDESET)
 
     def get_elem_block_property_names(self):
         """Returns a list of element block property names."""
-        return self._get_object_property_names('elblock')
+        return self._get_object_property_names(ELEMBLOCK)
 
     ###############
     # Coordinates #
@@ -1665,22 +2455,22 @@ class Exodus:
         large = self.large_model
         if not large:
             try:
-                coord = self.data.variables['coord'][:, start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD][:, start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve nodal coordinate array!")
         else:
             try:
-                coordx = self.data.variables['coordx'][start - 1:start + count - 1]
+                coordx = self.data.variables[VAR_COORD_X][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve x axis nodal coordinate array!")
             if dim_cnt > 1:
                 try:
-                    coordy = self.data.variables['coordy'][start - 1:start + count - 1]
+                    coordy = self.data.variables[VAR_COORD_Y][start - 1:start + count - 1]
                 except KeyError:
                     raise KeyError("Failed to retrieve y axis nodal coordinate array!")
                 if dim_cnt > 2:
                     try:
-                        coordz = self.data.variables['coordz'][start - 1:start + count - 1]
+                        coordz = self.data.variables[VAR_COORD_Z][start - 1:start + count - 1]
                     except KeyError:
                         raise KeyError("Failed to retrieve z axis nodal coordinate array!")
                     coord = numpy.array([coordx, coordy, coordz])
@@ -1710,12 +2500,12 @@ class Exodus:
         large = self.large_model
         if not large:
             try:
-                coord = self.data.variables['coord'][0][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD][0][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve nodal coordinate array!")
         else:
             try:
-                coord = self.data.variables['coordx'][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD_X][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve x axis nodal coordinate array!")
         return coord
@@ -1741,12 +2531,12 @@ class Exodus:
         large = self.large_model
         if not large:
             try:
-                coord = self.data.variables['coord'][1][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD][1][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve nodal coordinate array!")
         else:
             try:
-                coord = self.data.variables['coordy'][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD_Y][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve y axis nodal coordinate array!")
         return coord
@@ -1772,12 +2562,12 @@ class Exodus:
         large = self.large_model
         if not large:
             try:
-                coord = self.data.variables['coord'][2][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD][2][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve nodal coordinate array!")
         else:
             try:
-                coord = self.data.variables['coordz'][start - 1:start + count - 1]
+                coord = self.data.variables[VAR_COORD_Z][start - 1:start + count - 1]
             except KeyError:
                 raise KeyError("Failed to retrieve z axis nodal coordinate array!")
         return coord
@@ -1786,7 +2576,7 @@ class Exodus:
         """Returns an array containing the names of the coordinate axes in this database."""
         dim_cnt = self.num_dim
         try:
-            names = self.data.variables['coor_names']
+            names = self.data.variables[VAR_COORD_NAMES]
         except KeyError:
             raise KeyError("Failed to retrieve coordinate name array!")
         result = util.arrparse(names, dim_cnt, self._MAX_NAME_LENGTH_T)
@@ -1802,7 +2592,7 @@ class Exodus:
         result = numpy.empty([num], Exodus._MAX_LINE_LENGTH_T)
         if num > 0:
             try:
-                infos = self.data.variables['info_records']
+                infos = self.data.variables[VAR_INFO]
             except KeyError:
                 raise KeyError("Failed to retrieve info records from database!")
             for i in range(num):
@@ -1815,7 +2605,7 @@ class Exodus:
         result = numpy.empty([num, 4], Exodus._MAX_STR_LENGTH_T)
         if num > 0:
             try:
-                qas = self.data.variables['qa_records']
+                qas = self.data.variables[VAR_QA]
             except KeyError:
                 raise KeyError("Failed to retrieve qa records from database!")
             for i in range(num):
@@ -1969,35 +2759,35 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
 
-    def remove_nodeset(self, nodeset_id):
+    def remove_nodeset(self, identifier):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.remove_nodeset(nodeset_id)
+        self.ledger.remove_nodeset(identifier)
 
     def merge_nodeset(self, new_id, ns1, ns2, delete=True):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.merge_nodesets(new_id, ns1, ns2, delete)
 
-    def add_node_to_nodeset(self, node_id, nodeset_id):
+    def add_node_to_nodeset(self, node_id, identifier):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.add_node_to_nodeset(node_id, nodeset_id)
+        self.ledger.add_node_to_nodeset(node_id, identifier)
 
-    def add_nodes_to_nodeset(self, node_ids, nodeset_id):
+    def add_nodes_to_nodeset(self, node_ids, identifier):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.add_nodes_to_nodeset(node_ids, nodeset_id)
+        self.ledger.add_nodes_to_nodeset(node_ids, identifier)
 
-    def remove_node_from_nodeset(self, node_id, nodeset_id):
+    def remove_node_from_nodeset(self, node_id, identifier):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.remove_node_from_nodeset(node_id, nodeset_id)
+        self.ledger.remove_node_from_nodeset(node_id, identifier)
 
-    def remove_nodes_from_nodeset(self, node_ids, nodeset_id):
+    def remove_nodes_from_nodeset(self, node_ids, identifier):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
-        self.ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
+        self.ledger.remove_nodes_from_nodeset(node_ids, identifier)
 
     """
     Adds new sideset. Takes in element ids, side ids, id of the new sideset, and name of the new sideset. 
@@ -2051,8 +2841,22 @@ class Exodus:
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to split sideset")
         self.ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
-    
 
+    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to split sideset based on x-coord")
+        self.ledger.split_sideset_x_coords(old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+    
+    def split_sideset_y_coords(self, old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to split sideset based on y-coord")
+        self.ledger.split_sideset_y_coords(old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+
+    def split_sideset_z_coords(self, old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to split sideset based on z-coord")
+        self.ledger.split_sideset_z_coords(old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+    
     def add_element(self, block_id, nodelist):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
@@ -2068,6 +2872,11 @@ class Exodus:
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to skin element into new sideset")
         self.ledger.skin_element_block(block_id, skin_id, skin_name)
+
+    def skin(self, skin_id, skin_name):
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to skin element into new sideset")
+        self.ledger.skin(skin_id, skin_name)
         
     def write(self, path=None):
         if self.mode != 'w' and self.mode != 'a':
@@ -2079,7 +2888,11 @@ class Exodus:
         self.ledger.write(path)
 
 
+# TODO some functions return numpy arrays, some return Python lists. Should be consistently one or the other.
+# TODO you should be able to select variables by name as well as id!
+#  that's what Sandia told us to do originally!
+#  Same goes for other data types!
+
+
 if __name__ == "__main__":
-    ex = Exodus("sample-files/disk_out_ref.ex2", 'r')
-    print(ex.data)
-    ex.close()
+    ...
