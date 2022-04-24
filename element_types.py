@@ -321,61 +321,62 @@ class PYRA14(PYRA13):
 		self.num_nodes = 14
 
 
-# Takes in uppercase string of type
-# Returns (class, num faces)
-# NOTE -> This is only for the purposes of face iteration (hence why hex9->hex8)
-# TODO -> The TYPEA+1 doesn't work because of num_nodes check (hex9 for ex)
-elem_types = {
-	"CIRCLE": CIRCLE,
-	"SPHERE": CIRCLE, #both 1 node
-	"BEAM": BAR2,
-	"BAR": BAR2, #???
-	"BAR2": BAR2,
-	"BAR3": BAR3,
-	"QUAD": QUAD4, #Assumption
-	"QUAD4": QUAD4,
-	"QUAD5": QUAD5,
-	"QUAD8": QUAD8,
-	"QUAD9": QUAD9,
-	"SHELL": SHELL4, #Assumption
-	"SHELL4": SHELL4,
-	"SHELL8": SHELL8,
-	"SHELL9": SHELL9, 
-	#"TRI": TRI3, #Assumption
-	#"TRI3": TRI3,
-	#"TRI6": TRI6,
 
-	# TRI -> TRISHELL
-	"TRI": TRISHELL3,
-	"TRI3": TRISHELL3,
-	"TRI6": TRISHELL6,
-
-	"TRISHELL": TRISHELL3, #Assumption
-	"TRISHELL3": TRISHELL3,
-	"TRISHELL6": TRISHELL6,
-	"TETRA": TETRA4,
-	"TETRA4": TETRA4,
-	"TETRA10": TETRA10,
-	"WEDGE": WEDGE6, #Assumption
-	"WEDGE6": WEDGE6,
-	"WEDGE15": WEDGE15,
-	"WEDGE16": WEDGE16,
-	"WEDGE20": WEDGE20, # Assumption
-	"WEDGE21": WEDGE21,
-	"HEX": HEX8, #Assumption
-	"HEX8": HEX8,
-	"HEX9": HEX9,
-	"HEX20": HEX20,
-	"HEX27": HEX27,
-	"PYRA": PYRA5, #Assumption
-	"PYRA5": PYRA5,
-	"PYRA13": PYRA13,
-	"PYRA14": PYRA14
-}
 
 # Returns an object of type ElementType
 # Needed for iterate_element_faces() method
-def get_element_type(string):
+def get_element_type(string, tri='shell'):
+	# Takes in uppercase string of type
+	# Returns (class, num faces)
+	elem_types = {
+		"CIRCLE": CIRCLE,
+		"SPHERE": CIRCLE, #both 1 node
+		"BEAM": BAR2,
+		"BAR": BAR2, #???
+		"BAR2": BAR2,
+		"BAR3": BAR3,
+		"QUAD": QUAD4, #Assumption
+		"QUAD4": QUAD4,
+		"QUAD5": QUAD5,
+		"QUAD8": QUAD8,
+		"QUAD9": QUAD9,
+		"SHELL": SHELL4, #Assumption
+		"SHELL4": SHELL4,
+		"SHELL8": SHELL8,
+		"SHELL9": SHELL9, 
+
+		#"TRI": TRI3, #Assumption
+		#"TRI3": TRI3,
+		#"TRI6": TRI6,
+
+		# TRI -> TRISHELL
+		"TRI": TRISHELL3 if tri=='shell' else TRI3,
+		"TRI3": TRISHELL3 if tri=='shell' else TRI3,
+		"TRI6": TRISHELL6 if tri=='shell' else TRI6,
+
+		"TRISHELL": TRISHELL3, #Assumption
+		"TRISHELL3": TRISHELL3,
+		"TRISHELL6": TRISHELL6,
+		"TETRA": TETRA4,
+		"TETRA4": TETRA4,
+		"TETRA10": TETRA10,
+		"WEDGE": WEDGE6, #Assumption
+		"WEDGE6": WEDGE6,
+		"WEDGE15": WEDGE15,
+		"WEDGE16": WEDGE16,
+		"WEDGE20": WEDGE20, # Assumption
+		"WEDGE21": WEDGE21,
+		"HEX": HEX8, #Assumption
+		"HEX8": HEX8,
+		"HEX9": HEX9,
+		"HEX20": HEX20,
+		"HEX27": HEX27,
+		"PYRA": PYRA5, #Assumption
+		"PYRA5": PYRA5,
+		"PYRA13": PYRA13,
+		"PYRA14": PYRA14
+	}
+
 	s = string.upper()
 	if s in elem_types:
 		return elem_types[s]()

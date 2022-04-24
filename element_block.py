@@ -30,6 +30,9 @@ class ElementBlock:
 	def get_blk_num(self):
 		return self.blk_num
 
+	def get_blk_name(self):
+		return self.blk_name
+
 	def get_connect_title(self):
 		return self.connect_title
 
@@ -65,9 +68,9 @@ class ElementBlock:
 
 
 	# Returns a list of the unique faces of the form [(ndx, face_number)]
-	def skin_block(self, shift):
+	def skin_block(self, shift, tri='shell'):
 		all_faces = [] # size (num elements, faces in element)
-		elem_iterator = element_types.get_element_type(self.elem_type)
+		elem_iterator = element_types.get_element_type(self.elem_type, tri)
 		for i in range(len(self.elements)):
 			all_faces.append(elem_iterator.iterate_element_faces(self.elements[i]))
 

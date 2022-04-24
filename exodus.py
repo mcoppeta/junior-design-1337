@@ -339,6 +339,9 @@ class Exodus:
     @property
     def num_elem(self):
         """Number of elements stored in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_elem()
+
         try:
             result = self.data.dimensions[DIM_NUM_ELEM].size
         except KeyError:
@@ -348,6 +351,9 @@ class Exodus:
     @property
     def num_elem_blk(self):
         """Number of element blocks stored in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_elem_blocks()
+
         try:
             result = self.data.dimensions[DIM_NUM_EB].size
         except KeyError:
@@ -417,6 +423,9 @@ class Exodus:
     @property
     def num_elem_block_var(self):
         """Number of elemental variables."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_elem_variable()
+
         try:
             return self.data.dimensions[DIM_NUM_ELEM_VAR].size
         except KeyError:
@@ -535,6 +544,9 @@ class Exodus:
         Subset starts at element number ``start`` (1-based) and contains ``count`` elements.
         """
         # Start is 1 based (>0).  start + count - 1 <= number of nodes
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_elem_num_map()[start - 1:start + count - 1]
+
         num_elem = self.num_elem
         if num_elem == 0:
             raise KeyError("Cannot retrieve a element id map if there are no elements!")
@@ -582,6 +594,9 @@ class Exodus:
 
     def get_elem_block_id_map(self):
         """Returns the id map for element blocks (eb_prop1)."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_eb_prop1()[:]
+
         try:
             table = self.data.variables[VAR_EB_ID_MAP][:]
         except KeyError:
@@ -1688,13 +1703,21 @@ class Exodus:
             raise ValueError("Start index must be greater than 0")
         if count < 0:
             raise ValueError("Count must be a positive integer")
-        if (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
+
+        if self.mode == 'w' or self.mode == 'a':
+            num_node_entry = self.ledger.get_num_nodes_per_el_block(internal_id)
+        elif (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
             num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
             num_node_entry = 0
+
         if num_node_entry > 0:
             try:
-                result = self.data.variables[VAR_CONNECT % internal_id][start - 1:start + count - 1]
+                if self.mode == 'w' or self.mode == 'a':
+                    result = self.ledger.get_connectX(internal_id)[start - 1:start + count - 1]
+                else:
+                    result = self.data.variables[VAR_CONNECT % internal_id][start - 1:start + count - 1]
+
             except KeyError:
                 raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
                                .format(obj_id, VAR_CONNECT % internal_id))
@@ -1714,15 +1737,24 @@ class Exodus:
         """
         # TODO this will be way faster with caching
         try:
-            num_entries = self.data.dimensions[DIM_NUM_EL_IN_BLK % internal_id].size
+            if self.mode == 'w' or self.mode == 'a':
+                num_entries = self.ledger.get_num_elem_in_block(internal_id)
+            else:
+                num_entries = self.data.dimensions[DIM_NUM_EL_IN_BLK % internal_id].size
         except KeyError:
             raise KeyError("Failed to retrieve number of elements in element block with id {} ('{}')"
                            .format(obj_id, DIM_NUM_EL_IN_BLK % internal_id))
-        if (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
+        
+        if self.mode == 'w' or self.mode == 'a':
+            num_node_entry = self.ledger.get_num_nodes_per_el_block(internal_id)
+        elif (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
             num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
             num_node_entry = 0
+
         try:
+            if self.mode == 'w' or self.mode == 'a':
+                topology = self.ledger.get_elem_block_type(internal_id)
             if num_node_entry > 0:
                 connect = self.data.variables[VAR_CONNECT % internal_id]
                 topology = connect.getncattr(ATTR_ELEM_TYPE)
@@ -1731,6 +1763,8 @@ class Exodus:
         except KeyError:
             raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
                            .format(obj_id, VAR_CONNECT % internal_id))
+        
+	# TODO: Add case for append mode if attributes added
         if (DIM_NUM_ATT_IN_BLK % internal_id) in self.data.dimensions:
             num_att_blk = self.data.dimensions[DIM_NUM_ATT_IN_BLK % internal_id].size
         else:
@@ -2094,12 +2128,18 @@ class Exodus:
 
     def get_elem_block_names(self):
         """Returns an array containing the names of element blocks in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_elem_block_names()
         return self._get_set_block_names(ELEMBLOCK)
 
     def get_elem_block_name(self, obj_id):
         """Returns the name of the given element block."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_elem_block_name(obj_id)
+        
         internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         names = self._get_set_block_names(ELEMBLOCK)
+
         if len(names) > 0:
             return names[internal_id - 1]
         else:
@@ -2661,6 +2701,9 @@ class Exodus:
         nodeset[:] = node_ids
 
     def get_nodes_in_elblock(self, id):
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_connectX(id)
+
         if "node_num_map" in self.data.variables:
             raise Exception("Using node num map")
         nodeids = self.data["connect" + str(id)]
@@ -2799,25 +2842,53 @@ class Exodus:
     
 
     def add_element(self, block_id, nodelist):
+        """
+        Returns the id of the newly created element if successful
+
+        :param block_id: (user-defined) ID for new element
+        :param nodelist: list of node IDs that make up the new element
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         return self.ledger.add_element(block_id, nodelist)
 
 
     def remove_element(self, elem_id):
+        """
+        Returns the removed element (the list of nodes)
+
+        :param elem_id: ID of the element to be removed
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         return self.ledger.remove_element(elem_id)
 
-    def skin_element_block(self, block_id, skin_id, skin_name):
-        if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to skin element into new sideset")
-        self.ledger.skin_element_block(block_id, skin_id, skin_name)
+    def skin_element_block(self, block_id, skin_id, skin_name, tri='shell'):
+        """
+        Skins a particular element block. Adds a corresponding sideset of the external faces
 
-    def skin(self, skin_id, skin_name):
+        :param block_id: ID of the block to be skinned
+        :param skin_id: (user-defined) ID of the new sideset
+        :param skin_name: (user-defined) name of the new sideset
+        :param tri: indicates if TRI prefix corresponds to tri 'tri' or trishell 'shell'
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to skin element into new sideset")
-        self.ledger.skin(skin_id, skin_name)
+        self.ledger.skin_element_block(block_id, skin_id, skin_name, tri)
+
+    def skin(self, skin_id, skin_name, tri='shell'):
+        """
+        Skins the entire mesh (all element blocks).
+        Adds a single corresponding sideset of the external faces
+
+        :param block_id: ID of the block to be skinned
+        :param skin_id: (user-defined) ID of the new sideset
+        :param skin_name: (user-defined) name of the new sideset
+        :param tri: indicates if TRI prefix corresponds to tri 'tri' or trishell 'shell'
+        """
+        if self.mode != 'w' and self.mode != 'a':
+            raise PermissionError("Need to be in write or append mode to skin element into new sideset")
+        self.ledger.skin(skin_id, skin_name, tri)
         
     def write(self, path=None):
         if self.mode != 'w' and self.mode != 'a':
