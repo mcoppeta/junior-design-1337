@@ -760,7 +760,6 @@ def test_read_after_add(tmpdir):
     assert np.array_equal(dfs, [1, 2, 2, 1])
     assert np.array_equal(elems, [3, 4, 7, 8])
     assert np.array_equal(sides, [4, 4, 4, 4])
-    exofile.close()
 
 
     # Add sides to sideset and check
