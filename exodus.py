@@ -268,6 +268,8 @@ class Exodus:
     @property
     def num_side_sets(self):
         """Number of side sets stored in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.num_side_sets()
         try:
             result = self.data.dimensions['num_side_sets'].size
         except KeyError:
@@ -521,6 +523,8 @@ class Exodus:
 
     def get_side_set_id_map(self):
         """Returns the id map for side sets (ss_prop1)."""
+        if self.mode == 'w' or self.mode == 'a':
+            self.ledger.get_side_set_id_map()
         try:
             table = self.data.variables['ss_prop1'][:]
         except KeyError:
@@ -548,7 +552,10 @@ class Exodus:
         if obj_type == 'nodeset':
             table = self.get_node_set_id_map()
         elif obj_type == 'sideset':
-            table = self.get_side_set_id_map()
+            if (self.mode == 'w' or self.mode == 'a'):
+                table = self.ledger.get_side_set_id_map()
+            else:
+                table = self.get_side_set_id_map()
         elif obj_type == 'elblock':
             table = self.get_elem_block_id_map()
         else:
@@ -1063,6 +1070,9 @@ class Exodus:
         :param count: number of elements
         :return: tuple containing the selected part of the side set of format: (elements, corresponding sides)
         """
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger._int_get_partial_side_set(obj_id, internal_id, start, count)
+        
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No side sets are stored in this database!")
@@ -1094,6 +1104,9 @@ class Exodus:
         :param count: number of elements
         :return: array containing the selected part of the side set distribution factors list
         """
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger._int_get_partial_side_set_df(obj_id, internal_id, start, count)
+        
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No side sets are stored in this database!")
@@ -1118,6 +1131,9 @@ class Exodus:
         :param internal_id: INTERNAL (1-based) id
         :return: (number of elements, number of distribution factors)
         """
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger._int_get_side_set_params(obj_id, internal_id)
+        
         num_sets = self.num_side_sets
         if num_sets == 0:
             raise KeyError("No side sets are stored in this database!")
@@ -1335,10 +1351,15 @@ class Exodus:
 
     def get_side_set_names(self):
         """Returns an array containing the names of side sets in this database."""
+        if self.mode == 'w' or self.mode == 'a':
+            return self.ledger.get_side_set_names()
         return self._get_set_block_names('sideset')
 
     def get_side_set_name(self, obj_id):
         """Returns the name of the given side set."""
+        if self.mode == 'a' or self.mode == 'w':
+            return self.ledger.get_side_set_name(obj_id)
+    
         internal_id = self._lookup_id('sideset', obj_id)
         names = self._get_set_block_names('sideset')
         if len(names) > 0:
@@ -1978,10 +1999,23 @@ class Exodus:
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.remove_nodes_from_nodeset(node_ids, nodeset_id)
 
+    """
+    Adds new sideset. Takes in element ids, side ids, id of the new sideset, and name of the new sideset. 
+    Can optionally specify distribution factor and variables. If no distribution factors are specified 
+    and they are required, placeholder 1s will be inserted. If no variables are specified and they are required, 
+    placeholder 0s will be inserted. If specifying distribution factors, they must be of size n * len(elem_ids), where
+    n is a positive integer. If specifying variables, they must be of dimensions 
+    [number of sideset variables, number of timesteps, number of sides in sideset].
+    """
+
     def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact, variables)
+
+    """
+    Removes an existing sideset. Must specify id of sideset for removal.
+    """
 
     def remove_sideset(self, ss_id):
         if self.mode != 'w' and self.mode != 'a':
@@ -1989,10 +2023,24 @@ class Exodus:
         self.ledger.remove_sideset(ss_id)
 
 
+    """
+    Adds sides to already existing sideset. Must specify the element ids of sides to add, the side ids of sides to add
+    the id of the sideset being added to, and optionally the distribution factors and variables. If no distribution 
+    factors are specified, and they are required, they will be filled with 1s. If no variables are specified, 
+    and they are required, they will be filled with 0s. If specifying distribution factors, they must be of size n * len(elem_ids), 
+    where n is a positive integer. If specifying variables, they must be of dimensions 
+    [number of sideset variables, number of timesteps, number of sides being added].
+    """
+
     def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodeset")
         self.ledger.add_sides_to_sideset(elem_ids, side_ids, ss_id, dist_facts, variables)
+
+    """
+    Removes sides from the specified sideset id. Takes in element ids and their corresponding side ids, as 
+    well as the id of the sideset to remove the sides from. 
+    """
 
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
         if self.mode != 'w' and self.mode != 'a':

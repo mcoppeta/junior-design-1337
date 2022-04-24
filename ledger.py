@@ -140,6 +140,29 @@ class Ledger:
     def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2):
         self.sideset_ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
 
+    def num_side_sets(self):
+        return self.sideset_ledger.num_side_sets()
+
+    # return id map for sideset
+    def get_side_set_id_map(self):
+        return self.sideset_ledger.get_side_set_id_map()
+
+    def get_side_set_names(self):
+        return self.sideset_ledger.get_side_set_names()
+
+    def get_side_set_name(self, ndx):
+        return self.sideset_ledger.get_side_set_name(ndx)
+
+    # get portion of a sideset's elem and side id's
+    def _int_get_partial_side_set(self, obj_id, internal_id, start, count):
+        return self.sideset_ledger._int_get_partial_side_set(obj_id, internal_id, start, count)
+
+    def _int_get_side_set_params(self, obj_id, internal_id):
+        return self.sideset_ledger._int_get_side_set_params(obj_id, internal_id)
+
+    def _int_get_partial_side_set_df(self, obj_id, internal_id, start, count):
+        return self.sideset_ledger._int_get_partial_side_set_df(obj_id, internal_id, start, count)
+
     # element methods
     def remove_element(self, elem_id):
         return self.element_ledger.remove_element(elem_id)
