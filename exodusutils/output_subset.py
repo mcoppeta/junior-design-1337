@@ -1,4 +1,9 @@
-"""Allows creation of a new Exodus file by copying selected parts of an opened Exodus file."""
+"""
+Allows creation of a new Exodus file by copying selected parts of an opened Exodus file.
+
+To choose what parts of a file to keep, you must pass lists of selectors to the `output_subset` function. See
+`exodusutils.selector` for more information on how selectors work.
+"""
 
 from __future__ import annotations  # use the magic of python 3.7 to let use write Exodus instead of "Exodus"
 from typing import TYPE_CHECKING, List
@@ -31,7 +36,7 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
     :param prop_selector: selector for object properties
     :param nod_vars: list of nodal variable ids to keep (1-indexed)
     :param glo_vars: list of global variable ids to keep (1-indexed)
-    :param time_steps: range of time steps to keep
+    :param time_steps: range of time steps to keep (1-indexed)
     """
     # TODO you should be able to select variables by name as well as id!
     # Sort lists to maintain input file order in output file

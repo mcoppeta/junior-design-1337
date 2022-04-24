@@ -2,8 +2,6 @@
 
 from typing import NewType
 
-LIB_VERSION_MAJOR = 0
-LIB_VERSION_MINOR = 1337
 LIB_NAME = "Python Exodus Utilities"
 
 # Types
@@ -13,14 +11,22 @@ ElementTopography = NewType('ElementTopography', str)
 
 # Constants
 ELEMBLOCK = ObjectType("elblock")
+"""Represents an element block."""
 NODESET = ObjectType("nodeset")
+"""Represents a node set."""
 SIDESET = ObjectType("sideset")
+"""Represents a side set."""
 
 GLOBAL_VAR = VariableType("global")
+"""Represents global variables."""
 NODAL_VAR = VariableType("node")
+"""Represents nodal variables."""
 ELEMENTAL_VAR = VariableType("elem")
+"""Represents elemental variables."""
 NODESET_VAR = VariableType("nodeset")
+"""Represents node set variables."""
 SIDESET_VAR = VariableType("sideset")
+"""Represents side set variables."""
 
 CIRCLE = ElementTopography("CIRCLE")
 SPHERE = ElementTopography("SPHERE")

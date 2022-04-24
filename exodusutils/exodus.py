@@ -1,3 +1,7 @@
+"""
+# Heading
+"""
+
 import builtins
 import warnings
 from dataclasses import dataclass
@@ -25,6 +29,23 @@ class _ElemBlockParam:
 
 
 class Exodus:
+    """
+    The Exodus class represents an opened Exodus II file.
+
+    The first step in doing anything to an Exodus II file is to create a new Exodus object from it (See
+    `Exodus.__init__` for how to do this).
+
+    You can read and modify an Exodus II file using ``Exodus``'s properties and functions. You may not modify
+    properties, but you can get them with minimal performance impact. Calling any functions will read data from the file
+    on disk, and this data is not cached by the library, so you should avoid multiple identical function calls whenever
+    possible.
+
+    Many of the functions of ``Exodus`` require "1-based" indices. To clarify: Exodus data is usually accessed starting
+    from 1 rather than 0 as is more common in computer programming. If a function requests 1-based indices that means
+    list indexing starts at 1. If a function requests 0-based indices that means list indexing starts at 0.
+
+    Once you are finished with the Exodus II file, call `Exodus.close` to safely close the file.
+    """
     _FORMAT_MAP = {'EX_NETCDF4': 'NETCDF4',
                    'EX_LARGE_MODEL': 'NETCDF3_64BIT_OFFSET',
                    'EX_NORMAL_MODEL': 'NETCDF3_CLASSIC',
@@ -39,6 +60,18 @@ class Exodus:
 
     # Should creating a new file (mode 'w') be a function on its own?
     def __init__(self, path, mode, shared=False, format='EX_NETCDF4', word_size=4):
+        """
+        Exodus constructor.
+
+        :param path: path to the Exodus II file to open as a string.
+        :param mode: access mode. 'r' opens the file in read only mode. 'a' is append mode; it allows you to modify the
+        file as well as read from it. 'w' is write mode; it creates a new file at the specified path and opens it as in
+        append mode.
+        :param shared: if `True` the file will open with unbuffered shared access for NetCDF 3 classic, 64bit offset,
+        and 64bit data models (EX_NORMAL_MODEL, EX_LARGE_MODEL, EX_64BIT_DATA).
+        :param format: if `mode` is 'w' then this is the underlying netCDF format the database will use.
+        :param word_size: if `mode` is 'w' then this is the floating point word size used in the database.
+        """
         # clobber and format and word_size only apply to mode w
         if mode not in ['r', 'w', 'a']:
             raise ValueError("mode must be 'w', 'r', or 'a', got '{}'".format(mode))
@@ -67,11 +100,9 @@ class Exodus:
             raise FileNotFoundError("file '{}' does not exist".format(path)) from None
         except PermissionError:
             raise PermissionError("You do not have access to '{}'".format(path)) from None
-        # TODO this can actually hide some errors which is bad. This check should be done explicitly
-        except OSError:
-            raise OSError("file '{}' already exists".format(path)) from None
-
-
+        # this can actually hide some errors which is bad.
+        # except OSError:
+        #     raise OSError("file '{}' already exists".format(path)) from None
 
         if self.mode == 'w':
             # This is important according to ex_open.c
@@ -105,16 +136,6 @@ class Exodus:
             if nc_format == 'NETCDF3_64BIT_DATA':
                 int64bit_status = 1
             self.data.setncattr('int64_status', int64bit_status)
-
-        # TODO Uncomment these later
-        #  The C library doesn't seem to care if the file is in read or modify mode when it does this
-        # Add this if it doesn't exist (value of 33)
-        # if 'len_name' not in self.data.dimensions:
-        #     warnings.warn("'len_name' dimension is missing!")
-
-        # Add this if it doesn't exist (value of 32)
-        # if 'maximum_name_length' not in self.data.ncattrs():
-        #     warnings.warn("'maximum_name_length' attribute is missing!")
 
         # Check version compatibility
         ver = self.version
@@ -1005,9 +1026,9 @@ class Exodus:
 
     def has_var_names(self, var_type: VariableType):
         """
-        .Test if this Exodus file has variable names for a variable type.
+        Test if this Exodus file has variable names for a variable type.
 
-        :param var_type: GLOBAL_VAR, NODAL_VAR, ELEMENTAL_VAR, NODESET_VAR, or SIDESET_VAR from `constants`
+        :param var_type: GLOBAL_VAR, NODAL_VAR, ELEMENTAL_VAR, NODESET_VAR, or SIDESET_VAR from `exodusutils.constants`
         :return: True if this variable type has names defined, false otherwise
         """
         if var_type == GLOBAL_VAR:
@@ -2609,36 +2630,9 @@ class Exodus:
                 return index
         return None
 
-    def get_dimension(self, name):
-        if name in self.data.dimensions:
-            return self.data.dimensions[name].size
-        else:
-            raise RuntimeError("dimensions '{}' cannot be found!".format(name))
-
-    def get_parameter(self, name):
-        if name in self.data.ncattrs():
-            return self.data.getncattr(name)
-        else:
-            raise RuntimeError("parameter '{}' cannot be found!".format(name))
-
     def close(self):
+        """Close the Exodus II file."""
         self.data.close()
-
-    def print_dimensions(self):
-        for dim in self.data.dimensions.values():
-            print(dim)
-
-    def print_dimension_names(self):
-        for dim in self.data.dimensions:
-            print(dim)
-
-    def print_variables(self):
-        for v in self.data.variables.values():
-            print(v, "\n")
-
-    def print_variable_names(self):
-        for v in self.data.variables:
-            print(v)
 
     def set_nodeset(self, node_set_id, node_ids):
         ndx = node_set_id - 1

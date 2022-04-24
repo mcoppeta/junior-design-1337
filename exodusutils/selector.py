@@ -1,3 +1,10 @@
+"""
+Selectors are used to select a subset of an Exodus file's features.
+
+These are used extensively in `exodusutils.output_subset`. See that documentation for more details on how to use
+members of this module.
+"""
+
 from __future__ import annotations  # use the magic of python 3.7 to let use write Exodus instead of "Exodus"
 from typing import TYPE_CHECKING
 

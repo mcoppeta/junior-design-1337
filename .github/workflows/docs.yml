@@ -27,7 +27,7 @@ jobs:
         pip install pdoc
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       # ADJUST THIS: build your documentation into docs/.
-      - run: pdoc exodusutils !exodusutils.constants !exodusutils.elem_ledger !exodusutils.element_block !exodusutils.element_types !exodusutils.iterate !exodusutils.ledger !exodusutils.ns_ledger !exodusutils.ss_ledger !exodusutils.util -o docs/
+      - run: pdoc exodusutils !exodusutils.elem_ledger !exodusutils.element_block !exodusutils.element_types !exodusutils.iterate !exodusutils.ledger !exodusutils.ns_ledger !exodusutils.ss_ledger !exodusutils.util -o docs/
       # We use a custom build script for pdoc itself, ideally you just run `pdoc -o docs/ ...` here.
 
       - run: tar --directory docs/ -hcf artifact.tar .

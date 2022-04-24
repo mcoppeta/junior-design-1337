@@ -3,7 +3,8 @@
 from datetime import datetime
 import numpy as np
 from netCDF4 import stringtoarr
-from .constants import LIB_VERSION_MINOR, LIB_VERSION_MAJOR, LIB_NAME
+from .constants import LIB_NAME
+from ._version import __version__
 
 
 def c_print(line):
@@ -62,7 +63,7 @@ def generate_qa_rec(length):
     """
     rec = np.empty((4, length + 1), '|S1')
     rec[0] = stringtoarr(LIB_NAME, length+1)
-    rec[1] = stringtoarr("%d.%d" % (LIB_VERSION_MAJOR, LIB_VERSION_MINOR), length+1)
+    rec[1] = stringtoarr(__version__, length+1)
     t = datetime.now()
     rec[2] = stringtoarr(t.strftime("%m/%d/%y"), length+1)
     rec[3] = stringtoarr(t.strftime("%X"), length+1)
