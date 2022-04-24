@@ -749,7 +749,6 @@ def test_read_after_remove(tmpdir):
     elems, sides = exofile.get_side_set(7)
     assert np.array_equal(elems, [7, 8, 3, 4])
     assert np.array_equal(sides, [3, 3, 3, 3])
-    exofile.write(tmpdir + "./cube_read_test.exo")
     exofile.close()
 
 def test_read_after_add(tmpdir):
@@ -761,6 +760,8 @@ def test_read_after_add(tmpdir):
     assert np.array_equal(dfs, [1, 2, 2, 1])
     assert np.array_equal(elems, [3, 4, 7, 8])
     assert np.array_equal(sides, [4, 4, 4, 4])
+    exofile.close()
+
 
     # Add sides to sideset and check
     exofile.add_sides_to_sideset([3, 4, 7, 8], [3, 3, 3, 3], 1)
@@ -779,6 +780,7 @@ def test_read_after_remove_sides(tmpdir):
     assert np.array_equal(elems, [6, 8])
     assert np.array_equal(sides, [6, 6])
     assert np.array_equal(dfs, [1, 1, 1, 1, 1, 1, 1, 1])
+    exofile.close()
 
 
 
