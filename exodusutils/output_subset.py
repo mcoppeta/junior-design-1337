@@ -23,9 +23,13 @@ if TYPE_CHECKING:  # evaluates to false at runtime
 # Writing out a subset of a mesh
 def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[ElementBlockSelector],
                   ss_selectors: List[SideSetSelector], ns_selectors: List[NodeSetSelector],
-                  prop_selector: PropertySelector, nod_vars: List[int], glo_vars: List[int], time_steps: List[int]):
+                  prop_selector: PropertySelector, nod_vars: List[int] = ..., glo_vars: List[int] = ...,
+                  time_steps: List[int] = ...):
     """
     Creates a new Exodus file containing a subset of the mesh stored in another Exodus file.
+
+    For variables and time steps: pass in ``...`` to select everything, ``None`` to select nothing, or a list of
+    specific values. Lists will be sorted upon entry to maintain element order consistency.
 
     :param input: exodus object of the file to copy a subset of
     :param path: location of the new exodus file
@@ -39,6 +43,18 @@ def output_subset(input: Exodus, path: str, title: str, eb_selectors: List[Eleme
     :param time_steps: range of time steps to keep (1-indexed)
     """
     # TODO you should be able to select variables by name as well as id!
+    if time_steps is None:
+        time_steps = []
+    elif time_steps is ...:
+        time_steps = list(range(1, input.num_time_steps + 1))
+    if nod_vars is None:
+        nod_vars = []
+    elif nod_vars is ...:
+        nod_vars = list(range(1, input.num_node_var + 1))
+    if glo_vars is None:
+        glo_vars = []
+    elif glo_vars is ...:
+        glo_vars = list(range(1, input.num_global_var + 1))
     # Sort lists to maintain input file order in output file
     time_steps.sort()
     nod_vars.sort()
