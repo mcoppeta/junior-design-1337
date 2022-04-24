@@ -1802,7 +1802,7 @@ class Exodus:
             raise KeyError("Failed to retrieve connectivity list of element block with id {} ('{}')"
                            .format(obj_id, VAR_CONNECT % internal_id))
         
-	# TODO: Add case for append mode if attributes added
+    # TODO: Add case for append mode if attributes added
         if (DIM_NUM_ATT_IN_BLK % internal_id) in self.data.dimensions:
             num_att_blk = self.data.dimensions[DIM_NUM_ATT_IN_BLK % internal_id].size
         else:
@@ -2805,147 +2805,214 @@ class Exodus:
     #                                                              #
     ################################################################
 
-    def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
+    def add_nodeset(self, node_ids, node_set_id, node_set_name=""):
+        """ Add node set to exodus file
+        Args:
+            node_ids: the node IDs that will be in the new node set
+            node_set_id: the id of the new node set
+            node_set_name: the name of the new node set. Defaults to NodeSetN
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add node set")
-        self.ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
+        self.ledger.add_nodeset(node_ids, node_set_id, node_set_name)
 
     def remove_nodeset(self, identifier):
+        """ Remove node set from exodus file
+        Args:
+            identifier: the node set to remove. Can be node set ID or node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to remove node set")
         self.ledger.remove_nodeset(identifier)
 
-    def merge_nodeset(self, new_id, ns1, ns2, delete=True):
+    def merge_nodeset(self, new_id: int, ns1: int, ns2: int, delete: bool = True):
+        """ Merge 2 node sets
+        Args:
+            new_id: the ID of the new node set
+            ns1: the ID of the first node set
+            ns2: the ID of the second node set
+            delete: whether or not to delete the original node sets. Defaults to True
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to merge node sets")
         self.ledger.merge_nodesets(new_id, ns1, ns2, delete)
 
-    def add_node_to_nodeset(self, node_id, identifier):
+    def add_node_to_nodeset(self, node_id: int, identifier):
+        """ add a node to an existing node set
+        Args:
+            node_id: the node to add to the existing node set
+            identifier: the node set being added to. Can be node set ID or node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add node to node set")
         self.ledger.add_node_to_nodeset(node_id, identifier)
 
     def add_nodes_to_nodeset(self, node_ids, identifier):
+        """ Add multiple nodes to an existing node set
+        Args:
+            node_ids: an array of nodes to add to the existing node set
+            identifier: the node set being added to. Can be node set ID or node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add nodes to node set")
         self.ledger.add_nodes_to_nodeset(node_ids, identifier)
 
-    def remove_node_from_nodeset(self, node_id, identifier):
+    def remove_node_from_nodeset(self, node_id: int, identifier):
+        """ Remove given nodes from a specified node set
+        Args:
+            node_ids: the ids of the nodes to remove from the given node set
+            identifier: Specifies the node set from which nodes are being removed. Can be node set ID or node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to remove node from node set")
         self.ledger.remove_node_from_nodeset(node_id, identifier)
 
     def remove_nodes_from_nodeset(self, node_ids, identifier):
+        """ Remove given nodes from a specified node set
+        Args:
+            node_ids: the ids of the nodes to remove from the given node set
+            identifier: Specifies the node set from which nodes are being removed. Can be node set ID or node set name
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to remove nodes from node set")
         self.ledger.remove_nodes_from_nodeset(node_ids, identifier)
 
-    """
-    Adds new sideset. Takes in element ids, side ids, id of the new sideset, and name of the new sideset. 
-    Can optionally specify distribution factor and variables. If no distribution factors are specified 
-    and they are required, placeholder 1s will be inserted. If no variables are specified and they are required, 
-    placeholder 0s will be inserted. If specifying distribution factors, they must be of size n * len(elem_ids), where
-    n is a positive integer. If specifying variables, they must be of dimensions 
-    [number of sideset variables, number of timesteps, number of sides in sideset].
-    """
 
-    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
+    def add_side_set(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
+        """
+        Adds new sideset. Takes in element ids, side ids, id of the new sideset, and name of the new sideset. 
+        Can optionally specify distribution factor and variables. If no distribution factors are specified 
+        and they are required, placeholder 1s will be inserted. If no variables are specified and they are required, 
+        placeholder 0s will be inserted.
+
+        :param elem_ids: The element IDs of the sides
+        :param side_ids: The side numbers
+        :param ss_id: The ID of the new sideset
+        :param ss_name: The name of the new sideset
+        :param dist_fact: OPTIONAL, if specified needs to be of length n * len(elem_ids)
+        :param variables: OPTIONAL, if specified needs to be of shape [num sideset variables, num timesteps, num sides in sideset]
+        """
+
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add side set")
         self.ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact, variables)
 
-    """
-    Removes an existing sideset. Must specify id of sideset for removal.
-    """
 
-    def remove_sideset(self, ss_id):
+    def remove_side_set(self, ss_id):
+        """
+        Removes an existing sideset. Must specify id of sideset for removal.
+
+        :param ss_id: ID of the sideset to remove
+        """
+
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to remove side set")
         self.ledger.remove_sideset(ss_id)
 
 
-    """
-    Adds sides to already existing sideset. Must specify the element ids of sides to add, the side ids of sides to add
-    the id of the sideset being added to, and optionally the distribution factors and variables. If no distribution 
-    factors are specified, and they are required, they will be filled with 1s. If no variables are specified, 
-    and they are required, they will be filled with 0s. If specifying distribution factors, they must be of size n * len(elem_ids), 
-    where n is a positive integer. If specifying variables, they must be of dimensions 
-    [number of sideset variables, number of timesteps, number of sides being added].
-    """
+    def add_sides_to_side_set(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
+        
+        """
+        Adds sides to already existing sideset. Must specify the element ids of sides to add, the side ids of sides to add
+        the id of the sideset being added to, and optionally the distribution factors and variables. If no distribution 
+        factors are specified, and they are required, they will be filled with 1s. If no variables are specified, 
+        and they are required, they will be filled with 0s.
 
-    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
+        :param elem_ids: The element IDs of the sides
+        :param side_ids: The side numbers
+        :param ss_id: The ID of the new sideset
+        :param ss_name: The name of the new sideset
+        :param dist_fact: OPTIONAL, if specified needs to be of length n * len(elem_ids), where n is the current number of distribution factors
+        per side for this sideset
+        :param variables: OPTIONAL, if specified needs to be of shape [num sideset variables, num timesteps, num sides being added]
+        """ 
+
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to add sides to side set")
         self.ledger.add_sides_to_sideset(elem_ids, side_ids, ss_id, dist_facts, variables)
 
-    """
-    Removes sides from the specified sideset id. Takes in element ids and their corresponding side ids, as 
-    well as the id of the sideset to remove the sides from. 
-    """
 
-    def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
+    def remove_sides_from_side_set(self, elem_ids, side_ids, ss_id):
+        """
+        Removes sides from the sideset with the specified ss_id. 
+
+        :param elem_ids: The element IDs of the sides to remove
+        :param side_ids: The side numbers of the sides to remove
+        :param ss_id: The ID of the sideset to remove sides from
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to remove sides from side set")
         self.ledger.remove_sides_from_sideset(elem_ids, side_ids, ss_id)
 
-    """
-    Splits an existing side set (specified by ID) into 2 new side sets based on a passed in function. The paramater
-    'function' should return a boolean and take in a tuple of (element, state). The parameter 'delete' should be True
-    to delete the original side set after splitting or False to keep the original side set after splitting. An ID for
-    each of the two new side sets must be passed in, and names for each of the two new side sets can be passed in
-    but default to the empty string otherwise.
-    """
+    def split_side_set(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        """
+        Splits an existing side set (specified by ID) into 2 new side sets based on a passed in function
 
-    def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        :param old_ss: ID of side set to be split
+        :param function: function that should take in a tuple of (element, state) and return a boolean
+        :param ss_id1: ID of first created side set, contains sides that cause 'function' to return True
+        :param ss_id2: ID of second created side set, contains sides that cause 'function' to return False
+        :param delete: True to delete original side set after splitting, False to keep original side set
+        :param ss_name1: Name of first side set created from split, defaults to empty string
+        :param ss_name2: Name of second side set created from split, defaults to empty string
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to split sideset")
         self.ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
 
-    """
-    Splits an existing side set into 2 new side sets based on a comparison of the x-coordinates of nodes in the sides
-    and to a user-specified value. Comparison should be one of the following strings:  '<', '>', '<=', '>=', '=', or '!='.
-    The parameter 'x-value' should be the value that x-coords of the nodes of a side are compared to. The parameter
-    'all_nodes' should be True if all of the nodes in a given side need to match the criteria of the comparison
-    or False if only one node needs to meet the criteria of the comparison. The parameter 'delete' should be True to
-    delete the original side set after splitting or False to keep the original side set after splitting. An ID for
-    each of the two new side sets must be passed in, and names for each of the two new side sets can be passed in
-    but default to the empty string otherwise.
-    """
+    def split_side_set_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        """
+        Splits an existing side set into 2 new side sets based on a comparison of the x-coordinates of nodes in the sides
+        and to a user-specified value. 
 
-    def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        :param old_ss: ID of side set to be split
+        :param comparison: String, either '<', '>', '<=', '>=', '=', or '!=', to be used for splitting criteria
+        :param x_value: Number value to compare x-coordinate of nodes in a side to
+        :param all_nodes: True if all nodes in given side need to match comparison criteria, False if only one needs to
+        :param ss_id1: ID of first created side set, contains sides that have nodes with x-coords that make comparison true
+        :param ss_id2: ID of second created side set, contains sides that have nodes with x-coords that make comparison false
+        :param delete: True to delete original side set after splitting, False to keep original side set
+        :param ss_name1: Name of first side set created from split, defaults to empty string
+        :param ss_name2: Name of second side set created from split, defaults to empty string
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to split sideset based on x-coord")
         self.ledger.split_sideset_x_coords(old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
     
+    def split_side_set_y_coords(self, old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        """
+        Splits an existing side set into 2 new side sets based on a comparison of the y-coordinates of nodes in the sides
+        and to a user-specified value. 
 
-    """
-    Splits an existing side set into 2 new side sets based on a comparison of the y-coordinates of nodes in the sides
-    and to a user-specified value. Comparison should be one of the following strings:  '<', '>', '<=', '>=', '=', or '!='.
-    The parameter 'y-value' should be the value that y-coords of the nodes of a side are compared to. The parameter
-    'all_nodes' should be True if all of the nodes in a given side need to match the criteria of the comparison
-    or False if only one node needs to meet the criteria of the comparison. The parameter 'delete' should be True to 
-    delete the original side set after splitting or False to keep the original side set after splitting. An ID for each
-    of the two new side sets must be passed in, and names for each of the two new side sets can be passed in
-    but default to the empty string otherwise.
-    """
-
-    def split_sideset_y_coords(self, old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        :param old_ss: ID of side set to be split
+        :param comparison: String, either '<', '>', '<=', '>=', '=', or '!=', to be used for splitting criteria
+        :param y_value: Number value to compare y-coordinate of nodes in a side to
+        :param all_nodes: True if all nodes in given side need to match comparison criteria, False if only one needs to
+        :param ss_id1: ID of first created side set, contains sides that have nodes with y-coords that make comparison true
+        :param ss_id2: ID of second created side set, contains sides that have nodes with y-coords that make comparison false
+        :param delete: True to delete original side set after splitting, False to keep original side set
+        :param ss_name1: Name of first side set created from split, defaults to empty string
+        :param ss_name2: Name of second side set created from split, defaults to empty string
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to split sideset based on y-coord")
         self.ledger.split_sideset_y_coords(old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
 
-    """
-    Splits an existing side set into 2 new side sets based on a comparison of the z-coordinates of nodes in the sides
-    and to a user-specified value. Comparison should be one of the following strings:  '<', '>', '<=', '>=', '=', or '!='.
-    The parameter 'z-value' should be the value that z-coords of the nodes of a side are compared to. The parameter
-    'all_nodes' should be True if all of the nodes in a given side need to match the criteria of the comparison
-    or False if only one node needs to meet the criteria of the comparison. The parameter 'delete' should be True to
-    delete the original side set after splitting or False to keep the original side set after splitting. An ID for each
-    of the two new side sets must be passed in, and names for each of the two new side sets can be passed in
-    but default to the empty string otherwise.
-    """
+    def split_side_set_z_coords(self, old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        """
+        Splits an existing side set into 2 new side sets based on a comparison of the z-coordinates of nodes in the sides
+        and to a user-specified value. 
 
-    def split_sideset_z_coords(self, old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
+        :param old_ss: ID of side set to be split
+        :param comparison: String, either '<', '>', '<=', '>=', '=', or '!=', to be used for splitting criteria
+        :param z_value: Number value to compare z-coordinate of nodes in a side to
+        :param all_nodes: True if all nodes in given side need to match comparison criteria, False if only one needs to
+        :param ss_id1: ID of first created side set, contains sides that have nodes with z-coords that make comparison true
+        :param ss_id2: ID of second created side set, contains sides that have nodes with z-coords that make comparison false
+        :param delete: True to delete original side set after splitting, False to keep original side set
+        :param ss_name1: Name of first side set created from split, defaults to empty string
+        :param ss_name2: Name of second side set created from split, defaults to empty string
+        """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to split sideset based on z-coord")
         self.ledger.split_sideset_z_coords(old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
@@ -3000,6 +3067,7 @@ class Exodus:
         self.ledger.skin(skin_id, skin_name, tri)
         
     def write(self, path=None):
+        """ Write out the exodus object to a file. New path must be specified while in write mode """
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to write")
         elif self.mode == 'a' and path is None:
