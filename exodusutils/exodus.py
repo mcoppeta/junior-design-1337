@@ -2841,7 +2841,7 @@ class Exodus:
         self.ledger.remove_nodes_from_nodeset(node_ids, identifier)
 
 
-    def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
+    def add_side_set(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
         """
         Adds new sideset. Takes in element ids, side ids, id of the new sideset, and name of the new sideset. 
         Can optionally specify distribution factor and variables. If no distribution factors are specified 
@@ -2861,7 +2861,7 @@ class Exodus:
         self.ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact, variables)
 
 
-    def remove_sideset(self, ss_id):
+    def remove_side_set(self, ss_id):
         """
         Removes an existing sideset. Must specify id of sideset for removal.
 
@@ -2873,7 +2873,7 @@ class Exodus:
         self.ledger.remove_sideset(ss_id)
 
 
-    def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
+    def add_sides_to_side_set(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
         
         """
         Adds sides to already existing sideset. Must specify the element ids of sides to add, the side ids of sides to add
@@ -2895,7 +2895,7 @@ class Exodus:
         self.ledger.add_sides_to_sideset(elem_ids, side_ids, ss_id, dist_facts, variables)
 
 
-    def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
+    def remove_sides_from_side_set(self, elem_ids, side_ids, ss_id):
         """
         Removes sides from the sideset with the specified ss_id. 
 

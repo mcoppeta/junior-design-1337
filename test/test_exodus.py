@@ -529,10 +529,10 @@ def test_permissions():
         exofile.write()
 
     with pytest.raises(PermissionError):
-        exofile.add_sideset([10, 11, 12, 13, 14, 15], [1, 2, 3, 4], 3, "sideset1", [10, 1, 1, 1, 1])
+        exofile.add_side_set([10, 11, 12, 13, 14, 15], [1, 2, 3, 4], 3, "sideset1", [10, 1, 1, 1, 1])
 
     with pytest.raises(PermissionError):
-        exofile.remove_sideset(10)
+        exofile.remove_side_set(10)
 
     with pytest.raises(PermissionError):
         exofile.add_node_to_nodeset(11, 3)
@@ -556,11 +556,11 @@ def test_permissions():
 def test_empty_sideset_remove(tmpdir):
     exofile = Exodus(str(tmpdir) + '\\test.ex2', 'w')
     with pytest.raises(IndexError):
-        exofile.remove_sideset(10)
+        exofile.remove_side_set(10)
 
 def test_add_sideset_no_df_no_vars(tmpdir):
     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
-    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New")
+    exofile.add_side_set([3, 4, 7, 8], [3, 3, 3, 3], 3, "New")
     exofile.write(str(tmpdir) + "/new_file.exo")
     exofile.close()
     exofile = Exodus(str(tmpdir) + "/new_file.exo", "r")
@@ -582,7 +582,7 @@ def test_add_sideset_no_df_no_vars(tmpdir):
 
 def test_add_sideset_df_no_vars(tmpdir):
     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
-    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", [1, 1, 1, 1, 1, 1, 1, 1])
+    exofile.add_side_set([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", [1, 1, 1, 1, 1, 1, 1, 1])
     exofile.write(str(tmpdir) + "/add_sideset_df_no_vars.exo")
     exofile.close()
 
@@ -607,7 +607,7 @@ def test_add_sideset_df_no_vars(tmpdir):
 
 def test_add_sideset_df_vars(tmpdir):
     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
-    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", [1, 1, 1, 1, 1, 1, 1, 1], [[1, 1, 1, 1], [1, 1, 1, 1]])
+    exofile.add_side_set([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", [1, 1, 1, 1, 1, 1, 1, 1], [[1, 1, 1, 1], [1, 1, 1, 1]])
     exofile.write(str(tmpdir) + "/add_sideset_df_vars.exo")
     exofile.close()
 
@@ -632,7 +632,7 @@ def test_add_sideset_df_vars(tmpdir):
 
 def test_add_sideset_no_df_vars(tmpdir):
     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
-    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", variables=[[1, 2, 3, 4], [1, 2, 3, 4]])
+    exofile.add_side_set([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", variables=[[1, 2, 3, 4], [1, 2, 3, 4]])
     exofile.write(str(tmpdir) + "/add_sideset_no_df_vars.exo")
     exofile.close()
 
@@ -656,7 +656,7 @@ def test_add_sideset_no_df_vars(tmpdir):
 
 def test_add_sideset_df_cube1ts(tmpdir):
     exofile = Exodus("./sample-files/cube_1ts_mod.e", 'a')
-    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", dist_fact =[1, 1, 1, 1, 1, 1, 1, 1])
+    exofile.add_side_set([3, 4, 7, 8], [3, 3, 3, 3], 3, "New", dist_fact =[1, 1, 1, 1, 1, 1, 1, 1])
     exofile.write(str(tmpdir) + "/add_sideset_df_vars_cube1ts.exo")
     exofile.close()
 
@@ -676,7 +676,7 @@ def test_add_sideset_df_cube1ts(tmpdir):
 
 def test_add_sideset_no_df_cube1ts(tmpdir):
     exofile = Exodus("./sample-files/cube_1ts_mod.e", 'a')
-    exofile.add_sideset([3, 4, 7, 8], [3, 3, 3, 3], 3, "New")
+    exofile.add_side_set([3, 4, 7, 8], [3, 3, 3, 3], 3, "New")
     exofile.write(str(tmpdir) + "/add_sideset_no_df_cube1ts.exo")
     exofile.close()
 
@@ -694,7 +694,7 @@ def test_add_sideset_no_df_cube1ts(tmpdir):
 
 def test_add_sides_to_sideset_no_vars_no_df(tmpdir):
     exofile = Exodus("./sample-files/cube_1ts_mod.e", 'a')
-    exofile.add_sides_to_sideset([1, 2, 3, 4], [4, 4, 4, 4], 1)
+    exofile.add_sides_to_side_set([1, 2, 3, 4], [4, 4, 4, 4], 1)
     exofile.write(str(tmpdir) + "/add_sides_to_sideset_cube1ts.exo")
     exofile.close()
 
@@ -713,7 +713,7 @@ def test_add_sides_to_sideset_no_vars_no_df(tmpdir):
 
 def test_add_sides_to_sideset_vars_dfs(tmpdir):
     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
-    exofile.add_sides_to_sideset([1, 2, 3, 4], [4, 4, 4, 4], 2, dist_facts=[4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], variables=[[[1, 2, 3, 4]], [[1, 2, 3, 4]]])
+    exofile.add_sides_to_side_set([1, 2, 3, 4], [4, 4, 4, 4], 2, dist_facts=[4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], variables=[[[1, 2, 3, 4]], [[1, 2, 3, 4]]])
     exofile.write(str(tmpdir) + "/add_sides_to_sideset_cubewdata.exo")
     exofile.close()
 
@@ -734,7 +734,7 @@ def test_add_sides_to_sideset_vars_dfs(tmpdir):
 
 def test_add_sides_to_sideset_no_vars_no_df(tmpdir):
     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
-    exofile.add_sides_to_sideset([1, 2, 3, 4], [4, 4, 4, 4], 2)
+    exofile.add_sides_to_side_set([1, 2, 3, 4], [4, 4, 4, 4], 2)
     exofile.write(str(tmpdir) + "/add_sides_to_sideset_cubewdata.exo")
     exofile.close()
 
@@ -757,7 +757,7 @@ def test_add_sides_to_sideset_no_vars_no_df(tmpdir):
 def test_var_fail_cube1ts():
     exofile = Exodus("./sample-files/cube_1ts_mod.e", 'a')
     with pytest.raises(Exception):
-        exofile.add_sides_to_sideset([1, 2, 3, 4], [4, 4, 4, 4], 1, variables=[1, 1, 1, 1])
+        exofile.add_sides_to_side_set([1, 2, 3, 4], [4, 4, 4, 4], 1, variables=[1, 1, 1, 1])
     exofile.close()
 
 # def test_add_sideset_biplane(tmpdir):
@@ -774,7 +774,7 @@ def test_var_fail_cube1ts():
 
 def test_read_after_remove(tmpdir):
     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
-    exofile.remove_sideset(2)
+    exofile.remove_side_set(2)
     elems, sides = exofile.get_side_set(7)
     assert np.array_equal(elems, [7, 8, 3, 4])
     assert np.array_equal(sides, [3, 3, 3, 3])
@@ -783,7 +783,7 @@ def test_read_after_remove(tmpdir):
 def test_read_after_add(tmpdir):
     # Add sideset and check
     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
-    exofile.add_sideset([3, 4, 7, 8], [4, 4, 4, 4], 1, "BasicNew", dist_fact=[1, 2, 2, 1])
+    exofile.add_side_set([3, 4, 7, 8], [4, 4, 4, 4], 1, "BasicNew", dist_fact=[1, 2, 2, 1])
     elems, sides = exofile.get_side_set(1)
     dfs = exofile.get_side_set_df(1)
     assert np.array_equal(dfs, [1, 2, 2, 1])
@@ -792,7 +792,7 @@ def test_read_after_add(tmpdir):
 
 
     # Add sides to sideset and check
-    exofile.add_sides_to_sideset([3, 4, 7, 8], [3, 3, 3, 3], 1)
+    exofile.add_sides_to_side_set([3, 4, 7, 8], [3, 3, 3, 3], 1)
     elems, sides = exofile.get_side_set(1)
     dfs = exofile.get_side_set_df(1)
     assert np.array_equal(dfs, [1, 2, 2, 1, 1, 1, 1, 1])
@@ -802,7 +802,7 @@ def test_read_after_add(tmpdir):
 
 def test_read_after_remove_sides(tmpdir):
     exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
-    exofile.remove_sides_from_sideset([7, 5], [6, 6], 2)
+    exofile.remove_sides_from_side_set([7, 5], [6, 6], 2)
     elems, sides = exofile.get_side_set(2)
     dfs = exofile.get_side_set_df(2)
     assert np.array_equal(elems, [6, 8])
