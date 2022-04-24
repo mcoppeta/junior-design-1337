@@ -2807,37 +2807,37 @@ class Exodus:
 
     def add_nodeset(self, node_ids, nodeset_id, nodeset_name=""):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to add node set")
         self.ledger.add_nodeset(node_ids, nodeset_id, nodeset_name)
 
     def remove_nodeset(self, identifier):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to remove node set")
         self.ledger.remove_nodeset(identifier)
 
     def merge_nodeset(self, new_id, ns1, ns2, delete=True):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to merge node sets")
         self.ledger.merge_nodesets(new_id, ns1, ns2, delete)
 
     def add_node_to_nodeset(self, node_id, identifier):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to add node to node set")
         self.ledger.add_node_to_nodeset(node_id, identifier)
 
     def add_nodes_to_nodeset(self, node_ids, identifier):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to add nodes to node set")
         self.ledger.add_nodes_to_nodeset(node_ids, identifier)
 
     def remove_node_from_nodeset(self, node_id, identifier):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to remove node from node set")
         self.ledger.remove_node_from_nodeset(node_id, identifier)
 
     def remove_nodes_from_nodeset(self, node_ids, identifier):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to remove nodes from node set")
         self.ledger.remove_nodes_from_nodeset(node_ids, identifier)
 
     """
@@ -2851,7 +2851,7 @@ class Exodus:
 
     def add_sideset(self, elem_ids, side_ids, ss_id, ss_name, dist_fact=None, variables=None):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to add side set")
         self.ledger.add_sideset(elem_ids, side_ids, ss_id, ss_name, dist_fact, variables)
 
     """
@@ -2860,7 +2860,7 @@ class Exodus:
 
     def remove_sideset(self, ss_id):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to remove side set")
         self.ledger.remove_sideset(ss_id)
 
 
@@ -2875,7 +2875,7 @@ class Exodus:
 
     def add_sides_to_sideset(self, elem_ids, side_ids, ss_id, dist_facts=None, variables=None):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to add sides to side set")
         self.ledger.add_sides_to_sideset(elem_ids, side_ids, ss_id, dist_facts, variables)
 
     """
@@ -2885,23 +2885,65 @@ class Exodus:
 
     def remove_sides_from_sideset(self, elem_ids, side_ids, ss_id):
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to remove sides from side set")
         self.ledger.remove_sides_from_sideset(elem_ids, side_ids, ss_id)
+
+    """
+    Splits an existing side set (specified by ID) into 2 new side sets based on a passed in function. The paramater
+    'function' should return a boolean and take in a tuple of (element, state). The parameter 'delete' should be True
+    to delete the original side set after splitting or False to keep the original side set after splitting. An ID for
+    each of the two new side sets must be passed in, and names for each of the two new side sets can be passed in
+    but default to the empty string otherwise.
+    """
 
     def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to split sideset")
         self.ledger.split_sideset(old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2)
 
+    """
+    Splits an existing side set into 2 new side sets based on a comparison of the x-coordinates of nodes in the sides
+    and to a user-specified value. Comparison should be one of the following strings:  '<', '>', '<=', '>=', '=', or '!='.
+    The parameter 'x-value' should be the value that x-coords of the nodes of a side are compared to. The parameter
+    'all_nodes' should be True if all of the nodes in a given side need to match the criteria of the comparison
+    or False if only one node needs to meet the criteria of the comparison. The parameter 'delete' should be True to
+    delete the original side set after splitting or False to keep the original side set after splitting. An ID for
+    each of the two new side sets must be passed in, and names for each of the two new side sets can be passed in
+    but default to the empty string otherwise.
+    """
+
     def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to split sideset based on x-coord")
         self.ledger.split_sideset_x_coords(old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
     
+
+    """
+    Splits an existing side set into 2 new side sets based on a comparison of the y-coordinates of nodes in the sides
+    and to a user-specified value. Comparison should be one of the following strings:  '<', '>', '<=', '>=', '=', or '!='.
+    The parameter 'y-value' should be the value that y-coords of the nodes of a side are compared to. The parameter
+    'all_nodes' should be True if all of the nodes in a given side need to match the criteria of the comparison
+    or False if only one node needs to meet the criteria of the comparison. The parameter 'delete' should be True to 
+    delete the original side set after splitting or False to keep the original side set after splitting. An ID for each
+    of the two new side sets must be passed in, and names for each of the two new side sets can be passed in
+    but default to the empty string otherwise.
+    """
+
     def split_sideset_y_coords(self, old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to split sideset based on y-coord")
         self.ledger.split_sideset_y_coords(old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2)
+
+    """
+    Splits an existing side set into 2 new side sets based on a comparison of the z-coordinates of nodes in the sides
+    and to a user-specified value. Comparison should be one of the following strings:  '<', '>', '<=', '>=', '=', or '!='.
+    The parameter 'z-value' should be the value that z-coords of the nodes of a side are compared to. The parameter
+    'all_nodes' should be True if all of the nodes in a given side need to match the criteria of the comparison
+    or False if only one node needs to meet the criteria of the comparison. The parameter 'delete' should be True to
+    delete the original side set after splitting or False to keep the original side set after splitting. An ID for each
+    of the two new side sets must be passed in, and names for each of the two new side sets can be passed in
+    but default to the empty string otherwise.
+    """
 
     def split_sideset_z_coords(self, old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1="", ss_name2=""):
         if self.mode != 'w' and self.mode != 'a':
@@ -2916,7 +2958,7 @@ class Exodus:
         :param nodelist: list of node IDs that make up the new element
         """
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to add element")
         return self.ledger.add_element(block_id, nodelist)
 
 
@@ -2927,7 +2969,7 @@ class Exodus:
         :param elem_id: ID of the element to be removed
         """
         if self.mode != 'w' and self.mode != 'a':
-            raise PermissionError("Need to be in write or append mode to add nodeset")
+            raise PermissionError("Need to be in write or append mode to remove element")
         return self.ledger.remove_element(elem_id)
 
     def skin_element_block(self, block_id, skin_id, skin_name, tri='shell'):
