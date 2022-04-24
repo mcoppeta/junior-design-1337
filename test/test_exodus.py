@@ -762,17 +762,17 @@ def test_var_fail_cube1ts():
 
 
 def test_remove_sides_from_sideset(tmpdir):
-    exofile = Exodus("./sample-files/cube_with_data.exo", 'a')
-    exofile.remove_sides_from_side_set([7, 5], [6, 6], 2)
-    exofile.write(str(tmpdir) + "/add_sides_to_sideset_cubewdata.exo")
+    exofile = Exodus("./sample-files/biplane.exo", 'a')
+    exofile.remove_sides_from_side_set([46, 47], [1, 1], 10)
+    exofile.write(str(tmpdir) + "/add_sides_to_sideset_biplane.exo")
     exofile.close()
 
-    exofile = Exodus(str(tmpdir) + "/add_sides_to_sideset_cubewdata.exo", 'r')
-    elems, sides = exofile.get_side_set(2)
-    dfs = exofile.get_side_set_df(2)
-    assert np.array_equal(elems, [6, 8])
-    assert np.array_equal(sides, [6, 6])
-    assert np.array_equal(dfs, [1, 1, 1, 1, 1, 1, 1, 1])
+    exofile = Exodus(str(tmpdir) + "/add_sides_to_sideset_biplane.exo", 'r')
+    elems, sides = exofile.get_side_set(10)
+    dfs = exofile.get_side_set_df(10)
+    assert np.array_equal(elems, [48, 49])
+    assert np.array_equal(sides, [1, 1])
+    assert np.array_equal(dfs, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     exofile.close()
 
 
