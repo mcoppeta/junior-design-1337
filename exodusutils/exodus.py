@@ -1,16 +1,16 @@
 import builtins
 import warnings
+from dataclasses import dataclass
+from typing import Tuple
 import netCDF4 as nc
 import numpy
-from typing import Tuple
-from ledger import Ledger
-import util
-from constants import *
-from dataclasses import dataclass
+from .ledger import Ledger
+from . import util
+from .constants import *
 
 
 @dataclass
-class ElemBlockParam:
+class _ElemBlockParam:
     """Stores data used to create a side set node count list."""
     # Adapted from exodusII_int.h on SEACAS
     elem_type_str: str
@@ -1761,7 +1761,7 @@ class Exodus:
         internal_id = self._lookup_id(ELEMBLOCK, obj_id)
         return self._int_get_elem_block_params(obj_id, internal_id)
 
-    def _int_get_elem_block_param_object(self, obj_id, ndim) -> ElemBlockParam:
+    def _int_get_elem_block_param_object(self, obj_id, ndim) -> _ElemBlockParam:
         """Returns parameters used to describe an elem block."""
         # Adapted from ex_int_get_block_param.c
         # Used to get side set node count list
@@ -2057,7 +2057,7 @@ class Exodus:
             el_type = UNKNOWN
             num_sides = 0
             num_nod_side[0] = 0
-        return ElemBlockParam(topo, obj_id, num_el, nod_el, num_sides, num_nod_side, num_att, 0, el_type)
+        return _ElemBlockParam(topo, obj_id, num_el, nod_el, num_sides, num_nod_side, num_att, 0, el_type)
 
     #########
     # Names #

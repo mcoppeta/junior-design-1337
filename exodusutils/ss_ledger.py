@@ -1,5 +1,5 @@
 import numpy as np
-import util
+from . import util
 
 class SSLedger:
 

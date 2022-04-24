@@ -1,18 +1,18 @@
 """Allows creation of a new Exodus file by copying selected parts of an opened Exodus file."""
 
 from __future__ import annotations  # use the magic of python 3.7 to let use write Exodus instead of "Exodus"
+from typing import TYPE_CHECKING, List
 
 import warnings
 import netCDF4 as nc
 import numpy
-import util
-from selector import ElementBlockSelector, NodeSetSelector, SideSetSelector, PropertySelector
-from constants import *
-from typing import TYPE_CHECKING, List
+from . import util
+from .selector import ElementBlockSelector, NodeSetSelector, SideSetSelector, PropertySelector
+from .constants import *
 
 # Activate type checking for Exodus by only importing it in the editor
 if TYPE_CHECKING:  # evaluates to false at runtime
-    from exodus import Exodus
+    from .exodus import Exodus
 
 
 # Writing out a subset of a mesh

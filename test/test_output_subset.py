@@ -1,9 +1,7 @@
 import pytest
 import numpy as np
-from exodus import Exodus
-from selector import ElementBlockSelector, NodeSetSelector, SideSetSelector, PropertySelector
-from constants import *
-from output_subset import output_subset
+from exodusutils.constants import *
+from exodusutils import *
 
 # Disables all warnings in this module
 pytestmark = pytest.mark.filterwarnings('ignore')

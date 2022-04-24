@@ -1,7 +1,6 @@
 import pytest
 import numpy as np
-from exodus import Exodus
-from selector import ElementBlockSelector, NodeSetSelector, SideSetSelector, PropertySelector
+from exodusutils import Exodus, ElementBlockSelector, NodeSetSelector, SideSetSelector, PropertySelector
 
 
 def test_ns_selector():

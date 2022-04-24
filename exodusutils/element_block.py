@@ -1,5 +1,5 @@
 import numpy as np
-import element_types
+from . import element_types
 
 class ElementBlock:
 

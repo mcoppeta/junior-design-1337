@@ -1,9 +1,9 @@
 """Contains common functions used in the Python Exodus Library."""
 
-import numpy as np
-from constants import LIB_VERSION_MINOR, LIB_VERSION_MAJOR, LIB_NAME
 from datetime import datetime
+import numpy as np
 from netCDF4 import stringtoarr
+from .constants import LIB_VERSION_MINOR, LIB_VERSION_MAJOR, LIB_NAME
 
 
 def c_print(line):

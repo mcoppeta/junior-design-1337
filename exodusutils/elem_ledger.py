@@ -1,6 +1,6 @@
 import numpy as np
-import util
-from element_block import ElementBlock
+from . import util
+from .element_block import ElementBlock
 
 
 # Ledger for both element blocks and elements

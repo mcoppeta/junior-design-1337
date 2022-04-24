@@ -1,12 +1,13 @@
 import pytest
 import numpy as np
-from exodus import Exodus
 from netCDF4 import Dataset
-import util
-from iterate import SampleFiles
+from exodusutils import util
+from exodusutils.exodus import Exodus
+from exodusutils.iterate import SampleFiles
 
 
 # Disables all warnings in this module
+
 pytestmark = pytest.mark.filterwarnings('ignore')
 
 
