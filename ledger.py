@@ -2,6 +2,10 @@ from ns_ledger import NSLedger
 from ss_ledger import SSLedger
 from elem_ledger import ElemLedger
 import netCDF4 as nc
+import datetime
+from constants import *
+import util
+import numpy as np
 
 
 class Ledger:
@@ -177,6 +181,19 @@ class Ledger:
             self.a_write(path)
 
     def w_write(self):
+        if 'len_name' not in self.ex.data.dimensions:
+            self.ex.data.createDimension('len_name', self._MAX_NAME_LENGTH + 1)
+        if 'four' not in self.ex.data.dimensions:
+            self.ex.data.createDimension('four', 4)
+
+        # QA records
+        num_qa_rec = 1
+        self.ex.data.createDimension('num_qa_rec', num_qa_rec)
+        var = self.ex.data.createVariable('qa_records', '|S1', (DIM_NUM_QA, DIM_FOUR, DIM_STRING_LENGTH))
+        qa = np.empty((num_qa_rec, 4, self.ex.max_allowed_name_length + 1), '|S1')  # add 1 for null terminator
+        qa[0] = util.generate_qa_rec(self.ex.max_string_length)
+        var[:] = qa
+
         self.nodeset_ledger.write_dimensions(self.ex.data)
         self.nodeset_ledger.write_variables(self.ex.data)
         self.sideset_ledger.write_dimensions(self.ex.data)
@@ -203,6 +220,10 @@ class Ledger:
             # ignore dimensions that will be written by elem ledger
             if dimension == "num_elem" or dimension == "num_el_blk" or dimension[:13] == "num_el_in_blk" \
                     or dimension[:14] == "num_nod_per_el" or dimension == "num_elem_var":
+                continue
+
+            # ignore for updating QA records
+            if dimension == 'num_qa_rec':
                 continue
 
             out.createDimension(dimension, old.dimensions[dimension].size)
@@ -239,6 +260,9 @@ class Ledger:
                     or var == "name_elem_var" or var[:13] == "vals_elem_var" or var == "elem_var_tab":
                 continue
 
+            if var == 'qa_records':
+                continue
+
             var_data = old[var]
 
             # variable creation data
@@ -248,6 +272,16 @@ class Ledger:
             out.createVariable(varname, datatype, dimensions)
             out[varname].setncatts(old[varname].__dict__)
             out[varname][:] = old[var][:]
+
+        
+        # QA records
+        num_qa_rec = self.ex.num_qa + 1
+        out.createDimension(DIM_NUM_QA, num_qa_rec)
+        out.createVariable(VAR_QA, '|S1', (DIM_NUM_QA, DIM_FOUR, DIM_STRING_LENGTH))
+        qa = np.empty((num_qa_rec, 4, self.ex.max_string_length + 1), '|S1')  # add 1 for null terminator
+        qa[0:self.ex.num_qa] = old.variables[VAR_QA][:]
+        qa[-1] = util.generate_qa_rec(self.ex.max_string_length)
+        out['qa_records'][:] = qa
 
         self.nodeset_ledger.write_variables(out)
         self.sideset_ledger.write_variables(out)
