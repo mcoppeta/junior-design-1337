@@ -1,18 +1,25 @@
+"""
+Selectors are used to select a subset of an Exodus file's features.
+
+These are used extensively in `exodusutils.output_subset`. See that documentation for more details on how to use
+members of this module.
+"""
+
 from __future__ import annotations  # use the magic of python 3.7 to let use write Exodus instead of "Exodus"
+from typing import TYPE_CHECKING
 
 from abc import ABC, abstractmethod
-from constants import *
 import warnings
+from .constants import *
 
 # Give us some handy type checking without creating cyclic imports at runtime
 # Its like preprocessor code, but not!
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # evaluates to false at runtime
-    from exodus import Exodus
+    from .exodus import Exodus
 
 
-class ObjectSelector(ABC):
+class _ObjectSelector(ABC):
     """Abstract base class of all selectors."""
 
     def __init__(self, exodus: Exodus, obj_id: int, obj_type: ObjectType):
@@ -24,7 +31,7 @@ class ObjectSelector(ABC):
 
 
 # TODO name support for variables?
-class ElementBlockSelector(ObjectSelector):
+class ElementBlockSelector(_ObjectSelector):
     """Selects a subset of an element block's components."""
 
     def __init__(self, exodus: Exodus, obj_id: int, elements=..., variables=..., attributes=...):
@@ -45,7 +52,7 @@ class ElementBlockSelector(ObjectSelector):
         :param variables: the variable indices to select (1-based)
         :param attributes: the attribute indices (1-based) or a list of attribute names to select
         """
-        ObjectSelector.__init__(self, exodus, obj_id, ELEMBLOCK)
+        _ObjectSelector.__init__(self, exodus, obj_id, ELEMBLOCK)
 
         if elements is None:
             self.elements = []
@@ -135,7 +142,7 @@ class ElementBlockSelector(ObjectSelector):
                 raise TypeError("attributes must contain either all strings or all integers!")
 
 
-class NodeSetSelector(ObjectSelector):
+class NodeSetSelector(_ObjectSelector):
     """Selects a subset of a node set's components."""
 
     def __init__(self, exodus: Exodus, obj_id: int, nodes=..., variables=...):
@@ -153,7 +160,7 @@ class NodeSetSelector(ObjectSelector):
         :param nodes: list of nodes to select within this set (1-based)
         :param variables: the variable indices to select (1-based)
         """
-        ObjectSelector.__init__(self, exodus, obj_id, NODESET)
+        _ObjectSelector.__init__(self, exodus, obj_id, NODESET)
 
         if nodes is None:
             self.nodes = []
@@ -198,7 +205,7 @@ class NodeSetSelector(ObjectSelector):
                 warnings.warn("Duplicate variables were automatically removed.")
 
 
-class SideSetSelector(ObjectSelector):
+class SideSetSelector(_ObjectSelector):
     """Selects a subset of a side set's components."""
 
     def __init__(self, exodus: Exodus, obj_id: int, sides=..., variables=...):
@@ -216,7 +223,7 @@ class SideSetSelector(ObjectSelector):
         :param sides: list of sides to select within this set (1-based)
         :param variables: the variable indices to select (1-based)
         """
-        ObjectSelector.__init__(self, exodus, obj_id, SIDESET)
+        _ObjectSelector.__init__(self, exodus, obj_id, SIDESET)
 
         if sides is None:
             self.sides = []

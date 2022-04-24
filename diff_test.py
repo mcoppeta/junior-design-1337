@@ -1,4 +1,4 @@
-from exodus import Exodus
+from exodusutils import Exodus
 
 if __name__ == "__main__":
     ex = Exodus("sample-files/cube_1ts_mod.e", 'r')

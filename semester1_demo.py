@@ -1,4 +1,4 @@
-from exodus import Exodus
+from exodusutils import  Exodus
 
 # first open the file
 ex = Exodus('sample-files/can copy.ex2', 'a')

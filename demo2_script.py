@@ -1,5 +1,4 @@
-from exodus import Exodus
-
+from exodusutils import Exodus
 
 # This part of the demo does the following:
 #   1. Create a new nodeset with id 99, containing the same nodes as ns2 (+X face)
