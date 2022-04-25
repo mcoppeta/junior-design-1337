@@ -1,11 +1,11 @@
 # Python Exodus Utilities
-A 100% Python-based library of processing tools for working with Exodus files  
-Created by GT Junior Design Team 1337 for Sandia National Labs  
+A 100% Python-based library of processing tools for working with Exodus files.
+Created by GT Junior Design Team 1337 for Sandia National Labs.
 
 **Team 1337:**  
 Michael Coppeta, Christoffer Rokholm, Allen Santmier, Christopher Turko, John Washburne
 
-## Release Notes for version 1.0.0
+## Release Notes for Version 1.0.0
 
 ### New Features
 - Read data from Exodus II file
