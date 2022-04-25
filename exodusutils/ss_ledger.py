@@ -334,10 +334,10 @@ class SSLedger:
 
         meet_criteria_elem = [] # will contain elements that make function True
         meet_criteria_side = [] # will contain faces of elements that make function True
-        meet_criteria_df = [] # will contain dsit. fact. of sides that make function True
+        meet_criteria_df = [] # will contain dist. fact. of sides that make function True
         not_met_elem = [] # will contain elements that make function False
         not_met_side = [] # will contain faces of elements that make function False
-        not_met_df = [] # will contain dsit. fact. of sides that make function False
+        not_met_df = [] # will contain dist. fact. of sides that make function False
 
         for i in range(self.ss_sizes[ndx]): # iterate through sides
             side_tuple = (elem_id_map[self.ss_elem[ndx][i] - 1], self.ss_sides[ndx][i]) # (element, face) tuple
