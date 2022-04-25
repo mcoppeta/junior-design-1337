@@ -314,7 +314,6 @@ class SSLedger:
     # User function should return boolean and take in tuple of (element, side).
     # Function provided here as a model for users to add other split_sideset functions
     # to library with more varied functionality
-    # TODO: known bug with bake.e sample file
     # TODO: handle sideset variables
     def split_sideset(self, old_ss, function, ss_id1, ss_id2, delete, ss_name1, ss_name2):
         # Get sideset that will be split
@@ -331,21 +330,24 @@ class SSLedger:
 
         num_df_per_side = int(self.num_dist_fact[ndx] / self.ss_sizes[ndx]) # find number of df per side, if 0 there are no df
 
-        meet_criteria_elem = []
-        meet_criteria_side = []
-        meet_criteria_df = []
-        not_met_elem = []
-        not_met_side = []
-        not_met_df = []
-        for i in range(self.ss_sizes[ndx]):
-            side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
-            if function(side_tuple):
+        elem_id_map = self.ex.get_elem_id_map() # get internal elem IDs
+
+        meet_criteria_elem = [] # will contain elements that make function True
+        meet_criteria_side = [] # will contain faces of elements that make function True
+        meet_criteria_df = [] # will contain dsit. fact. of sides that make function True
+        not_met_elem = [] # will contain elements that make function False
+        not_met_side = [] # will contain faces of elements that make function False
+        not_met_df = [] # will contain dsit. fact. of sides that make function False
+
+        for i in range(self.ss_sizes[ndx]): # iterate through sides
+            side_tuple = (elem_id_map[self.ss_elem[ndx][i] - 1], self.ss_sides[ndx][i]) # (element, face) tuple
+            if function(side_tuple): # if side makes user-specified function evaluate to True
                 meet_criteria_elem.append(side_tuple[0])
                 meet_criteria_side.append(side_tuple[1])
                 adjusted_i = i * num_df_per_side # adjust i to account for multiple df
                 if (num_df_per_side != 0):
                     meet_criteria_df.extend(range(adjusted_i,  adjusted_i + num_df_per_side))
-            else:
+            else: # if side makes user-specified function evaluate to False
                 not_met_elem.append(side_tuple[0])
                 not_met_side.append(side_tuple[1])
                 adjusted_i = i * num_df_per_side # adjust i to account for multiple df
@@ -375,7 +377,7 @@ class SSLedger:
            self.remove_sideset(old_ss)
 
     # Creates 2 new sidesets from sides in old sideset based on x-coordinate values.
-    # TODO: Test function more thoroughly, most testing informal and only on 'cube_its_mod.e' sample file
+    # TODO: Test function more thoroughly, most testing done informally
     def split_sideset_x_coords(self, old_ss, comparison, x_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
         # Set comparison that will be used
         if comparison == '<':
@@ -492,7 +494,7 @@ class SSLedger:
            self.remove_sideset(old_ss)
 
     # Creates 2 new sidesets from sides in old sideset based on y-coordinate values.
-    # TODO: Test function more thoroughly, most testing informal and only on 'cube_its_mod.e' sample file
+    # TODO: Test function more thoroughly, most testing done informally
     def split_sideset_y_coords(self, old_ss, comparison, y_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
         # Set comparison that will be used
         if comparison == '<':
@@ -520,7 +522,7 @@ class SSLedger:
             sides = ss[1]
             self.ss_elem[ndx] = np.array(elems)
             self.ss_sides[ndx] = np.array(sides)
-            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(old_ss))
+            self.ss_dist_fact[ndx] = np.array(self.get_side_set_df(old_ss))
             # for i in range(self.num_ss_var):
             #     if i == 0:
             #         self.ss_vars[ndx] = []
@@ -608,7 +610,7 @@ class SSLedger:
            self.remove_sideset(old_ss)
 
     # Creates 2 new sidesets from sides in old sideset based on z-coordinate values.
-    # TODO: Test function more thoroughly, most testing informal and only on 'cube_its_mod.e' sample file
+    # TODO: Test function more thoroughly, most testing done informally
     def split_sideset_z_coords(self, old_ss, comparison, z_value, all_nodes, ss_id1, ss_id2, delete, ss_name1, ss_name2):
         # Set comparison that will be used
         if comparison == '<':
@@ -637,7 +639,7 @@ class SSLedger:
             sides = ss[1]
             self.ss_elem[ndx] = np.array(elems)
             self.ss_sides[ndx] = np.array(sides)
-            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(old_ss))
+            self.ss_dist_fact[ndx] = np.array(self.get_side_set_df(old_ss))
             # for i in range(self.num_ss_var):
             #     if i == 0:
             #         self.ss_vars[ndx] = []
