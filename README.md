@@ -55,7 +55,7 @@ If the package is uploaded to pip, it can be installed and imported the same as 
 Import the Exodus class from the exodus.py module into a Python script. Open an Exodus file using the Exodus constructor and interact with the files using the methods outlined in the documentation file exodus.html
 
 ### Run Tests
-To run the tests using pytest, run the command `pytest` from the root directory (the one that contains the ‘tests’ folder). Pytest will automatically find all of the test files, run them, and report which tests failed.
+To run the tests using pytest, run the command `py -m pytest` on Windows or `python -m pytest` on Linux from the root directory (the one that contains the ‘tests’ folder). Pytest will automatically find all of the test files, run them, and report which tests failed.
 
 ### Troubleshooting
 - If you are missing dependencies, `pip install netCDF4` and `pip install numpy`.
