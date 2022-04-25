@@ -30,7 +30,7 @@ Michael Coppeta, Christoffer Rokholm, Allen Santmier, Christopher Turko, John Wa
 - Selector objects could potentially be used in read functions, but there is currently no support.
 - `output_subset` will not output data it does not recognize (things like assemblies won’t be carried over).
 - The library doesn’t cache function results, so repeat identical function calls are slower than they could be if caching was used.
-- `split_sideset` has known bugs (see behavior with `bake.e` sample file) and somewhat restricted functionality including a lack of support for side set variables. Coordinate-based side set splitting functions are also prone to bugs due to limited testing at time of release.
+- `split_sideset` has somewhat restricted functionality, including a lack of support for side set variables, but is provided as a model for how users can create their own functions for splitting side sets. Coordinate-based side set splitting functions are also prone to bugs due to limited testing at time of release.
 - Skinning has two main issues. First, the algorithm for eliminating duplicate faces will remove front/back faces because they share the same nodes. Second, it’s not clear whether TRI refers to triangle blocks or trishell blocks. The `skin` function currently takes a parameter so that it may be specified.  
 - Elemental attributes are not handled in a/w modes. If elements are changed in append mode, then attributes may not be retained correctly. 
 
