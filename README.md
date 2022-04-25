@@ -60,4 +60,5 @@ To run the tests using pytest, run the command `pytest` from the root directory 
 ### Troubleshooting
 - If you are missing dependencies, `pip install netCDF4` and `pip install numpy`.
 - If the tests will not run, make sure you are running `pytest` on the root directory and have pytest installed (`pip install pytest`).
+- If you are in append mode and a function does not give expected output, try closing the file and reopening it in read mode. Read mode is much simpler and less error-prone.
 

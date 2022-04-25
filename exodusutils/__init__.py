@@ -17,8 +17,27 @@ assembly.
 
 # Tutorial
 ## Opening and closing an Exodus II file
+To open an Exodus II file, create an instance of the `exodusutils.exodus.Exodus` class with the path to the file you want to open and the
+mode you want to open it in. Mode 'r' opens the file in read only mode and mode 'a' opens it for reading and writing.
+
+When you are done working with the Exodus II file, call the `close` function on the `Exodus` object. This both closes
+the object itself, meaning you cannot use it anymore, and closes access to the actual file on disk as well.
+
+```
+# Open the Exodus II file named "biplane.exo" in read mode located in the
+# directory "sample-files" relative to the script's directory
+ex = Exodus("sample-files/biplane.exo", 'r')
+# Print out the title attribute of the file
+print(ex.title)
+# ...
+# whatever other code you need to run
+# ...
+# We're done with the file, so close it
+ex.close()
+```
 ## Difference between two Exodus II files
 ## Output a subset of an Exodus II file
++
 ## Skinning a mesh
 ## Adding data to an Exodus II file
 ## Removing data from an Exodus II file
