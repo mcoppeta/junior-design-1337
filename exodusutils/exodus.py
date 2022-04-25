@@ -1417,7 +1417,7 @@ class Exodus:
                         j += 1
             if j >= num_eb:
                 raise ValueError("Invalid element number %d in side set %d!" % (elem, obj_id))
-            if side >= eb_params[j].num_sides:
+            if side > eb_params[j].num_sides:
                 raise ValueError("Invalid side number %d for element type %s in side set %d!" %
                                  (side, eb_params[j].elem_type_str, obj_id))
             ss_param_idx[i] = j
@@ -1743,7 +1743,7 @@ class Exodus:
             raise ValueError("Count must be a positive integer")
 
         if self.mode == 'w' or self.mode == 'a':
-            num_node_entry = self.ledger.get_num_nodes_per_el_block(internal_id)
+            num_node_entry = self.ledger.get_num_nodes_per_el_block(obj_id)
         elif (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
             num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
@@ -1752,7 +1752,7 @@ class Exodus:
         if num_node_entry > 0:
             try:
                 if self.mode == 'w' or self.mode == 'a':
-                    result = self.ledger.get_connectX(internal_id)[start - 1:start + count - 1]
+                    result = self.ledger.get_connectX(obj_id)[start - 1:start + count - 1]
                 else:
                     result = self.data.variables[VAR_CONNECT % internal_id][start - 1:start + count - 1]
 
@@ -1776,7 +1776,7 @@ class Exodus:
         # TODO this will be way faster with caching
         try:
             if self.mode == 'w' or self.mode == 'a':
-                num_entries = self.ledger.get_num_elem_in_block(internal_id)
+                num_entries = self.ledger.get_num_elem_in_block(obj_id)
             else:
                 num_entries = self.data.dimensions[DIM_NUM_EL_IN_BLK % internal_id].size
         except KeyError:
@@ -1784,7 +1784,7 @@ class Exodus:
                            .format(obj_id, DIM_NUM_EL_IN_BLK % internal_id))
         
         if self.mode == 'w' or self.mode == 'a':
-            num_node_entry = self.ledger.get_num_nodes_per_el_block(internal_id)
+            num_node_entry = self.ledger.get_num_nodes_per_el_block(obj_id)
         elif (DIM_NUM_NOD_PER_EL % internal_id) in self.data.dimensions:
             num_node_entry = self.data.dimensions[DIM_NUM_NOD_PER_EL % internal_id].size
         else:
@@ -1792,7 +1792,7 @@ class Exodus:
 
         try:
             if self.mode == 'w' or self.mode == 'a':
-                topology = self.ledger.get_elem_block_type(internal_id)
+                topology = self.ledger.get_elem_block_type(obj_id)
             if num_node_entry > 0:
                 connect = self.data.variables[VAR_CONNECT % internal_id]
                 topology = connect.getncattr(ATTR_ELEM_TYPE)

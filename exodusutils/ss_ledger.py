@@ -395,7 +395,6 @@ class SSLedger:
 
         # Get sideset that will be split
         ndx = self.find_sideset_num(old_ss)
-
         # if not loaded in yet, need to load in 
         if (self.ss_elem[ndx] is None):
             ss = self.ex.get_side_set(old_ss)
@@ -403,7 +402,7 @@ class SSLedger:
             sides = ss[1]
             self.ss_elem[ndx] = np.array(elems)
             self.ss_sides[ndx] = np.array(sides)
-            self.ss_dist_fact[ndx] = np.array(self.ex.get_side_set_df(old_ss))
+            self.ss_dist_fact[ndx] = np.array(self.get_side_set_df(old_ss))
             # for i in range(self.num_ss_var):
             #     if i == 0:
             #         self.ss_vars[ndx] = []
@@ -420,11 +419,13 @@ class SSLedger:
 
         ss_nodes = self.ex.get_side_set_node_list(old_ss)
 
+        elem_id_map = self.ex.get_elem_id_map()
+
         # Either add sides to new sideset if all nodes in a given side meet x-coord criteria
         if all_nodes:
             node_ndx = 0 # keep track of ID of current node in sideset
             for i in range(len(ss_nodes[1])):
-                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                side_tuple = (elem_id_map[self.ss_elem[ndx][i] - 1], self.ss_sides[ndx][i])
                 nodes_per_side = ss_nodes[1][i] # number of nodes in current side
                 flag = True # flag used to determine whether or not all nodes in the side meet criteria
                 for j in range(nodes_per_side):
@@ -448,7 +449,7 @@ class SSLedger:
         else:
             node_ndx = 0 # keep track of ID of current node in sideset
             for i in range(len(ss_nodes[1])):
-                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                side_tuple = (elem_id_map[self.ss_elem[ndx][i] - 1], self.ss_sides[ndx][i])
                 nodes_per_side = ss_nodes[1][i] # number of nodes in current side
                 flag = False # flag used to determine whether or not there is a node on side meeting criteria
                 for j in range(nodes_per_side):
@@ -473,7 +474,7 @@ class SSLedger:
             meet_criteria_df = [1] * len(meet_criteria_side)
         if len(not_met_df) == 0:
             not_met_df = [1] * len(not_met_side)
-
+        
         # If none of the sides meet the splitting criteria, don't create an empty sideset
         try:
             self.add_sideset(meet_criteria_elem, meet_criteria_side, ss_id1, ss_name1, meet_criteria_df)
@@ -511,7 +512,7 @@ class SSLedger:
 
         # Get sideset that will be split
         ndx = self.find_sideset_num(old_ss)
-
+        elem_id_map = self.ex.get_elem_id_map()
         # if not loaded in yet, need to load in 
         if (self.ss_elem[ndx] is None):
             ss = self.ex.get_side_set(old_ss)
@@ -540,7 +541,7 @@ class SSLedger:
         if all_nodes:
             node_ndx = 0 # keep track of ID of current node in sideset
             for i in range(len(ss_nodes[1])):
-                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                side_tuple = (elem_id_map[self.ss_elem[ndx][i] - 1], self.ss_sides[ndx][i])
                 nodes_per_side = ss_nodes[1][i] # number of nodes in current side
                 flag = True # flag used to determine whether or not all nodes in the side meet criteria
                 for j in range(nodes_per_side):
@@ -564,7 +565,7 @@ class SSLedger:
         else:
             node_ndx = 0 # keep track of ID of current node in sideset
             for i in range(len(ss_nodes[1])):
-                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                side_tuple = (elem_id_map[self.ss_elem[ndx][i] - 1], self.ss_sides[ndx][i])
                 nodes_per_side = ss_nodes[1][i] # number of nodes in current side
                 flag = False # flag used to determine whether or not there is a node on side meeting criteria
                 for j in range(nodes_per_side):
@@ -627,6 +628,7 @@ class SSLedger:
 
         # Get sideset that will be split
         ndx = self.find_sideset_num(old_ss)
+        elem_id_map = self.ex.get_elem_id_map()
 
         # if not loaded in yet, need to load in 
         if (self.ss_elem[ndx] is None):
@@ -656,7 +658,7 @@ class SSLedger:
         if all_nodes:
             node_ndx = 0 # keep track of ID of current node in sideset
             for i in range(len(ss_nodes[1])):
-                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                side_tuple = (elem_id_map[self.ss_elem[ndx][i] - 1], self.ss_sides[ndx][i])
                 nodes_per_side = ss_nodes[1][i] # number of nodes in current side
                 flag = True # flag used to determine whether or not all nodes in the side meet criteria
                 for j in range(nodes_per_side):
@@ -680,7 +682,7 @@ class SSLedger:
         else:
             node_ndx = 0 # keep track of ID of current node in sideset
             for i in range(len(ss_nodes[1])):
-                side_tuple = (self.ss_elem[ndx][i], self.ss_sides[ndx][i])
+                side_tuple = (elem_id_map[self.ss_elem[ndx][i] - 1], self.ss_sides[ndx][i])
                 nodes_per_side = ss_nodes[1][i] # number of nodes in current side
                 flag = False # flag used to determine whether or not there is a node on side meeting criteria
                 for j in range(nodes_per_side):
