@@ -1418,8 +1418,8 @@ class Exodus:
             if j >= num_eb:
                 raise ValueError("Invalid element number %d in side set %d!" % (elem, obj_id))
             if side > eb_params[j].num_sides:
-                raise ValueError("Invalid side number %d for element type %s of element number %d in side set %d!" %
-                                 (side, eb_params[j].elem_type_val, eb_params[j].num_sides, obj_id))
+                raise ValueError("Invalid side number %d for element type %s in side set %d!" %
+                                 (side, eb_params[j].elem_type_str, obj_id))
             ss_param_idx[i] = j
             ss_elem_node_idx[i] = eb_params[j].num_nodes_per_side[side - 1]
             node_ctr += eb_params[j].num_nodes_per_side[side - 1]
