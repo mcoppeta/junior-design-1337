@@ -2705,6 +2705,7 @@ class Exodus:
     ########################################################################
 
     def diff(self, other):
+        """Prints the number of some features in this file and another."""
         # # Nodesets
         selfNS = self.num_node_sets
         otherNS = other.num_node_sets

@@ -37,6 +37,14 @@ print(ex.title)
 ex.close()
 ```
 ## Difference between two Exodus II files
+To quickly view the difference between two `Exodus` objects you can use the `exodusutils.exodus.Exodus.diff` function.
+`diff` quickly prints out the number of certain features in the file. You can also use the more specific
+`exodusutils.exodus.Exodus.diff_nodeset` function to print out the differences between a node set in one file and a
+node set in another file. If the two Exodus files are similar, these functions will produce meaningful output, but
+for two completely different files, the output will likely not be of use.
+
+Of course, if these functions do not provide an ideal level of detail, you can always manually compare the data stored
+in two `Exodus` objects.
 ## Output a subset of an Exodus II file
 If you have a big Exodus file and want to work with only a part of the whole mesh, you can use
 `exodusutils.output_subset` to output a part of the mesh to a new file.
@@ -119,6 +127,20 @@ ex.write("sample-files/w/tail-skinned.exo")
 ex.close()
 ```
 ## Skinning a mesh
+In some cases, you may want to work with only the exterior faces of a mesh. Skinning a mesh creates a side set
+containing all the exterior faces of the mesh or selected element block. See the `exodusutils.exodus.Exodus.skin` and
+`exodusutils.exodus.Exodus.skin_element_block` functions for more information.
+
+To use the skinning functions, create the `Exodus` object in append mode. When the functions successfully complete, they
+will create a new side set with the specified ID and name. Remember to call the `write` function afterwards in order to
+write these changes to a new Exodus II file.
+
+Exodus II files are inconsistent in the definition of some topographical features, especially tris. When calling a skin
+function, you can specify whether the "TRI" prefix of an element block's topography attribute refers to a normal TRI or
+a TRISHELL.
+
+The skinning functions may encounter problems with certain element types, namely shells. If an element block does not
+skin properly, it may be due to an unsupported element type.
 """
 
 from .exodus import Exodus
