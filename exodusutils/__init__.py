@@ -45,6 +45,22 @@ for two completely different files, the output will likely not be of use.
 
 Of course, if these functions do not provide an ideal level of detail, you can always manually compare the data stored
 in two `Exodus` objects.
+
+```
+ex = Exodus("sample-files/can.ex2", 'r')
+ex2 = Exodus("sample-files/cube_1ts_mod.e", 'r')
+
+# Prints to console some differences between the two models
+ex.diff(ex2)
+
+# Prints to console the overlap and differences between
+# nodeset 1 of ex, and nodeset 2 of ex2
+ex.diff_nodeset(1, ex2, 2)
+
+ex.close()
+ex2.close()
+```
+
 ## Output a subset of an Exodus II file
 If you have a big Exodus file and want to work with only a part of the whole mesh, you can use
 `exodusutils.output_subset` to output a part of the mesh to a new file.
