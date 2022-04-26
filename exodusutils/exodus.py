@@ -2677,10 +2677,6 @@ class Exodus:
 
     # endregion
 
-    def close(self):
-        """Close the Exodus II file."""
-        self.data.close()
-
     ########################################################################
     #                                                                      #
     #                Data Processing Helper Utilities                      #
@@ -2698,38 +2694,9 @@ class Exodus:
                 return index
         return None
 
-    # TODO remove?
-    def set_nodeset(self, node_set_id, node_ids):
-        ndx = node_set_id - 1
-        if "ns_prop1" in self.data.variables:
-            ndx = numpy.where(self.data.variables["ns_prop1"][:] == node_set_id)[0][0]
-            ndx += 1
-
-        key = "node_ns" + str(ndx)
-        nodeset = self.data[key]
-
-        if "node_num_map" in self.data.variables:
-            indices = numpy.zeros(len(node_ids))
-            i = 0
-            for id in node_ids:
-                ndx = numpy.where(self.data["node_num_map"][:] == id)[0][0]
-                indices[i] = ndx
-                i += 1
-            nodeset[:] = indices
-            return
-        nodeset[:] = node_ids
-
-    # TODO remove?
-    def get_nodes_in_elblock(self, id):
-        if self.mode == 'w' or self.mode == 'a':
-            return self.ledger.get_connectX(id)
-
-        if "node_num_map" in self.data.variables:
-            raise Exception("Using node num map")
-        nodeids = self.data["connect" + str(id)]
-        # flatten it into 1d
-        nodeids = nodeids[:].flatten()
-        return nodeids
+    def close(self):
+        """Close the Exodus II file."""
+        self.data.close()
 
     ########################################################################
     #                                                                      #
@@ -2738,6 +2705,7 @@ class Exodus:
     ########################################################################
 
     def diff(self, other):
+        """Prints the number of some features in this file and another."""
         # # Nodesets
         selfNS = self.num_node_sets
         otherNS = other.num_node_sets
@@ -3067,7 +3035,7 @@ class Exodus:
         self.ledger.skin(skin_id, skin_name, tri)
         
     def write(self, path=None):
-        """ Write out the exodus object to a file. New path must be specified while in write mode """
+        """Write out the Exodus object to a new file."""
         if self.mode != 'w' and self.mode != 'a':
             raise PermissionError("Need to be in write or append mode to write")
         elif self.mode == 'a' and path is None:
