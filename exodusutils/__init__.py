@@ -86,7 +86,6 @@ eb_sels = [ElementBlockSelector(ex, 1), ElementBlockSelector(ex, 3), ElementBloc
 output_subset(ex, "sample-files/w/tail.exo", "Biplane Tail", eb_sels, [], [], PropertySelector(ex))
 ex.close()
 ```
-## Skinning a mesh
 ## Adding/Removing/Modifying data in an Exodus II file
 To alter an Exodus II file, create the `Exodus` object in append mode (mode='a'). In read mode, calling any functions
 that modify the file will cause an error to be thrown. Any modifications you make to the file will only be stored in
@@ -106,6 +105,7 @@ creation of new side sets.
 ex = Exodus("sample-files/w/tail.exo", 'a')
 # Skin the whole mesh and output the side set containing all exterior faces to
 # a new side set with ID 3312
+# To learn more about skinning, see the tutorial on skinning a mesh
 ex.skin(3312, 'Skinned Mesh')
 # Split the newly created side set 3312 into side set 1111 containing only
 # faces entirely to the right of x=0.849 and 222 containing those to the
@@ -118,6 +118,7 @@ ex.write("sample-files/w/tail-skinned.exo")
 # without losing our progress
 ex.close()
 ```
+## Skinning a mesh
 """
 
 from .exodus import Exodus
